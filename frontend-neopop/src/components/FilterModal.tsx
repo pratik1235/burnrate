@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ElevatedCard } from '@cred/neopop-web/lib/components';
+import { ElevatedCard, InputField } from '@cred/neopop-web/lib/components';
 import { Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { Button } from '@cred/neopop-web/lib/components';
 import { CloseButton } from '@/components/CloseButton';
@@ -110,7 +111,7 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
   if (!open) return null;
 
   const inputStyle = {
-    backgroundColor: '#121212',
+    backgroundColor: colorPalette.black[100],
     border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: 8,
     padding: '10px 12px',
@@ -144,7 +145,7 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
       />
 
       <ElevatedCard
-        backgroundColor="#161616"
+        backgroundColor={colorPalette.black[90]}
         style={{
           position: 'relative',
           width: '100%',
@@ -167,7 +168,7 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
             fontType={FontType.BODY}
             fontSize={18}
             fontWeight={FontWeights.BOLD}
-            color="#ffffff"
+            color={mainColors.white}
           >
             Filters
           </Typography>

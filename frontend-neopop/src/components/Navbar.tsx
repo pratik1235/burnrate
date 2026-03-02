@@ -1,4 +1,5 @@
 import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { Settings } from 'lucide-react';
 
@@ -20,7 +21,7 @@ export function Navbar({ activeTab = 'dashboard', onTabChange, className }: Navb
   return (
     <nav
       style={{
-        backgroundColor: '#121212',
+        backgroundColor: colorPalette.black[100],
         borderBottom: '1px solid rgba(255,255,255,0.1)',
         padding: '0 24px',
         height: 56,
@@ -36,7 +37,7 @@ export function Navbar({ activeTab = 'dashboard', onTabChange, className }: Navb
     >
       <div style={{ position: 'absolute', left: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
         <img src="/burnrate-logo.svg" alt="" width={24} height={24} style={{ display: 'block' }} />
-        <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.BOLD} color="#ffffff" style={{ letterSpacing: '-0.02em' }}>
+        <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em' }}>
           burnrate
         </Typography>
       </div>

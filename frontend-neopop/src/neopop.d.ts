@@ -24,6 +24,41 @@ declare module '@cred/neopop-web/lib/components' {
   export const ToastContainer: ComponentType<any>;
 }
 
+declare module '@cred/neopop-web/lib/primitives' {
+  export const colorPalette: {
+    black: Record<number, string>;
+    popBlack: Record<number, string>;
+    rss: Record<number, string>;
+    error: Record<number, string>;
+    success: Record<number, string>;
+    poliPurple: Record<number, string>;
+    pinkPong: Record<number, string>;
+    mannna: Record<number, string>;
+    neoPaccha: Record<number, string>;
+    yoyo: Record<number, string>;
+    info: Record<number, string>;
+    warning: Record<number, string>;
+    skyBlue: Record<number, string>;
+    aqua: Record<number, string>;
+    goldRush: Record<number, string>;
+    indigo: Record<number, string>;
+    mint: Record<number, string>;
+    brown: Record<number, string>;
+    cyan: Record<number, string>;
+    magenta: Record<number, string>;
+    lavender: Record<number, string>;
+    charcoal: Record<number, string>;
+  };
+  export const mainColors: {
+    black: string;
+    white: string;
+    red: string;
+    green: string;
+    yellow: string;
+    blue?: string;
+  };
+}
+
 declare module '@cred/neopop-web/lib/components/Typography/types' {
   export enum FontType {
     HEADING = 'heading',

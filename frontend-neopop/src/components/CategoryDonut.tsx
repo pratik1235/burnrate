@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { Typography } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { formatCurrency } from '@/lib/utils';
 import type { CategoryBreakdown } from '@/lib/types';
 import { CATEGORY_CONFIG, CATEGORY_COLORS } from '@/lib/types';
@@ -33,25 +34,19 @@ function CustomTooltip({
   return (
     <div
       style={{
-        backgroundColor: '#161616',
+        backgroundColor: colorPalette.black[90],
         borderRadius: 8,
         padding: '8px 12px',
         border: '1px solid rgba(255,255,255,0.1)',
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
       }}
     >
-      <p
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color,
-        }}
-      >
+      <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.SEMI_BOLD} color={color}>
         {catMap[category]?.name ?? config?.label ?? category}
-      </p>
-      <p style={{ color: '#ffffff', fontSize: 14, fontWeight: 600 }}>
+      </Typography>
+      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
         {formatCurrency(entry.value as number)}
-      </p>
+      </Typography>
     </div>
   );
 }
@@ -76,7 +71,7 @@ export function CategoryDonut({ data, className }: CategoryDonutProps) {
       style={{ padding: 20, minWidth: 280, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
       className={className}
     >
-      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff" style={{ marginBottom: 16 }}>
+      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white} style={{ marginBottom: 16 }}>
         Where your money goes
       </Typography>
 
@@ -127,12 +122,12 @@ export function CategoryDonut({ data, className }: CategoryDonutProps) {
                   fontType={FontType.BODY}
                   fontSize={12}
                   fontWeight={FontWeights.REGULAR}
-                  color="#ffffff"
+                  color={mainColors.white}
                   style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                 >
                   {catMap[entry.category]?.name ?? config?.label ?? entry.category}
                 </Typography>
-                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff" style={{ flexShrink: 0 }}>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white} style={{ flexShrink: 0 }}>
                   {pct}%
                 </Typography>
               </div>

@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Lock } from 'lucide-react';
-import { Button, Typography } from '@cred/neopop-web/lib/components';
-import { FontType } from '@cred/neopop-web/lib/components/Typography/types';
+import { Upload, CheckCircle2, AlertCircle, Loader2, Lock } from 'lucide-react';
+import { Button, Typography, InputField } from '@cred/neopop-web/lib/components';
+import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 
 type UploadStatus = 'idle' | 'uploading' | 'success' | 'error' | 'password_needed';
 
@@ -109,31 +110,22 @@ export function StatUpload({ onUpload, className, compact = false }: StatUploadP
         className={className}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Lock size={18} color="#FF8744" />
-          <Typography fontType={FontType.BODY} fontSize={14} color="#FF8744">
+          <Lock size={18} color={colorPalette.rss[500]} />
+          <Typography fontType={FontType.BODY} fontSize={14} color={colorPalette.rss[500]}>
             {resultMessage}
           </Typography>
         </div>
         <Typography fontType={FontType.BODY} fontSize={12} color="rgba(255,255,255,0.5)">
           {fileName}
         </Typography>
-        <input
+        <InputField
+          colorMode="dark"
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handlePasswordRetry()}
           placeholder="e.g. PRAT1508 or DDMMYYYY"
+          value={password}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handlePasswordRetry()}
           autoFocus
-          style={{
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 8,
-            padding: '10px 14px',
-            color: '#fff',
-            fontSize: 14,
-            outline: 'none',
-            fontFamily: 'monospace',
-          }}
         />
         <div style={{ display: 'flex', gap: 8 }}>
           <Button
@@ -171,22 +163,22 @@ export function StatUpload({ onUpload, className, compact = false }: StatUploadP
     uploading: {
       icon: Loader2,
       text: `Processing ${fileName}...`,
-      color: '#FF8744',
+      color: colorPalette.rss[500],
     },
     success: {
       icon: CheckCircle2,
       text: resultMessage || `${fileName} uploaded successfully`,
-      color: '#06C270',
+      color: mainColors.green,
     },
     error: {
       icon: AlertCircle,
       text: resultMessage || 'Upload failed. Try again.',
-      color: '#EE4D37',
+      color: mainColors.red,
     },
     password_needed: {
       icon: Lock,
       text: '',
-      color: '#FF8744',
+      color: colorPalette.rss[500],
     },
   };
 
@@ -197,7 +189,7 @@ export function StatUpload({ onUpload, className, compact = false }: StatUploadP
     <div
       {...getRootProps()}
       style={{
-        border: `2px dashed ${isDragActive ? '#FF8744' : 'rgba(255,255,255,0.2)'}`,
+        border: `2px dashed ${isDragActive ? colorPalette.rss[500] : 'rgba(255,255,255,0.2)'}`,
         borderRadius: 12,
         padding: compact ? 16 : 32,
         display: 'flex',
@@ -222,11 +214,11 @@ export function StatUpload({ onUpload, className, compact = false }: StatUploadP
           ...(status === 'uploading' ? { animation: 'spin 1s linear infinite' } : {}),
         }}
       />
-      <p style={{ color: current.color, fontSize: 14, fontWeight: 500, margin: 0 }}>
+      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color={current.color} style={{ margin: 0 }}>
         {current.text}
-      </p>
+      </Typography>
       {!compact && status === 'idle' && (
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>PDF files only</p>
+        <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.4)" style={{ marginTop: 4 }}>PDF files only</Typography>
       )}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>

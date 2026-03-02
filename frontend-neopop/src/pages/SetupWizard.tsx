@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { mainColors } from '@cred/neopop-web/lib/primitives';
 import { toast } from '@/components/Toast';
 import { SetupForm, type SetupFormInitialData } from '@/components/SetupForm';
 import { submitSetup, useSettings } from '@/hooks/useApi';
@@ -12,7 +13,7 @@ const PageWrapper = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #0d0d0d;
+  background-color: ${mainColors.black};
   padding: 24px;
   position: relative;
 `;

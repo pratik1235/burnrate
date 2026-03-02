@@ -5,6 +5,7 @@ import { CreditCardVisual } from '@/components/CreditCardVisual';
 import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
 import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { useCards, useAnalytics } from '@/hooks/useApi';
 import { deleteCard } from '@/lib/api';
@@ -16,7 +17,7 @@ import styled from 'styled-components';
 
 const PageLayout = styled.div`
   min-height: 100vh;
-  background-color: #0d0d0d;
+  background-color: ${mainColors.black};
 `;
 
 const Content = styled.main`
@@ -69,7 +70,7 @@ const RemoveButton = styled.button`
   background: rgba(238, 77, 55, 0.15);
   border: 1px solid rgba(238, 77, 55, 0.4);
   border-radius: 8px;
-  color: #ee4d37;
+  color: ${mainColors.red};
   cursor: pointer;
   transition: background 0.2s;
   flex-shrink: 0;
@@ -178,7 +179,7 @@ export function Cards() {
             fontType={FontType.HEADING}
             fontSize={24}
             fontWeight={FontWeights.BOLD}
-            color="#ffffff"
+            color={mainColors.white}
             style={{ letterSpacing: '-0.02em' }}
           >
             Your Cards
@@ -256,7 +257,7 @@ export function Cards() {
                       fontType={FontType.BODY}
                       fontSize={18}
                       fontWeight={FontWeights.BOLD}
-                      color="#ffffff"
+                      color={mainColors.white}
                     >
                       {formatCurrency(card.spend)}
                     </Typography>

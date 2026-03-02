@@ -1,4 +1,5 @@
 import { Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { Lightbulb } from 'lucide-react';
 
@@ -32,13 +33,13 @@ export function InsightCard({ text, className }: InsightCardProps) {
             marginTop: 2,
           }}
         >
-          <Lightbulb size={16} color="#FF8744" />
+          <Lightbulb size={16} color={colorPalette.rss[500]} />
         </div>
         <div>
-          <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="#FF8744" style={{ marginBottom: 4 }}>
+          <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color={colorPalette.rss[500]} style={{ marginBottom: 4 }}>
             Fun Insight
           </Typography>
-          <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="#ffffff" style={{ lineHeight: 1.6 }}>
+          <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color={mainColors.white} style={{ lineHeight: 1.6 }}>
             {text}
           </Typography>
         </div>

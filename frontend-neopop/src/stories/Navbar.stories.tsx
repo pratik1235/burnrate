@@ -14,7 +14,6 @@ export const Default: Story = {
   args: {
     activeTab: 'dashboard',
     onTabChange: (tab) => console.log('Tab:', tab),
-    onSearchClick: () => console.log('Search'),
   },
 };
 
@@ -22,6 +21,5 @@ export const TransactionsActive: Story = {
   args: {
     activeTab: 'transactions',
     onTabChange: (tab) => console.log('Tab:', tab),
-    onSearchClick: () => console.log('Search'),
   },
 };

@@ -1,4 +1,5 @@
 import { Typography } from '@cred/neopop-web/lib/components';
+import { mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { CreditCard } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -32,7 +33,7 @@ export function CardWidget({ bank, last4, totalSpend, transactionCount, classNam
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: config.color,
-              color: 'white',
+              color: mainColors.white,
               fontWeight: 700,
               fontSize: 14,
             }}
@@ -40,7 +41,7 @@ export function CardWidget({ bank, last4, totalSpend, transactionCount, classNam
             {config.logo}
           </div>
           <div>
-            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               {config.name}
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)">
@@ -51,7 +52,7 @@ export function CardWidget({ bank, last4, totalSpend, transactionCount, classNam
         <CreditCard size={18} color="rgba(255,255,255,0.5)" />
       </div>
 
-      <Typography fontType={FontType.BODY} fontSize={24} fontWeight={FontWeights.BOLD} color="#ffffff" style={{ marginBottom: 4 }}>
+      <Typography fontType={FontType.BODY} fontSize={24} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ marginBottom: 4 }}>
         {formatCurrency(totalSpend)}
       </Typography>
       <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)">

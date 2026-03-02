@@ -1,5 +1,6 @@
 import { formatCurrency } from '@/lib/utils';
 import { Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import type { MerchantSpend } from '@/lib/types';
 
@@ -16,7 +17,7 @@ export function TopMerchants({ data, className }: TopMerchantsProps) {
       style={{ padding: 20, minWidth: 280, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
       className={className}
     >
-      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff" style={{ marginBottom: 16 }}>
+      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white} style={{ marginBottom: 16 }}>
         Top Merchants
       </Typography>
 
@@ -25,15 +26,15 @@ export function TopMerchants({ data, className }: TopMerchantsProps) {
           const widthPct = (merchant.amount / maxAmount) * 100;
           return (
             <div key={merchant.merchant} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.BOLD} color="#FF8744" style={{ width: 24, textAlign: 'right' }}>
+              <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.BOLD} color={colorPalette.rss[500]} style={{ width: 24, textAlign: 'right' }}>
                 {i + 1}
               </Typography>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="#ffffff" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color={mainColors.white} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {merchant.merchant}
                   </Typography>
-                  <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color="#ffffff" style={{ marginLeft: 8 }}>
+                  <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color={mainColors.white} style={{ marginLeft: 8 }}>
                     {formatCurrency(merchant.amount)}
                   </Typography>
                 </div>
@@ -50,7 +51,7 @@ export function TopMerchants({ data, className }: TopMerchantsProps) {
                     style={{
                       height: '100%',
                       width: `${widthPct}%`,
-                      backgroundColor: '#FF8744',
+                      backgroundColor: colorPalette.rss[500],
                       borderRadius: 4,
                       transition: 'width 0.5s',
                     }}

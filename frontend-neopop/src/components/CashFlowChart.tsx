@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { Typography } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { formatCurrencyCompact, formatCurrency } from '@/lib/utils';
 
 interface CashFlowData {
@@ -27,17 +28,17 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
   return (
     <div
       style={{
-        backgroundColor: '#161616',
+        backgroundColor: colorPalette.black[90],
         borderRadius: 8,
         padding: '8px 12px',
         border: '1px solid rgba(255,255,255,0.1)',
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
       }}
     >
-      <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginBottom: 4 }}>{label}</p>
-      <p style={{ color: '#ffffff', fontSize: 14, fontWeight: 600 }}>
+      <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)" style={{ marginBottom: 4 }}>{label}</Typography>
+      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
         {formatCurrency(payload[0].value as number)}
-      </p>
+      </Typography>
     </div>
   );
 }
@@ -49,7 +50,7 @@ export function CashFlowChart({ data, className }: CashFlowChartProps) {
       className={className}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+        <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
           Cash Flow
         </Typography>
         <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -61,7 +62,7 @@ export function CashFlowChart({ data, className }: CashFlowChartProps) {
         <BarChart data={data} barCategoryGap="25%">
           <defs>
             <linearGradient id="neopopBarGradient" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stopColor="#FF8744" stopOpacity={0.85} />
+              <stop offset="0%" stopColor={colorPalette.rss[500]} stopOpacity={0.85} />
               <stop offset="100%" stopColor="#FFAB7C" stopOpacity={1} />
             </linearGradient>
           </defs>

@@ -84,6 +84,10 @@ Open http://localhost:5173 in your browser.
 |-----------|-----------|
 | ![](screenshots/screenshot_customize.png) | ![](screenshots/screenshot_categories_modal.png) |
 
+| Setup |
+|-------|
+| ![](screenshots/screenshot_setup.png) |
+
 ## Project Structure
 
 ```

@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils';
 import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
 import { Button, SearchBar } from '@cred/neopop-web/lib/components';
 import { Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { SlidersHorizontal, Download } from 'lucide-react';
 import { CloseButton } from '@/components/CloseButton';
@@ -16,7 +17,7 @@ import styled from 'styled-components';
 
 const PageLayout = styled.div`
   min-height: 100vh;
-  background-color: #0D0D0D;
+  background-color: ${mainColors.black};
 `;
 
 const Content = styled.main`
@@ -255,7 +256,7 @@ function TransactionsContent() {
                   top: '100%',
                   right: 0,
                   marginTop: 6,
-                  background: '#1a1a1a',
+                  background: colorPalette.popBlack[300],
                   border: '1px solid rgba(255,255,255,0.15)',
                   borderRadius: 8,
                   padding: '6px 10px',
@@ -282,8 +283,8 @@ function TransactionsContent() {
               colorConfig={{
                 border: 'rgba(255,255,255,0.2)',
                 activeBorder: '#ffffff',
-                backgroundColor: searchQuery ? '#ffffff' : 'rgba(255,255,255,0.05)',
-                closeIcon: '#FF8744',
+                backgroundColor: searchQuery ? mainColors.white : 'rgba(255,255,255,0.05)',
+                closeIcon: colorPalette.rss[500],
               }}
             />
             </CompactSearchWrapper>
@@ -331,12 +332,17 @@ function TransactionsContent() {
               {safeTotal} transaction{safeTotal !== 1 ? 's' : ''}
             </Typography>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+              <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
                 {formatCurrency(totalAmount)} spent
               </Typography>
               {totalAmount < 0 && (
                 <div style={{ position: 'relative', display: 'inline-flex' }}>
-                  <span
+                  <Typography
+                    as="span"
+                    fontType={FontType.BODY}
+                    fontSize={11}
+                    fontWeight={FontWeights.REGULAR}
+                    color="rgba(255,255,255,0.5)"
                     style={{
                       width: 18,
                       height: 18,
@@ -345,15 +351,13 @@ function TransactionsContent() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 11,
-                      color: 'rgba(255,255,255,0.5)',
                       cursor: 'help',
                     }}
                     onMouseEnter={() => setTooltipVisible(true)}
                     onMouseLeave={() => setTooltipVisible(false)}
                   >
                     ?
-                  </span>
+                  </Typography>
                   {tooltipVisible && (
                     <div
                       style={{
@@ -362,7 +366,7 @@ function TransactionsContent() {
                         left: '50%',
                         transform: 'translateX(-50%)',
                         marginBottom: 6,
-                        background: '#1a1a1a',
+                        background: colorPalette.popBlack[300],
                         border: '1px solid rgba(255,255,255,0.15)',
                         borderRadius: 8,
                         padding: '8px 12px',

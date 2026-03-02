@@ -1,5 +1,6 @@
 import { formatCurrency } from '@/lib/utils';
 import { Typography } from '@cred/neopop-web/lib/components';
+import { mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import type { Bank } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
@@ -25,7 +26,7 @@ export function CardComparison({ data, period, className }: CardComparisonProps)
       className={className}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+        <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
           Card Comparison
         </Typography>
         <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -47,7 +48,7 @@ export function CardComparison({ data, period, className }: CardComparisonProps)
                       height: 24,
                       borderRadius: 6,
                       backgroundColor: config.color,
-                      color: 'white',
+                      color: mainColors.white,
                       fontSize: 10,
                       fontWeight: 700,
                       display: 'flex',
@@ -58,7 +59,7 @@ export function CardComparison({ data, period, className }: CardComparisonProps)
                     {config.logo}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                    <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color="#ffffff">
+                    <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color={mainColors.white}>
                       {config.name}
                     </Typography>
                     <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -66,7 +67,7 @@ export function CardComparison({ data, period, className }: CardComparisonProps)
                     </Typography>
                   </div>
                 </div>
-                <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color="#ffffff">
+                <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color={mainColors.white}>
                   {formatCurrency(card.amount)}
                 </Typography>
               </div>

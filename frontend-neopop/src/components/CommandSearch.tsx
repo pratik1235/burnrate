@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { ElevatedCard } from '@cred/neopop-web/lib/components';
+import { ElevatedCard, InputField } from '@cred/neopop-web/lib/components';
 import { Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { Button } from '@cred/neopop-web/lib/components';
 import { Search } from 'lucide-react';
@@ -71,7 +72,7 @@ export function CommandSearch({ open, onClose, onSearch, className }: CommandSea
       />
 
       <ElevatedCard
-        backgroundColor="#161616"
+        backgroundColor={colorPalette.black[90]}
         style={{
           position: 'relative',
           width: '100%',
@@ -91,22 +92,16 @@ export function CommandSearch({ open, onClose, onSearch, className }: CommandSea
           }}
         >
           <Search size={18} color="rgba(255,255,255,0.5)" style={{ flexShrink: 0 }} />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search transactions..."
-            style={{
-              flex: 1,
-              backgroundColor: 'transparent',
-              border: 'none',
-              outline: 'none',
-              fontSize: 14,
-              color: '#ffffff',
-            }}
-          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <InputField
+              colorMode="dark"
+              placeholder="Search transactions..."
+              value={query}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleSearch()}
+              inputRef={inputRef}
+            />
+          </div>
           <CloseButton onClick={onClose} variant="transparent" />
         </div>
 
@@ -143,7 +138,7 @@ export function CommandSearch({ open, onClose, onSearch, className }: CommandSea
           <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
             Type to search by merchant, amount, or description
           </Typography>
-          <kbd style={{ fontSize: 12, backgroundColor: '#121212', border: '1px solid rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace', color: 'rgba(255,255,255,0.5)' }}>
+          <kbd style={{ fontSize: 12, backgroundColor: colorPalette.black[100], border: '1px solid rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace', color: 'rgba(255,255,255,0.5)' }}>
             esc
           </kbd>
         </div>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
-import { Button, Typography, ElevatedCard, Tag } from '@cred/neopop-web/lib/components';
+import { Button, Typography, ElevatedCard, Tag, InputField, Row, Column } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import {
   getStatements,
@@ -19,13 +19,14 @@ import {
 import type { Statement } from '@/lib/types';
 import type { CategoryResponse, TagDefinitionResponse } from '@/lib/api';
 import { toast } from '@/components/Toast';
-import { RefreshCw, Palette, X, Trash2, Tag as TagIcon } from 'lucide-react';
+import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus } from 'lucide-react';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { CloseButton } from '@/components/CloseButton';
 import styled from 'styled-components';
 
 const PageLayout = styled.div`
   min-height: 100vh;
-  background-color: #0D0D0D;
+  background-color: ${mainColors.black};
 `;
 
 const Content = styled.main`
@@ -104,27 +105,11 @@ const StyledInput = styled.input`
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
-  color: #ffffff;
+  color: ${mainColors.white};
   font-size: 14px;
 
   &::placeholder {
     color: rgba(255, 255, 255, 0.4);
-  }
-`;
-
-const ColorInputWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  input[type='color'] {
-    width: 40px;
-    height: 40px;
-    padding: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    cursor: pointer;
-    background: transparent;
   }
 `;
 
@@ -157,21 +142,26 @@ const CategoryTable = styled.table`
     font-weight: 500;
   }
 
-  input {
-    width: 100%;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    color: #ffffff;
-    font-size: 13px;
+  tbody tr {
+    background: transparent;
   }
 
-  input:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  tbody tr td input:disabled {
+    opacity: 0.7;
   }
 `;
+
+const inputStyle = {
+  backgroundColor: colorPalette.black[100],
+  border: '1px solid rgba(255,255,255,0.2)',
+  borderRadius: 8,
+  padding: '10px 12px',
+  fontSize: 14,
+  color: '#ffffff',
+  outline: 'none' as const,
+  width: '100%',
+  colorScheme: 'dark' as const,
+};
 
 function DefineTagsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tags, setTags] = useState<TagDefinitionResponse[]>([]);
@@ -229,7 +219,7 @@ function DefineTagsModal({ open, onClose }: { open: boolean; onClose: () => void
     <ModalOverlay>
       <ModalBackdrop onClick={onClose} />
       <ElevatedCard
-        backgroundColor="#161616"
+        backgroundColor={colorPalette.black[90]}
         style={{
           position: 'relative',
           width: '100%',
@@ -248,7 +238,7 @@ function DefineTagsModal({ open, onClose }: { open: boolean; onClose: () => void
             borderBottom: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color="#ffffff">
+          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
             Define Tags
           </Typography>
           <CloseButton onClick={onClose} variant="modal" />
@@ -264,12 +254,21 @@ function DefineTagsModal({ open, onClose }: { open: boolean; onClose: () => void
               value={newTagName}
               onChange={(e) => setNewTagName(e.target.value.slice(0, 12))}
               placeholder="Tag name (max 12 chars)"
-              style={{ flex: 1 }}
+              style={{ flex: 1, ...inputStyle, borderRadius: 0, padding: '0px 0px 0px 10px', fontSize: 16, fontWeight: FontWeights.MEDIUM, backgroundColor: colorPalette.black[100] }}
             />
+            {/* <div style={{ flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Tag name (max 12 chars)"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value.slice(0, 12))}
+                style={inputStyle}
+              />
+            </div> */}
             <Button
               variant="secondary"
               kind="flat"
-              size="medium"
+              size="small"
               colorMode="dark"
               onClick={handleAdd}
               disabled={tags.length >= 20 || !newTagName.trim()}
@@ -278,7 +277,7 @@ function DefineTagsModal({ open, onClose }: { open: boolean; onClose: () => void
             </Button>
           </div>
 
-          <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff" style={{ marginBottom: 12 }}>
+          <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white} style={{ marginBottom: 12 }}>
             Tags ({tags.length}/20)
           </Typography>
 
@@ -299,7 +298,7 @@ function DefineTagsModal({ open, onClose }: { open: boolean; onClose: () => void
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: 'rgba(255,255,255,0.5)',
+                      color: colorPalette.black[50],
                       cursor: 'pointer',
                       padding: 2,
                       display: 'flex',
@@ -407,7 +406,7 @@ function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: () => v
     <ModalOverlay>
       <ModalBackdrop onClick={onClose} />
       <ElevatedCard
-        backgroundColor="#161616"
+        backgroundColor={colorPalette.black[90]}
         style={{
           position: 'relative',
           width: '100%',
@@ -426,7 +425,7 @@ function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: () => v
             borderBottom: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color="#ffffff">
+          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
             Reparse / Remove Statements
           </Typography>
           <CloseButton onClick={onClose} variant="modal" />
@@ -469,9 +468,9 @@ function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: () => v
                     gap: 8,
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Column alignItems="stretch" gap={5}>
+                      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
                         {s.bank.toUpperCase()} ...{s.cardLast4}
                       </Typography>
                       <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 2 }}>
@@ -480,8 +479,9 @@ function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: () => v
                       <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 2 }}>
                         {s.transactionCount} transactions
                       </Typography>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    </Column>
+                    <Column alignItems="center" gap={2}>
+                    <Row alignItems='center' justifyContent="space-evenly" gap={20}>
                       <Button
                         variant="primary"
                         kind="elevated"
@@ -489,10 +489,16 @@ function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: () => v
                         colorMode="dark"
                         onClick={() => handleReparse(s.id)}
                         disabled={!!actioning}
-                        style={{ minWidth: 'auto' }}
+                        style={{ minWidth: 'auto', marginRight: 10 }}
                       >
-                        <RefreshCw size={14} style={{ marginRight: 4 }} />
-                        Refresh
+                        <Row
+                          gap={4}
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <RefreshCw size={14} style={{ marginRight: 5 }} />
+                          Refresh
+                        </Row>
                       </Button>
                       <Button
                         variant="secondary"
@@ -503,14 +509,21 @@ function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: () => v
                         disabled={!!actioning}
                         style={{
                           minWidth: 'auto',
-                          color: '#ee4d37',
+                          color: mainColors.red,
                           borderColor: 'rgba(238,77,55,0.4)',
                         }}
                       >
+                        <Row
+                          gap={4}
+                          alignItems="center"
+                          justifyContent="center"
+                        >
                         <Trash2 size={14} style={{ marginRight: 4 }} />
                         Remove
+                        </Row>
                       </Button>
-                    </div>
+                    </Row>
+                    </Column>
                   </div>
                 </div>
               ))}
@@ -522,12 +535,141 @@ function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: () => v
   );
 }
 
+const CATEGORY_COLORS = [
+  { name: 'Orange', value: colorPalette.rss[500] },
+  { name: 'Purple', value: colorPalette.poliPurple[500] },
+  { name: 'Pink', value: colorPalette.pinkPong[500] },
+  { name: 'Yellow', value: colorPalette.mannna[500] },
+  { name: 'Lime', value: colorPalette.neoPaccha[500] },
+  { name: 'Violet', value: colorPalette.yoyo[500] },
+  { name: 'Red', value: mainColors.red },
+  { name: 'Green', value: mainColors.green },
+  { name: 'Blue', value: colorPalette.info[500] },
+  { name: 'Warn', value: colorPalette.warning[500] },
+  { name: 'Gray', value: colorPalette.black[50] },
+  { name: 'Teal', value: colorPalette.success[300] },
+];
+
+function ColorPickerPopover({
+  selectedColor,
+  onSelect,
+  onClose,
+}: {
+  selectedColor: string;
+  onSelect: (color: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 200 }}
+        onClick={onClose}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: '100%',
+          left: '-100%',
+          right: 50,
+          marginTop: 4,
+          marginRight: 50,
+          zIndex: 201,
+          background: colorPalette.black[100],
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 12,
+          padding: 12,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(6, 1fr)',
+          gap: 8,
+          width: 'max-content',
+        }}
+      >
+        {CATEGORY_COLORS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            onClick={() => {
+              onSelect(c.value);
+              onClose();
+            }}
+            title={c.name}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              backgroundColor: c.value,
+              border: selectedColor === c.value
+                ? `2px solid ${mainColors.white}`
+                : '2px solid transparent',
+              cursor: 'pointer',
+              padding: 0,
+              outline: 'none',
+              transition: 'border-color 0.15s',
+            }}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ColorPickerButton({
+  color,
+  onSelect,
+}: {
+  color: string;
+  onSelect: (color: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 8,
+          padding: '6px 10px',
+          cursor: 'pointer',
+          outline: 'none',
+        }}
+      >
+        <span
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            backgroundColor: color,
+            display: 'inline-block',
+            flexShrink: 0,
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}
+        />
+        <Palette size={14} color="rgba(255,255,255,0.5)" />
+      </button>
+      {open && (
+        <ColorPickerPopover
+          selectedColor={color}
+          onSelect={onSelect}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 function DefineCategoriesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [edits, setEdits] = useState<Record<string, { name?: string; keywords?: string; color?: string }>>({});
-  const [newRow, setNewRow] = useState({ name: '', keywords: '', color: '#FF8744' });
+  const [newRow, setNewRow] = useState({ name: '', keywords: '', color: colorPalette.rss[500] });
 
   useEffect(() => {
     if (open) {
@@ -601,7 +743,7 @@ function DefineCategoriesModal({ open, onClose }: { open: boolean; onClose: () =
         color: newRow.color,
       });
       setCategories((prev) => [...prev, cat].sort((a, b) => (a.is_prebuilt === b.is_prebuilt ? 0 : a.is_prebuilt ? 1 : -1) || a.name.localeCompare(b.name)));
-      setNewRow({ name: '', keywords: '', color: '#FF8744' });
+      setNewRow({ name: '', keywords: '', color: colorPalette.rss[500] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to add category');
     }
@@ -648,7 +790,7 @@ function DefineCategoriesModal({ open, onClose }: { open: boolean; onClose: () =
 
   const handleCancel = () => {
     setEdits({});
-    setNewRow({ name: '', keywords: '', color: '#FF8744' });
+    setNewRow({ name: '', keywords: '', color: colorPalette.rss[500] });
     onClose();
   };
 
@@ -658,7 +800,7 @@ function DefineCategoriesModal({ open, onClose }: { open: boolean; onClose: () =
     <ModalOverlay>
       <ModalBackdrop onClick={onClose} />
       <ElevatedCard
-        backgroundColor="#161616"
+        backgroundColor={colorPalette.black[90]}
         style={{
           position: 'relative',
           width: '100%',
@@ -671,27 +813,27 @@ function DefineCategoriesModal({ open, onClose }: { open: boolean; onClose: () =
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             justifyContent: 'space-between',
             padding: '16px 20px',
             borderBottom: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color="#ffffff">
+          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
             Customize Categories
           </Typography>
           <CloseButton onClick={onClose} variant="modal" />
         </div>
 
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 20, backgroundColor: colorPalette.black[90] }}>
           <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }}>
             Transactions which don&apos;t belong to your custom categories would fall back to pre-built categories.
           </Typography>
-          <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="#FF8744" style={{ marginBottom: 20 }}>
+          <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color={colorPalette.rss[500]} style={{ marginBottom: 20 }}>
             Do not create custom categories for credit card bill payments.
           </Typography>
 
-          <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff" style={{ marginBottom: 12 }}>
+          <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white} style={{ marginBottom: 12 }}>
             Categories ({categories.length} total, {customCount} custom / 20 max)
           </Typography>
 
@@ -706,88 +848,101 @@ function DefineCategoriesModal({ open, onClose }: { open: boolean; onClose: () =
                   <th>Name</th>
                   <th>Keywords</th>
                   <th>Color</th>
+                  <th style={{ width: 48 }} />
                 </tr>
               </thead>
               <tbody>
                 {categories.map((cat) => (
                   <tr key={cat.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          value={edits[cat.id]?.name ?? cat.name}
-                          onChange={(e) => setEdit(cat.id, 'name', e.target.value)}
-                          disabled={cat.is_prebuilt}
-                          placeholder="Name"
-                          style={{ flex: 1 }}
-                        />
-                        {!cat.is_prebuilt && (
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(cat)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ee4d37',
-                              cursor: 'pointer',
-                              padding: 4,
-                              flexShrink: 0,
-                            }}
-                            aria-label={`Delete ${cat.name}`}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <input
-                        value={edits[cat.id]?.keywords ?? cat.keywords}
-                        onChange={(e) => setEdit(cat.id, 'keywords', e.target.value)}
-                        placeholder="Keywords (comma-separated)"
+                      <InputField
+                        colorMode="dark"
+                        placeholder="Name"
+                        style={{ fontWeight: FontWeights.SEMI_BOLD, fontSize: 16 }}
+                        value={edits[cat.id]?.name ?? cat.name}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEdit(cat.id, 'name', e.target.value)}
+                        disabled={cat.is_prebuilt}
                       />
                     </td>
                     <td>
-                      <ColorInputWrapper>
-                        <input
-                          type="color"
-                          value={edits[cat.id]?.color ?? cat.color}
-                          onChange={(e) => setEdit(cat.id, 'color', e.target.value)}
-                        />
-                        <input
-                          type="text"
-                          value={edits[cat.id]?.color ?? cat.color}
-                          onChange={(e) => setEdit(cat.id, 'color', e.target.value)}
-                          style={{ width: 90 }}
-                        />
-                      </ColorInputWrapper>
+                      <InputField
+                        colorMode="dark"
+                        placeholder="Keywords (comma-separated)"
+                        style={{ fontWeight: FontWeights.MEDIUM, fontSize: 14, minWidth: 250 }}
+                        value={edits[cat.id]?.keywords ?? cat.keywords}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEdit(cat.id, 'keywords', e.target.value)}
+                      />
+                    </td>
+                    
+                    <td>
+                      <div style={{ minWidth: 20 }}></div>
+                      <div style={{ marginRight: 100 }}></div>
+                      <ColorPickerButton
+                        color={edits[cat.id]?.color ?? cat.color}
+                        onSelect={(c) => setEdit(cat.id, 'color', c)}
+                      />
+                    </td>
+                    <td>
+                      {!cat.is_prebuilt && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(cat)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: mainColors.red,
+                            cursor: 'pointer',
+                            padding: 4,
+                            display: 'flex',
+                            alignItems: 'center',
+                            marginRight: 10,
+                            marginLeft: -20,
+                          }}
+                          aria-label={`Delete ${cat.name}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
                 <tr>
                   <td>
-                    <input
-                      value={newRow.name}
-                      onChange={(e) => setNewRow((r) => ({ ...r, name: e.target.value.slice(0, 50) }))}
+                    <InputField
+                      colorMode="dark"
                       placeholder="New category name"
+                      value={newRow.name}
+                      style={{ fontWeight: FontWeights.SEMI_BOLD, fontSize: 16 }}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRow((r) => ({ ...r, name: e.target.value.slice(0, 50) }))}
                     />
                   </td>
                   <td>
-                    <input
-                      value={newRow.keywords}
-                      onChange={(e) => setNewRow((r) => ({ ...r, keywords: e.target.value }))}
+                    <InputField
+                      colorMode="dark"
+                      style={{ fontWeight: FontWeights.SEMI_BOLD, fontSize: 14 }}
                       placeholder="Keywords (comma-separated)"
+                      value={newRow.keywords}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRow((r) => ({ ...r, keywords: e.target.value }))}
                     />
                   </td>
                   <td>
-                    <ColorInputWrapper>
-                      <input type="color" value={newRow.color} onChange={(e) => setNewRow((r) => ({ ...r, color: e.target.value }))} />
-                      <input
-                        type="text"
-                        value={newRow.color}
-                        onChange={(e) => setNewRow((r) => ({ ...r, color: e.target.value }))}
-                        style={{ width: 90 }}
-                      />
-                    </ColorInputWrapper>
+                    <ColorPickerButton
+                      color={newRow.color}
+                      onSelect={(c) => setNewRow((r) => ({ ...r, color: c }))}
+                    />
+                  </td>
+                  <td>
+                    <Button
+                      variant="primary"
+                      kind="elevated"
+                      size="small"
+                      colorMode="dark"
+                      onClick={handleAdd}
+                      disabled={customCount >= 20 || !newRow.name.trim()}
+                      style={{  minWidth: 'auto', marginRight: 10, marginLeft: -40 }}
+                    >
+                      <Plus size={16} />
+                    </Button>
                   </td>
                 </tr>
               </tbody>
@@ -799,15 +954,15 @@ function DefineCategoriesModal({ open, onClose }: { open: boolean; onClose: () =
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: 12,
-                padding: '16px 20px',
+                padding: '20px 20px 0px 20px',
                 borderTop: '1px solid rgba(255,255,255,0.1)',
               }}
             >
-              <Button variant="primary" kind="elevated" size="small" colorMode="dark" onClick={handleCancel}>
+              <Button variant="secondary" kind="elevated" size="small" colorMode="dark" onClick={handleCancel}>
                 Cancel
               </Button>
               <Button
-                variant="secondary"
+                variant="primary"
                 kind="elevated"
                 size="small"
                 colorMode="dark"
@@ -835,8 +990,8 @@ export function Customize() {
       <Content>
         <CardsGrid>
           <FeatureCard onClick={() => setTagsModalOpen(true)}>
-            <TagIcon size={24} color="#FF8744" />
-            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+            <TagIcon size={24} color={colorPalette.rss[500]} />
+            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Define Tags
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -845,8 +1000,8 @@ export function Customize() {
           </FeatureCard>
 
           <FeatureCard onClick={() => setReparseModalOpen(true)}>
-            <RefreshCw size={24} color="#FF8744" />
-            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+            <RefreshCw size={24} color={colorPalette.rss[500]} />
+            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Reparse/Remove Statements
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -855,8 +1010,8 @@ export function Customize() {
           </FeatureCard>
 
           <FeatureCard onClick={() => setCategoriesModalOpen(true)}>
-            <Palette size={24} color="#FF8744" />
-            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+            <Palette size={24} color={colorPalette.rss[500]} />
+            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Customize Categories
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">

@@ -1,10 +1,17 @@
 * {
   box-sizing: border-box;
 }
+
+/* Ensure text content is selectable */
+body {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;
-  background-color: #0D0D0D;
+  background-color: #0d0d0d;
   color: #ffffff;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   min-height: 100vh;

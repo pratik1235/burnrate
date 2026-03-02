@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@cred/neopop-web/lib/components';
+import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
+import { mainColors } from '@cred/neopop-web/lib/primitives';
 import { Calendar } from 'lucide-react';
 
 type Preset = 'this_month' | '3_months' | '6_months' | '1_year' | 'custom';
@@ -56,7 +58,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
 
       {showCustom && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-          <Calendar size={16} color="#ffffff" />
+          <Calendar size={16} color={mainColors.white} />
           <input
             type="date"
             className="filter-date-input"
@@ -76,7 +78,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
               colorScheme: 'dark',
             }}
           />
-          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>to</span>
+          <Typography as="span" fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">to</Typography>
           <input
             type="date"
             className="filter-date-input"

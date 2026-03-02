@@ -13,6 +13,7 @@ import { uploadStatement, getStatementPeriods } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/Toast';
 import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { ElevatedCard } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { SlidersHorizontal } from 'lucide-react';
@@ -22,7 +23,7 @@ import styled from 'styled-components';
 
 const PageLayout = styled.div`
   min-height: 100vh;
-  background-color: #0D0D0D;
+  background-color: ${mainColors.black};
 `;
 
 const Content = styled.main`
@@ -73,7 +74,7 @@ const Skeleton = styled.div<{ width?: string; height?: string }>`
 `;
 
 const StyledLink = styled(Link)`
-  color: #FF8744;
+  color: ${colorPalette.rss[500]};
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -145,7 +146,7 @@ function StatementPeriodsModal({
         onClick={onClose}
       />
       <ElevatedCard
-        backgroundColor="#161616"
+        backgroundColor={colorPalette.black[90]}
         style={{
           position: 'relative',
           width: '100%',
@@ -164,7 +165,7 @@ function StatementPeriodsModal({
             borderBottom: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color="#ffffff">
+          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
             Statement Periods
           </Typography>
           <CloseButton onClick={onClose} variant="modal" />
@@ -200,7 +201,7 @@ function StatementPeriodsModal({
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   <div style={{ flex: 1 }}>
-                    <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+                    <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
                       {p.bank.toUpperCase()} ...{p.cardLast4}
                     </Typography>
                     <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 2 }}>
@@ -208,7 +209,7 @@ function StatementPeriodsModal({
                     </Typography>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.BOLD} color="#FF8744">
+                    <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.BOLD} color={colorPalette.rss[500]}>
                       {formatCurrency(p.totalAmountDue ?? 0)}
                     </Typography>
                   </div>
@@ -389,7 +390,7 @@ function DashboardContent() {
 
         <Section>
           <SectionHeader>
-            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Your Cards
             </Typography>
           </SectionHeader>
@@ -419,7 +420,7 @@ function DashboardContent() {
 
         <Section>
           <SectionHeader>
-            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Cash Flow
             </Typography>
           </SectionHeader>
@@ -436,7 +437,7 @@ function DashboardContent() {
 
         <Section>
           <SectionHeader>
-            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff">
+            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Recent Transactions
             </Typography>
             <StyledLink to="/transactions">View all</StyledLink>

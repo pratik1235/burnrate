@@ -14,13 +14,14 @@ import { useAnalytics } from '@/hooks/useApi';
 import { CATEGORY_CONFIG } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { SlidersHorizontal, Gauge, TrendingUp, Wallet } from 'lucide-react';
 import styled from 'styled-components';
 
 const PageLayout = styled.div`
   min-height: 100vh;
-  background-color: #0D0D0D;
+  background-color: ${mainColors.black};
 `;
 
 const Content = styled.main`
@@ -274,12 +275,12 @@ function AnalyticsContent() {
         <MetricsRow>
           <div style={{ padding: 20, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <Wallet size={18} color="#FF8744" />
+              <Wallet size={18} color={colorPalette.rss[500]} />
               <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)">
                 Total Spends
               </Typography>
             </div>
-            <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color="#ffffff" style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
+            <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
               {formatCurrency(summary?.totalSpend ?? 0)}
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -289,7 +290,7 @@ function AnalyticsContent() {
 
           <div style={{ padding: 20, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <Gauge size={18} color="#FF8744" />
+              <Gauge size={18} color={colorPalette.rss[500]} />
               <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)">
                 Credit Utilization
               </Typography>
@@ -300,20 +301,20 @@ function AnalyticsContent() {
               </Typography>
             ) : (
               <>
-                <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color="#ffffff" style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
+                <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
                   {creditUtilization.ratio}%
                 </Typography>
                 <div style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
                   <div style={{
                     height: '100%',
                     width: `${creditUtilization.ratio}%`,
-                    backgroundColor: creditUtilization.ratio > 75 ? '#EE4D37' : creditUtilization.ratio > 50 ? '#EAB308' : '#06C270',
+                    backgroundColor: creditUtilization.ratio > 75 ? mainColors.red : creditUtilization.ratio > 50 ? colorPalette.warning[500] : mainColors.green,
                     borderRadius: 3,
                     transition: 'width 0.5s',
                   }} />
                 </div>
                 <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
-                  {formatCurrency(creditUtilization.spend)} out of {formatCurrency(creditUtilization.limit)} × {creditUtilization.months}
+                  {formatCurrency(creditUtilization.spend)} out of {formatCurrency(creditUtilization.limit)} × {creditUtilization.months} month{creditUtilization.months === 1 ? '' : 's'}
                 </Typography>
               </>
             )}
@@ -321,12 +322,12 @@ function AnalyticsContent() {
 
           <div style={{ padding: 20, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <TrendingUp size={18} color="#06C270" />
+              <TrendingUp size={18} color={mainColors.green} />
               <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)">
                 Avg Monthly Spend
               </Typography>
             </div>
-            <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color="#ffffff" style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
+            <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
               {formatCurrency(avgMonthlySpend)}
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Typography, Tag } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { formatCurrency } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
 import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
@@ -129,17 +130,18 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
             fontType={FontType.BODY}
             fontSize={14}
             fontWeight={FontWeights.SEMI_BOLD}
-            color="#ffffff"
-            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}
+            color={mainColors.white}
+            style={{ overflow: 'visible', marginRight: '10em', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: '10.5em', maxWidth: 'calc(100% - 35em)', flex: 1 }}
           >
             {transaction.merchant}
           </Typography>
+          
           {tags.length > 0 && (
             <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', overflow: 'hidden', flexShrink: 0 }}>
               {tags.map((tag) => (
                 <Tag
                   key={tag}
-                  colorConfig={{ background: 'rgba(255,135,68,0.15)', color: '#FF8744' }}
+                  colorConfig={{ background: 'rgba(255,135,68,0.15)', color: colorPalette.rss[500] }}
                   colorMode="dark"
                 >
                   {tag}
@@ -155,16 +157,17 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
                   setDropdownOpen(!dropdownOpen);
                 }}
                 style={{
-                  fontSize: 11,
-                  padding: '2px 8px',
-                  borderRadius: 4,
+                  padding: '1px 8px 1px 8px',
+                  borderRadius: 0,
                   border: '1px solid rgba(255,255,255,0.15)',
-                  color: 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   backgroundColor: 'rgba(255,255,255,0.05)',
+                  position: 'relative',
                 }}
               >
-                Tag Transaction ▾
+                <Typography as="span" fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                  Tag Transaction ▾
+                </Typography>
               </span>
               {dropdownOpen && (
                 <div
@@ -173,7 +176,7 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
                     top: '100%',
                     left: 0,
                     marginTop: 4,
-                    background: '#1a1a1a',
+                    background: colorPalette.popBlack[300],
                     border: '1px solid rgba(255,255,255,0.15)',
                     borderRadius: 8,
                     padding: 4,
@@ -202,7 +205,7 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
                           cursor: disabled ? 'not-allowed' : 'pointer',
                           borderRadius: 4,
                           fontSize: 12,
-                          color: disabled ? 'rgba(255,255,255,0.3)' : '#ffffff',
+                          color: disabled ? 'rgba(255,255,255,0.3)' : mainColors.white,
                           backgroundColor: isSelected ? 'rgba(255,135,68,0.15)' : 'transparent',
                           display: 'flex',
                           alignItems: 'center',
@@ -221,20 +224,22 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
 
         {/* Category row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-          <span
+          <Typography
+            as="span"
+            fontType={FontType.BODY}
+            fontSize={12}
+            fontWeight={FontWeights.MEDIUM}
+            color={catColor}
             style={{
-              fontSize: 12,
               padding: '2px 8px',
               borderRadius: 12,
-              fontWeight: 500,
               backgroundColor: `${catColor}30`,
-              color: catColor,
               cursor: isCcPayment ? 'help' : 'default',
             }}
             title={isCcPayment ? 'Credit card payments are not included in spends calculation' : undefined}
           >
             {catLabel}
-          </span>
+          </Typography>
           {isCcPayment && (
             <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
               Not included in spends
@@ -250,7 +255,7 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
           fontType={FontType.BODY}
           fontSize={14}
           fontWeight={FontWeights.SEMI_BOLD}
-          color={isCredit ? '#06C270' : '#ffffff'}
+          color={isCredit ? mainColors.green : mainColors.white}
         >
           {isCredit ? '+' : '-'}{formatCurrency(transaction.amount)}
         </Typography>

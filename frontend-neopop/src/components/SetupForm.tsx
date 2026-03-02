@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@cred/neopop-web/lib/components';
+import { Button, InputField, Row, VerticalSpacer } from '@cred/neopop-web/lib/components';
 import { Typography } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import type { Bank } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
@@ -105,19 +106,19 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
         alignItems: 'center',
         justifyContent: 'center',
         padding: 24,
-        backgroundColor: '#0D0D0D',
+        backgroundColor: mainColors.black,
       }}
       className={className}
     >
       <div style={{ width: '100%', maxWidth: 448, boxSizing: 'border-box' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
-            <CreditCard size={28} color="#FF8744" />
-            <Typography fontType={FontType.BODY} fontSize={24} fontWeight={FontWeights.BOLD} color="#ffffff" style={{ letterSpacing: '-0.02em' }}>
+            <CreditCard size={28} color={colorPalette.rss[500]} />
+            <Typography fontType={FontType.BODY} fontSize={24} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em' }}>
               burnrate
             </Typography>
           </div>
-          <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color="#ffffff" style={{ marginBottom: 8 }}>
+          <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white} style={{ marginBottom: 8 }}>
             Let's make sense of your spends.
           </Typography>
           <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)">
@@ -128,7 +129,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
         <form onSubmit={handleSubmit} style={{ boxSizing: 'border-box' }}>
           <div
             style={{
-              backgroundColor: '#161616',
+              backgroundColor: colorPalette.black[90],
               borderRadius: 16,
               padding: 24,
               display: 'flex',
@@ -142,24 +143,14 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
             }}
           >
             <div style={{ overflow: 'hidden', minWidth: 0 }}>
-              <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.6)" style={{ marginBottom: 6 }}>
-                Your name (as on card)
-              </Typography>
-              <input
+              <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.6)" style={{ marginBottom: 6 }}>
+                Your name as on card</Typography>
+              <InputField
+                colorMode="dark"
+                placeholder="Your Name"
+                style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', fontWeight: FontWeights.MEDIUM, padding: '10px 12px 5px 12px', border: `1px solid rgba(255,255,255,0.2)`, borderRadius: 8, fontSize: 18, color: '#ffffff', outline: 'visible' }}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Pratik Prakash"
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  color: '#ffffff',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  outline: 'none',
-                  fontSize: 14,
-                }}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
               />
             </div>
 
@@ -170,14 +161,14 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 8, overflow: 'hidden' }}>
                 <input
                   value={dobDay}
-                  onChange={(e) => setDobDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDobDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
                   placeholder="DD"
                   maxLength={2}
                   style={{
                     width: '100%',
                     minWidth: 0,
                     boxSizing: 'border-box',
-                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.05)',
                     color: '#ffffff',
                     padding: '10px 12px',
                     borderRadius: 8,
@@ -189,14 +180,14 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                 />
                 <input
                   value={dobMonth}
-                  onChange={(e) => setDobMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDobMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
                   placeholder="MM"
                   maxLength={2}
                   style={{
                     width: '100%',
                     minWidth: 0,
                     boxSizing: 'border-box',
-                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.05)',
                     color: '#ffffff',
                     padding: '10px 12px',
                     borderRadius: 8,
@@ -208,14 +199,14 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                 />
                 <input
                   value={dobYear}
-                  onChange={(e) => setDobYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDobYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="YYYY"
                   maxLength={4}
                   style={{
                     width: '100%',
                     minWidth: 0,
                     boxSizing: 'border-box',
-                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.05)',
                     color: '#ffffff',
                     padding: '10px 12px',
                     borderRadius: 8,
@@ -242,7 +233,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                         flex: 1,
                         minWidth: 0,
                         boxSizing: 'border-box',
-                        backgroundColor: 'rgba(255,255,255,0.05)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.05)',
                         color: '#ffffff',
                         padding: '10px 12px',
                         borderRadius: 8,
@@ -259,28 +250,31 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                       ))}
                     </select>
                     <div style={{ position: 'relative' }}>
-                      <span
+                      <Typography
+                        as="span"
+                        fontType={FontType.BODY}
+                        fontSize={12}
+                        fontWeight={FontWeights.REGULAR}
+                        color="rgba(255,255,255,0.5)"
                         style={{
                           position: 'absolute',
                           left: 12,
                           top: '50%',
                           transform: 'translateY(-50%)',
-                          fontSize: 12,
-                          color: 'rgba(255,255,255,0.5)',
                         }}
                       >
                         ····
-                      </span>
+                      </Typography>
                       <input
                         value={card.last4}
-                        onChange={(e) => updateCard(index, 'last4', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCard(index, 'last4', e.target.value.replace(/\D/g, '').slice(0, 4))}
                         placeholder="1234"
                         maxLength={4}
                         style={{
                           width: 96,
                           paddingLeft: 40,
                           boxSizing: 'border-box',
-                          backgroundColor: 'rgba(255,255,255,0.05)',
+                          backgroundColor: 'rgba(0, 0, 0, 0.05)',
                           color: '#ffffff',
                           padding: '10px 12px 10px 40px',
                           borderRadius: 8,
@@ -302,7 +296,6 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                           background: 'none',
                           border: 'none',
                           color: 'rgba(255,255,255,0.5)',
-                          padding: 4,
                           minWidth: 32,
                         }}
                       >
@@ -312,6 +305,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                   </div>
                 ))}
               </div>
+              <div style={{ height: 3 }} />
               <Button
                 type="button"
                 variant="primary"
@@ -325,40 +319,34 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                   alignItems: 'center',
                   gap: 6,
                   fontSize: 12,
-                  color: '#FF8744',
+                  color: colorPalette.rss[500],
                   background: 'none',
                   border: 'none',
                   alignSelf: 'flex-start',
+                  maxWidth: 180,
                 }}
               >
-                <Plus size={14} />
-                Add another card
+                <Row alignItems="center" gap={4}>
+                  <Plus size={14} style={{ marginRight: 4 }} />
+                  Add another card
+                </Row>
+                
               </Button>
             </div>
 
             <div style={{ overflow: 'hidden', minWidth: 0 }}>
-              <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.6)" style={{ marginBottom: 6 }}>
-                Watch folder for new statements
-              </Typography>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input
-                  value={watchFolder}
-                  onChange={(e) => setWatchFolder(e.target.value)}
-                  placeholder="~/Documents/Statements"
-                  style={{
-                    flex: 1,
-                    minWidth: 120,
-                    boxSizing: 'border-box',
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    color: '#ffffff',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    outline: 'none',
-                    fontSize: 14,
-                  }}
-                />
-                <Button type="button" variant="primary" kind="elevated" size="small" colorMode="dark" onClick={handleBrowse}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ flex: 1, minWidth: 120 }}>
+                <InputField
+                    colorMode="dark"
+                    placeholder="Path to statements folder"
+                    label="Watch folder for new statements"
+                    style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', fontWeight: FontWeights.MEDIUM, padding: '10px 12px 5px 12px', border: `1px solid rgba(255,255,255,0.2)`, borderRadius: 8, fontSize: 14, color: '#ffffff', outline: 'visible' }}
+                    value={watchFolder}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWatchFolder(e.target.value)}
+                  />
+                </div>
+                <Button type="button" variant="primary" kind="elevated" size="medium" colorMode="dark" onClick={handleBrowse}>
                   <FolderOpen size={14} style={{ marginRight: 4 }} />
                   Browse
                 </Button>

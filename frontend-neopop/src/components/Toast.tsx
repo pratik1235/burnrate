@@ -2,6 +2,7 @@ import {
   showToast as neoShowToast,
   ToastContainer as NeoToastContainer,
 } from '@cred/neopop-web/lib/components';
+import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 
 export { NeoToastContainer as ToastContainer };
 
@@ -11,7 +12,7 @@ export const toast = {
       type: 'success',
       dismissOnClick: true,
       autoCloseTime: _duration ?? 4000,
-      colorConfig: { background: '#06C270', color: '#ffffff' },
+      colorConfig: { background: mainColors.green, color: mainColors.white },
     });
   },
   error: (message: string, _duration?: number) => {
@@ -19,7 +20,7 @@ export const toast = {
       type: 'error',
       dismissOnClick: true,
       autoCloseTime: _duration ?? 5000,
-      colorConfig: { background: '#EE4D37', color: '#ffffff' },
+      colorConfig: { background: mainColors.red, color: mainColors.white },
     });
   },
   info: (message: string, _duration?: number) => {
@@ -27,7 +28,7 @@ export const toast = {
       type: 'warning',
       dismissOnClick: true,
       autoCloseTime: _duration ?? 4000,
-      colorConfig: { background: '#FF8744', color: '#ffffff' },
+      colorConfig: { background: colorPalette.rss[500], color: mainColors.white },
     });
   },
   loading: (message: string) => {
@@ -35,7 +36,7 @@ export const toast = {
       type: 'warning',
       dismissOnClick: false,
       autoCloseTime: 0,
-      colorConfig: { background: '#FF8744', color: '#ffffff' },
+      colorConfig: { background: colorPalette.rss[500], color: mainColors.white },
     });
     return message;
   },

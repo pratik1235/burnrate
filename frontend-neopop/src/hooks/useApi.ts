@@ -3,7 +3,6 @@ import type { Category } from '@/lib/types';
 import {
   getSettings,
   setupProfile,
-  updateSettings,
   getTransactions as apiGetTransactions,
   getCards as apiGetCards,
   getSummary,
