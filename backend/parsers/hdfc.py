@@ -177,14 +177,21 @@ class HDFCParser(BaseParser):
         transactions: List[ParsedTransaction] = []
         seen: set = set()
 
+        # Normalize all lines once
+        cleaned: List[str] = []
         for raw_line in lines:
             line = raw_line.strip()
             if not line:
+                cleaned.append("")
                 continue
-
             line = re.sub(r"\(cid:\d+\)", " ", line)
             line = re.sub(r"\s+", " ", line).strip()
+            cleaned.append(line)
 
+        # --- Pass 1: standard single-line transactions (original logic) ---
+        for line in cleaned:
+            if not line:
+                continue
             tx = self._parse_transaction_line(line)
             if tx:
                 key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type)
@@ -192,7 +199,65 @@ class HDFCParser(BaseParser):
                     seen.add(key)
                     transactions.append(tx)
 
+        # --- Pass 2: multi-line transactions (e.g. UPI RuPay CC payments) ---
+        # Some HDFC card statements (e.g. RuPay cards) put the description
+        # on the line(s) ABOVE the date+amount line. When pass 1 extracts a
+        # transaction with an empty merchant ("Unknown"), look backwards for
+        # the description.
+        self._fixup_multiline_transactions(cleaned, transactions)
+
         return transactions
+
+    def _fixup_multiline_transactions(
+        self,
+        cleaned: List[str],
+        transactions: List[ParsedTransaction],
+    ) -> None:
+        """For transactions with 'Unknown' merchant, look backwards in the
+        source lines to find the description. This handles HDFC RuPay-style
+        multi-line entries where description precedes the date+amount line."""
+        unknown_txns = [tx for tx in transactions if tx.merchant == "Unknown"]
+        if not unknown_txns:
+            return
+
+        for tx in unknown_txns:
+            date_str = tx.date.strftime("%d/%m/%Y")
+            for idx, line in enumerate(cleaned):
+                if not line.startswith(date_str):
+                    continue
+                # Confirm this is the matching date+amount line
+                if _TX_AMOUNT_RE.search(line[11:]) is None:
+                    continue
+
+                # Collect description from preceding non-empty lines,
+                # stopping at another date line, header, or page boundary.
+                desc_parts: List[str] = []
+                for back in range(idx - 1, max(idx - 5, -1), -1):
+                    prev = cleaned[back]
+                    if not prev:
+                        break
+                    if _TX_DATE_RE.match(prev):
+                        break
+                    if any(kw in prev.upper() for kw in (
+                        "DATE & TIME", "TRANSACTION DESCRIPTION",
+                        "DOMESTIC TRANSACTION", "INTERNATIONAL TRANSACTION",
+                        "PAGE ", "REWARDS",
+                    )):
+                        break
+                    # Skip standalone reference numbers (continuation lines)
+                    if re.match(r"^[A-Z0-9]{10,}\)?\s*$", prev):
+                        continue
+                    desc_parts.insert(0, prev)
+
+                if desc_parts:
+                    raw_desc = " ".join(desc_parts)
+                    # Strip cardholder name if it appears as a standalone line
+                    # (common: name on one line, description on the next)
+                    if len(desc_parts) > 1:
+                        raw_desc = " ".join(desc_parts[1:])
+                    tx.merchant = self._clean_merchant(raw_desc)
+                    tx.description = raw_desc
+                break
 
     def _parse_transaction_line(self, line: str) -> Optional[ParsedTransaction]:
         date_match = _TX_DATE_RE.match(line)
@@ -253,8 +318,8 @@ class HDFCParser(BaseParser):
         merchant = re.sub(r"^EMI\s+", "", merchant)
         merchant = re.sub(r"^(PYU|PAY|RSP|ING|PPSL|BPPY)\*", "", merchant)
 
-        # Reference annotations
-        merchant = re.sub(r"\(Ref#[^)]*\)", "", merchant)
+        # Reference annotations — complete or truncated (multi-line wraps)
+        merchant = re.sub(r"\(Ref#[^)]*\)?\s*$", "", merchant)
 
         merchant = merchant.strip()
         return merchant[:512] if merchant else raw[:512]

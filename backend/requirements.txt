@@ -6,3 +6,4 @@ pdfplumber==0.11.4
 watchdog==5.0.0
 python-multipart==0.0.12
 aiofiles==24.1.0
+platformdirs==4.3.6

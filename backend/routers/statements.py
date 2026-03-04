@@ -9,15 +9,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from backend.models.database import SessionLocal, get_db
+from backend.models.database import SessionLocal, UPLOADS_DIR, get_db
 from backend.models.models import ProcessingLog, Statement, Transaction
 from backend.services import processing_queue
 from backend.services.statement_processor import process_statement
 
 router = APIRouter(prefix="/statements", tags=["statements"])
-
-UPLOADS_DIR = Path(__file__).resolve().parent.parent / "data" / "uploads"
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/upload")

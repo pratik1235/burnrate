@@ -215,6 +215,7 @@ function StatementPeriodsModal({
                     </Typography>
                   </div>
                   <div style={{ textAlign: 'right' }}>
+                     <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}> Statement Due</Typography>
                     <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.BOLD} color={colorPalette.rss[500]}>
                       {formatCurrency(p.totalAmountDue ?? 0)}
                     </Typography>

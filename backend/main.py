@@ -38,18 +38,20 @@ def seed_categories(db) -> None:
         {"name": "Food & Dining", "slug": "food", "keywords": "swiggy,zomato,mcdonald,starbucks,restaurant,cafe,dominos,kfc,subway,pizza hut,burger king,haldiram,barbeque nation", "color": "#F97316", "icon": "UtensilsCrossed"},
         {"name": "Shopping", "slug": "shopping", "keywords": "amazon,flipkart,myntra,ajio,meesho,nykaa,tatacliq,croma,reliance digital,infiniti retail,aptronix,indivinity", "color": "#8B5CF6", "icon": "ShoppingBag"},
         {"name": "Travel", "slug": "travel", "keywords": "uber,ola,makemytrip,irctc,cleartrip,goibibo,airline,railway,indigo,air india,vistara,yatra,agoda,ibibo,lounge", "color": "#3B82F6", "icon": "Car"},
-        {"name": "Bills & Utilities", "slug": "bills", "keywords": "jio,airtel,vi,bsnl,electricity,gas,insurance,broadband,tata power,adani,bharti,life insurance,lic", "color": "#6B7280", "icon": "Receipt"},
+        {"name": "Bills & Utilities", "slug": "bills", "keywords": "jio,airtel,vodafone,bsnl,electricity,gas,insurance,broadband,tata power,adani,bharti,life insurance,lic", "color": "#6B7280", "icon": "Receipt"},
         {"name": "Entertainment", "slug": "entertainment", "keywords": "netflix,spotify,hotstar,prime video,inox,pvr,youtube,apple,google play,bundl", "color": "#EC4899", "icon": "Film"},
         {"name": "Fuel", "slug": "fuel", "keywords": "hp,bharat petroleum,iocl,shell,indian oil,bpcl,hindustan petroleum", "color": "#EAB308", "icon": "Fuel"},
         {"name": "Health", "slug": "health", "keywords": "apollo,pharmeasy,1mg,hospital,medplus,netmeds,practo,lenskart", "color": "#10B981", "icon": "Heart"},
         {"name": "Groceries", "slug": "groceries", "keywords": "bigbasket,blinkit,zepto,dmart,jiomart,swiggy instamart,instamart,nature basket,more", "color": "#14B8A6", "icon": "ShoppingCart"},
-        {"name": "CC Bill Payment", "slug": "cc_payment", "keywords": "cc payment,cc pymt,bppy cc payment,bbps payment,neft payment,imps payment", "color": "#6B7280", "icon": "CreditCard"},
+        {"name": "CC Bill Payment", "slug": "cc_payment", "keywords": "cc payment,cc pymt,bppy cc payment,bbps payment,neft payment,imps payment,repayment,repayments,bbps,bill payment received", "color": "#6B7280", "icon": "CreditCard"},
         {"name": "Other", "slug": "other", "keywords": "", "color": "#9CA3AF", "icon": "MoreHorizontal"},
     ]
     for cat_data in PREBUILT:
         existing = db.query(CategoryDefinition).filter(CategoryDefinition.slug == cat_data["slug"]).first()
         if not existing:
             db.add(CategoryDefinition(is_prebuilt=1, **cat_data))
+        elif existing.is_prebuilt and existing.keywords != cat_data["keywords"]:
+            existing.keywords = cat_data["keywords"]
     db.commit()
 
 
@@ -112,11 +114,27 @@ _static_candidates = [
     str(_project_root_for_static / "frontend-neopop" / "dist"),
     str(_project_root_for_static / "frontend" / "dist"),
 ]
+_static_dir: Optional[str] = None
 for _candidate in _static_candidates:
     if _candidate and Path(_candidate).is_dir():
-        app.mount("/", StaticFiles(directory=_candidate, html=True), name="static")
+        _static_dir = _candidate
+        app.mount("/assets", StaticFiles(directory=str(Path(_candidate) / "assets")), name="static-assets")
         logger.info("Serving static files from %s", _candidate)
         break
+
+if _static_dir:
+    from starlette.responses import FileResponse
+
+    _index_html = Path(_static_dir) / "index.html"
+
+    @app.get("/{full_path:path}")
+    async def _spa_fallback(full_path: str):
+        """Serve index.html for all non-API, non-asset routes (SPA routing)."""
+        # Try to serve the exact file first (e.g. favicon.ico, manifest.json)
+        requested = Path(_static_dir) / full_path  # type: ignore[arg-type]
+        if requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(_index_html)
 
 
 if __name__ == "__main__":

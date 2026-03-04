@@ -19,7 +19,7 @@ import {
 import type { Statement } from '@/lib/types';
 import type { CategoryResponse, TagDefinitionResponse } from '@/lib/api';
 import { toast } from '@/components/Toast';
-import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus } from 'lucide-react';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { CloseButton } from '@/components/CloseButton';
 import styled from 'styled-components';
@@ -75,11 +75,6 @@ const PlaceholderCard = styled.div`
   align-items: center;
   justify-content: flex-start;
   min-height: 120px;
-  grid-column: 1 / -1;
-
-  @media (min-width: 901px) {
-    grid-column: 1 / 2;
-  }
 `;
 
 const ModalOverlay = styled.div`
@@ -1076,6 +1071,16 @@ export function Customize() {
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
               Create and edit categories for transaction categorization.
+            </Typography>
+          </FeatureCard>
+
+          <FeatureCard onClick={() => window.open('https://github.com/pratik1235/burnrate/issues/new', '_blank')}>
+            <MessageSquarePlus size={24} color={colorPalette.rss[500]} />
+            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+              Feedback / Bugs / Feature Request
+            </Typography>
+            <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+              Report a bug or suggest a feature on GitHub.
             </Typography>
           </FeatureCard>
 

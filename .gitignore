@@ -57,13 +57,15 @@ htmlcov/
 *.swp
 *~
 
-# screenshots/
-screenshots/*.mjs
+# assets/
+assets/*.mjs
 docs/
 
 video/
-screenshots/
 reddit-post.md
 *.db-wal
 *.db-shm
 *.db-journal
+tests/fixtures/
+assets/
+screenshots/
