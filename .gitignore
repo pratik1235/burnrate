@@ -69,6 +69,12 @@ reddit-post.md
 tests/fixtures/
 screenshots/
 
+# Internal/developer docs (not user-facing)
+docs/docker.md
+docs/homebrew-packaging.md
+docs/macos-native.md
+docs/windows-native.md
+
 # Tauri build artifacts
 src-tauri/target/
 src-tauri/binaries/

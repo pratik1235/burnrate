@@ -26,6 +26,8 @@ Burnrate is a personal finance analytics app that runs entirely on your laptop. 
 - No telemetry, analytics, or tracking
 - Your statements and transactions stay on your machine
 
+> **Note:** Currently, only **HDFC**, **ICICI**, **Axis**, and **Indian Bank** credit cards are officially supported and tested. Other bank cards *may* work, but stability is not guaranteed at this time. Support for many more cards is coming soon! If you'd like to request support for a new card, please [create a GitHub issue](https://github.com/pratik1235/burnrate/issues/new?title=Card%20support%20request:%20%3CYour%20Bank%3E&labels=enhancement).
+
 ## Installation
 
 ### Homebrew (macOS)
@@ -133,12 +135,12 @@ burnrate/
 
 ## Distribution
 
-| Method | Install | Docs |
-|--------|---------|------|
-| **Homebrew** | `brew tap pratik1235/burnrate && brew install burnrate` | — |
-| **Docker** | `docker pull pratik1235/burnrate` | [docs/docker.md](docs/docker.md) |
-| **macOS Native** | [Download .dmg](https://github.com/pratik1235/burnrate/releases/latest) | [docs/macos-native.md](docs/macos-native.md) |
-| **Windows Native** | [Download .exe](https://github.com/pratik1235/burnrate/releases/latest) | [docs/windows-native.md](docs/windows-native.md) |
+| Method | Install | Guide |
+|--------|---------|-------|
+| **Homebrew** (macOS) | `brew tap pratik1235/burnrate && brew install burnrate` | [docs/homebrew-installation.md](docs/homebrew-installation.md) |
+| **Docker** | `docker pull pratik1235/burnrate` | [docs/docker-installation.md](docs/docker-installation.md) |
+| **macOS Native** (.dmg) | [Download from Releases](https://github.com/pratik1235/burnrate/releases/latest) | [docs/macos-installation.md](docs/macos-installation.md) |
+| **Windows Native** (.exe) | [Download from Releases](https://github.com/pratik1235/burnrate/releases/latest) | [docs/windows-installation.md](docs/windows-installation.md) |
 
 ## License
 
