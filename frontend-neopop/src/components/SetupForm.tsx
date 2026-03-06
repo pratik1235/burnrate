@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, InputField, Row } from '@cred/neopop-web/lib/components';
 import { Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
@@ -49,6 +49,10 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
   const [dobYear, setDobYear] = useState('');
   const [cards, setCards] = useState<CardEntry[]>([{ bank: 'hdfc', last4: '' }]);
   const [watchFolder, setWatchFolder] = useState('');
+
+  const dobDayRef = useRef<HTMLInputElement | null>(null);
+  const dobMonthRef = useRef<HTMLInputElement | null>(null);
+  const dobYearRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -163,8 +167,15 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
               </Typography>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 8, overflow: 'hidden' }}>
                 <input
+                ref={dobDayRef}
                   value={dobDay}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDobDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 2);
+                  setDobDay(value);
+                  if (value.length === 2) {
+                    dobMonthRef.current?.focus();
+                  }
+                }}
                   placeholder="DD"
                   maxLength={2}
                   style={{
@@ -182,8 +193,15 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                   }}
                 />
                 <input
+                ref={dobMonthRef}
                   value={dobMonth}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDobMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 2);
+                  setDobMonth(value);
+                  if (value.length === 2) {
+                    dobYearRef.current?.focus();
+                  }
+                }}
                   placeholder="MM"
                   maxLength={2}
                   style={{
@@ -201,6 +219,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                   }}
                 />
                 <input
+                ref={dobYearRef}
                   value={dobYear}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDobYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="YYYY"
