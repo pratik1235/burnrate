@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastContainer, toast } from '@/components/Toast';
+import { useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer } from '@/components/Toast';
 import { SetupWizard } from '@/pages/SetupWizard';
 import { Dashboard } from '@/pages/Dashboard';
 import { Cards } from '@/pages/Cards';
@@ -8,7 +8,9 @@ import { Transactions } from '@/pages/Transactions';
 import { Analytics } from '@/pages/Analytics';
 import { Customize } from '@/pages/Customize';
 import { FilterProvider } from '@/contexts/FilterContext';
-import { useSettings, useProcessingLogPoller } from '@/hooks/useApi';
+import { useSettings } from '@/hooks/useApi';
+// @ts-ignore
+import { initDb } from '@/lib/db';
 
 function RootRedirect() {
   const { settings, loading } = useSettings();
@@ -36,52 +38,30 @@ function RootRedirect() {
   return <Navigate to="/setup" replace />;
 }
 
-function ProcessingLogWatcher() {
-  const handleLog = useCallback(
-    (log: { status: string; fileName: string; message: string | null; transactionCount: number }) => {
-      if (log.status === 'success') {
-        toast.success(
-          `Imported ${log.transactionCount} transactions from ${log.fileName}`,
-        );
-      } else if (log.status === 'duplicate') {
-        toast.info(`${log.fileName} was already imported`);
-      } else if (log.status === 'card_not_found') {
-        toast.warning(
-          log.message ?? `${log.fileName} belongs to a card that has not been added yet. Add the card to process it.`,
-        );
-      } else if (log.status === 'parse_error') {
-        toast.warning(
-          log.message ?? `Could not extract transactions from ${log.fileName}. The PDF format may not be supported.`,
-        );
-      } else {
-        toast.error(
-          `Failed to process ${log.fileName}: ${log.message || 'Unknown error'}`,
-        );
-      }
-    },
-    [],
-  );
-
-  useProcessingLogPoller(handleLog, 60_000);
-  return null;
+function DbInitializer({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    initDb().catch((err: unknown) => console.error('Failed to initialize database:', err));
+  }, []);
+  return <>{children}</>;
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <FilterProvider>
-      <ToastContainer />
-      <ProcessingLogWatcher />
-      <Routes>
-        <Route path="/" element={<RootRedirect />} />
-        <Route path="/setup" element={<SetupWizard />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/cards" element={<Cards />} />
-        <Route path="/transactions" element={<Transactions />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/customize" element={<Customize />} />
-      </Routes>
-      </FilterProvider>
-    </BrowserRouter>
+    <DbInitializer>
+      <HashRouter>
+        <FilterProvider>
+        <ToastContainer />
+        <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/setup" element={<SetupWizard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/cards" element={<Cards />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/customize" element={<Customize />} />
+        </Routes>
+        </FilterProvider>
+      </HashRouter>
+    </DbInitializer>
   );
 }

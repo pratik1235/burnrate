@@ -1,16 +1,16 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicegui-dev/tauri-v2-schema/main/tauri.schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "Burnrate",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.burnrate.desktop",
   "build": {
     "frontendDist": "../frontend-neopop/dist",
     "devUrl": "http://localhost:5173",
     "beforeBuildCommand": "cd frontend-neopop && npm run build",
-    "beforeDevCommand": ""
+    "beforeDevCommand": "cd frontend-neopop && npm run dev"
   },
   "app": {
-    "withGlobalTauri": false,
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Burnrate",
@@ -20,8 +20,7 @@
         "minHeight": 600,
         "center": true,
         "decorations": true,
-        "resizable": true,
-        "url": "http://localhost:8000"
+        "resizable": true
       }
     ]
   },
@@ -41,15 +40,12 @@
     }
   },
   "plugins": {
-    "shell": {
-      "sidecar": true,
-      "scope": [
-        {
-          "name": "binaries/burnrate-server",
-          "sidecar": true,
-          "args": ["--host", "127.0.0.1", "--port", { "validator": "\\d+" }]
-        }
-      ]
-    }
+    "fs": {
+      "scope": {
+        "allow": ["$HOME/**"],
+        "deny": ["$HOME/.ssh/**", "$HOME/.config/**"]
+      }
+    },
+    "dialog": {}
   }
 }

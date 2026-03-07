@@ -1,5 +1,10 @@
 {
-  "devDependencies": {
-    "playwright": "^1.58.2"
+  "name": "burnrate",
+  "private": true,
+  "workspaces": ["frontend-neopop"],
+  "scripts": {
+    "dev": "cd frontend-neopop && npm run dev",
+    "build": "cd frontend-neopop && npm run build",
+    "tauri": "tauri"
   }
 }

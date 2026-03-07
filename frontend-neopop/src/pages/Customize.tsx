@@ -19,9 +19,20 @@ import {
 import type { Statement } from '@/lib/types';
 import type { CategoryResponse, TagDefinitionResponse } from '@/lib/api';
 import { toast } from '@/components/Toast';
-import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus } from 'lucide-react';
+import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus, Mail, FolderOpen, FolderCheck, FolderX } from 'lucide-react';
+import { isTauri } from '@/utils/tauri';
+import {
+  pickAndWatchFolder,
+  getWatchedFolder,
+  stopWatching,
+  onNewPdf,
+  removeNewPdfListener,
+  importFileFromPath,
+} from '@/services/watchFolderService';
+import { processStatement } from '@/services/statementProcessor';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { CloseButton } from '@/components/CloseButton';
+import { GmailImport } from '@/components/GmailImport';
 import styled from 'styled-components';
 
 const PageLayout = styled.div`
@@ -67,15 +78,7 @@ const FeatureCard = styled.div`
   }
 `;
 
-const PlaceholderCard = styled.div`
-  border: 1px dashed rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 120px;
-`;
+
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -1033,11 +1036,217 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
   );
 }
 
+export function GmailImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+
+  return (
+    <ModalOverlay>
+      <ModalBackdrop onClick={onClose} />
+      <ElevatedCard
+        backgroundColor={colorPalette.black[90]}
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 520,
+          maxHeight: '80vh',
+          overflow: 'auto',
+          boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
+            Gmail Import
+          </Typography>
+          <CloseButton onClick={onClose} variant="modal" />
+        </div>
+
+        <div style={{ padding: 20 }}>
+          <GmailImport />
+        </div>
+      </ElevatedCard>
+    </ModalOverlay>
+  );
+}
+
+// ─── Watch Folder Modal (Tauri-only) ──────────────────────────────────────────
+
+export function WatchFolderModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [watchedPath, setWatchedPath] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [lastPdf, setLastPdf] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      getWatchedFolder().then(setWatchedPath);
+      // Listen for new PDFs while modal is open
+      onNewPdf(async (filePath) => {
+        const filename = filePath.split('/').pop() ?? filePath;
+        setLastPdf(filename);
+        toast.loading(`Importing ${filename}...`);
+        
+        try {
+          const fileObj = await importFileFromPath(filePath);
+          const result = await processStatement(fileObj);
+          
+          if (result.status === 'success') {
+            toast.success(`Automatically imported: ${filename} (${result.count} txns)`);
+          } else if (result.status === 'duplicate') {
+            toast.error(`${filename} is already imported`);
+          } else {
+            toast.error(`Auto-import failed: ${result.message || 'Unknown error'}`);
+          }
+        } catch (err) {
+          console.error('[WatchFolder] Auto-import error:', err);
+          toast.error(`Failed to process ${filename}`);
+        }
+      });
+    } else {
+      removeNewPdfListener();
+    }
+    return () => removeNewPdfListener();
+  }, [open]);
+
+  const handlePick = async () => {
+    setLoading(true);
+    try {
+      const path = await pickAndWatchFolder();
+      if (path) {
+        setWatchedPath(path);
+        toast.success('Watch folder set!');
+      }
+    } catch {
+      toast.error('Failed to set watch folder');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStop = async () => {
+    await stopWatching();
+    setWatchedPath(null);
+    setLastPdf(null);
+    toast.success('Stopped watching folder');
+  };
+
+  if (!open) return null;
+
+  return (
+    <ModalOverlay>
+      <ModalBackdrop onClick={onClose} />
+      <ElevatedCard
+        backgroundColor={colorPalette.black[90]}
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 480,
+          boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
+            Watch Folder
+          </Typography>
+          <CloseButton onClick={onClose} variant="modal" />
+        </div>
+
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)">
+            Pick a folder to watch. Any PDF statement added to it will be automatically imported.
+            Only available on desktop (Tauri).
+          </Typography>
+
+          {/* Current watched path */}
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: 12,
+              border: watchedPath
+                ? '1px solid rgba(0,200,100,0.3)'
+                : '1px solid rgba(255,255,255,0.08)',
+              background: watchedPath ? 'rgba(0,200,100,0.05)' : 'rgba(255,255,255,0.03)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            {watchedPath ? (
+              <FolderCheck size={20} color="#00C864" />
+            ) : (
+              <FolderOpen size={20} color="rgba(255,255,255,0.35)" />
+            )}
+            <Typography
+              fontType={FontType.BODY}
+              fontSize={13}
+              fontWeight={FontWeights.REGULAR}
+              color={watchedPath ? mainColors.white : 'rgba(255,255,255,0.4)'}
+              style={{ wordBreak: 'break-all', flex: 1 }}
+            >
+              {watchedPath ?? 'No folder selected'}
+            </Typography>
+          </div>
+
+          {lastPdf && (
+            <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+              Last detected: {lastPdf}
+            </Typography>
+          )}
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Button
+              variant="primary"
+              kind="elevated"
+              size="small"
+              colorMode="dark"
+              onClick={handlePick}
+              disabled={loading}
+            >
+              <FolderOpen size={14} style={{ marginRight: 6 }} />
+              {watchedPath ? 'Change Folder' : 'Pick Folder'}
+            </Button>
+            {watchedPath && (
+              <Button
+                variant="secondary"
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={handleStop}
+                style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
+              >
+                <FolderX size={14} style={{ marginRight: 6 }} />
+                Stop Watching
+              </Button>
+            )}
+          </div>
+        </div>
+      </ElevatedCard>
+    </ModalOverlay>
+  );
+}
+
 export function Customize() {
   const navigate = useNavigate();
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [reparseModalOpen, setReparseModalOpen] = useState(false);
   const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
+  const [gmailModalOpen, setGmailModalOpen] = useState(false);
+  const [watchFolderModalOpen, setWatchFolderModalOpen] = useState(false);
+  const runningInTauri = isTauri();
 
   return (
     <PageLayout>
@@ -1084,16 +1293,37 @@ export function Customize() {
             </Typography>
           </FeatureCard>
 
-          <PlaceholderCard>
-            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
-              Coming soon
+          <FeatureCard onClick={() => setGmailModalOpen(true)}>
+            <Mail size={24} color={colorPalette.rss[500]} />
+            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+              Gmail Import
             </Typography>
-          </PlaceholderCard>
+            <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+              Auto-import statements from your Gmail.
+            </Typography>
+          </FeatureCard>
+
+          {/* Watch Folder — only shown when running inside Tauri desktop app */}
+          {runningInTauri && (
+            <FeatureCard onClick={() => setWatchFolderModalOpen(true)}>
+              <FolderOpen size={24} color={colorPalette.rss[500]} />
+              <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                Watch Folder
+              </Typography>
+              <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                Auto-import PDFs dropped into a folder.
+              </Typography>
+            </FeatureCard>
+          )}
         </CardsGrid>
 
         <DefineTagsModal open={tagsModalOpen} onClose={() => setTagsModalOpen(false)} />
         <ReparseRemoveModal open={reparseModalOpen} onClose={() => setReparseModalOpen(false)} />
         <DefineCategoriesModal open={categoriesModalOpen} onClose={() => setCategoriesModalOpen(false)} />
+        <GmailImportModal open={gmailModalOpen} onClose={() => setGmailModalOpen(false)} />
+        {runningInTauri && (
+          <WatchFolderModal open={watchFolderModalOpen} onClose={() => setWatchFolderModalOpen(false)} />
+        )}
       </Content>
     </PageLayout>
   );

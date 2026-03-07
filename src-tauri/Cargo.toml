@@ -1,19 +1,20 @@
 [package]
 name = "burnrate"
-version = "0.2.0"
+version = "0.3.0"
 description = "Privacy-first, local-only credit card spend analytics"
 authors = ["Pratik Prakash"]
-edition = "2024"
+edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+notify = "6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [features]
 devtools = ["tauri/devtools"]
-tauri-plugin-shell = "2"
-tauri-plugin-process = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"

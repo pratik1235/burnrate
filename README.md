@@ -2,159 +2,77 @@
 
 **Privacy-first, local-only credit card spend analytics.**
 
-Burnrate is a personal finance analytics app that runs entirely on your laptop. Your financial data never leaves your machine — no cloud, no servers, no tracking.
+Burnrate is a personal finance analytics app that runs entirely in your browser or as a desktop app. Your financial data never leaves your machine — no cloud, no servers, no tracking. All processing and storage (IndexedDB) happen locally.
 
 ![Dashboard](assets/screenshot_dashboard.png)
 
 ## Features
 
 - **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, IndusInd, Kotak, Standard Chartered, YES, AU, RBL
-- **Auto-import** — Drop PDF statements or set up a watch folder for automatic processing
-- **Smart categorization** — Transactions auto-categorized with customizable categories and keywords
-- **Rich analytics** — Spend trends, category breakdowns, merchant insights, credit utilization
-- **Multi-card filtering across transactions and metrics** — Filter by cards, categories, date range, amount, direction, and tags
-- **Multiple Views** — Analyze transactions per statement, consolidate across multiple cards, or apply flexible filters for any custom combination
-- **Transaction tagging** — Define and apply custom tags to transactions
-- **CSV export** — Export filtered transactions for external analysis
-- **Statement management** — Reparse or remove imported statements
-- **Google Apps Script** — Auto-download statements from Gmail (optional)
+- **Browser-Native Processing** — PDF parsing and data extraction happen entirely in JavaScript (no backend server required).
+- **Auto-import (Desktop Only)** — Set up a native **Watch Folder** in the Tauri app for automatic processing of new statement PDFs.
+- **Gmail Import** — Connect directly to Gmail via the browser to fetch and import statements securely.
+- **Smart Categorization** — Transactions are auto-categorized locally with customizable categories and keywords.
+- **Rich Analytics** — Spend trends, category breakdowns, merchant insights, and credit utilization.
+- **Privacy First** — Data is stored in your browser's **IndexedDB**; nothing is ever uploaded.
 
 ## Privacy First
 
-- All data stored locally in SQLite
-- No network requests to external services
-- No telemetry, analytics, or tracking
-- Your statements and transactions stay on your machine
+- **Zero Server-side** — No backend, no API calls to our servers.
+- **Local Storage** — All data stored locally in your browser/desktop app via IndexedDB.
+- **No Tracking** — No telemetry, analytics, or tracking scripts.
+- **Offline Ready** — Works completely offline once loaded.
 
-> **Note:** Currently, only **HDFC**, **ICICI**, **Axis**, and **Indian Bank** credit cards are officially supported and tested. Other bank cards *may* work, but stability is not guaranteed at this time. Support for many more cards is coming soon! If you'd like to request support for a new card, please [create a GitHub issue](https://github.com/pratik1235/burnrate/issues/new?title=Card%20support%20request:%20%3CYour%20Bank%3E&labels=enhancement).
+> **Note:** Currently, **HDFC**, **ICICI**, **Axis**, and **Indian Bank** credit cards are officially supported. Support for many more cards is being added. If you'd like to request support for a new card, please [create a GitHub issue](https://github.com/pratik1235/burnrate/issues/new).
 
-## Installation
+## Getting Started
 
-### Homebrew (macOS)
-
-```bash
-brew tap pratik1235/burnrate
-brew install burnrate
-burnrate
-```
-
-Then open http://localhost:8000 in your browser.
-
-### Docker
+### Web App (Development)
 
 ```bash
-docker pull pratik1235/burnrate:v0.2.0
-docker run -p 8000:8000 -v burnrate_data:/data pratik1235/burnrate:v0.2.0
-```
-
-### macOS Native App
-
-Download `Burnrate_0.2.0_aarch64.dmg` from [GitHub Releases](https://github.com/pratik1235/burnrate/releases/latest), open the DMG, and drag to Applications.
-
-### Windows Native App
-
-Download `Burnrate-Setup.exe` from [GitHub Releases](https://github.com/pratik1235/burnrate/releases/latest) and run the installer.
-
-### From Source
-
-```bash
-# Backend
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cd ..
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
-
-# Frontend (in a separate terminal)
 cd frontend-neopop
 npm install
 npm run dev
 ```
+Open `http://localhost:5173` in your browser.
 
-Open http://localhost:5173 in your browser.
+### Desktop App (Tauri)
 
-### First Run
+To run the native desktop version with **Watch Folder** support:
 
-1. Complete the setup wizard (name, DOB, cards)
-2. Set a watch folder or drag-and-drop statement PDFs
-3. Explore your spend analytics
-
-## Screenshots
-
-| Dashboard | Transactions |
-|-----------|-------------|
-| ![](assets/screenshot_dashboard.png) | ![](assets/screenshot_transactions.png) |
-
-| Analytics | Cards |
-|-----------|-------|
-| ![](assets/screenshot_analytics.png) | ![](assets/screenshot_cards.png) |
-
-| Customize | Categories |
-|-----------|-----------|
-| ![](assets/screenshot_customize.png) | ![](assets/screenshot_categories_modal.png) |
-
-| Setup |
-|-------|
-| ![](assets/screenshot_setup.png) |
+```bash
+# Ensure you have Rust installed
+npm run tauri dev
+```
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Python 3.11+, FastAPI, SQLAlchemy, SQLite |
-| Frontend | React 18, TypeScript, Vite, styled-components |
-| Desktop | Tauri v2 (native macOS/Windows wrapper) |
+| **Frontend** | React 18, TypeScript, Vite, styled-components, NeoPOP UI |
+| **Storage** | IndexedDB (managed via Dexie.js) |
+| **Parsing** | PDF.js (client-side extraction) |
+| **Desktop** | Tauri v2 (Rust-based native wrapper) |
 
 ## Project Structure
 
 ```
 burnrate/
-├── backend/              # FastAPI backend
-│   ├── main.py           # App entry point
-│   ├── models/           # SQLAlchemy models
-│   ├── routers/          # API endpoints
-│   ├── services/         # Business logic
-│   ├── parsers/          # Bank-specific PDF parsers
-│   └── data/             # SQLite DB & uploads
-├── frontend-neopop/      # React frontend
+├── frontend-neopop/      # Pure React web app
 │   ├── src/
-│   │   ├── pages/        # Page components
-│   │   ├── components/   # Shared components
-│   │   ├── contexts/     # React contexts
-│   │   ├── hooks/        # Custom hooks
-│   │   └── lib/          # Types, utils, API
-│   └── public/
-├── src-tauri/            # Tauri native app shell
-├── apps-script/          # Gmail auto-download (optional)
-├── tests/                # Integration test suite
-├── scripts/              # Build scripts
-├── docs/                 # Distribution documentation
-└── assets/               # Screenshots
+│   │   ├── parsers/      # Client-side PDF parsers
+│   │   ├── services/     # Business logic & statement processing
+│   │   ├── lib/          # DB schema (Dexie) and API wrappers
+│   │   ├── components/   # UI components (NeoPOP)
+│   │   └── pages/        # Main application views
+├── src-tauri/            # Tauri desktop wrapper & native file watcher
+├── apps-script/          # Optional Google Apps Script for Gmail
+└── assets/               # Screenshots and branding
 ```
-
-## Distribution
-
-| Method | Install | Guide |
-|--------|---------|-------|
-| **Homebrew** (macOS) | `brew tap pratik1235/burnrate && brew install burnrate` | [docs/homebrew-installation.md](docs/homebrew-installation.md) |
-| **Docker** | `docker pull pratik1235/burnrate` | [docs/docker-installation.md](docs/docker-installation.md) |
-| **macOS Native** (.dmg) | [Download from Releases](https://github.com/pratik1235/burnrate/releases/latest) | [docs/macos-installation.md](docs/macos-installation.md) |
-| **Windows Native** (.exe) | [Download from Releases](https://github.com/pratik1235/burnrate/releases/latest) | [docs/windows-installation.md](docs/windows-installation.md) |
 
 ## Contributing
 
 We welcome contributions! Please read the [Contributing Guide](CONTRIBUTING.md) before submitting a pull request.
-
-Burnrate follows **spec-driven development** — all new features require a spec document before implementation. See the project documentation for reference:
-
-| Document | Description |
-|----------|-------------|
-| [Contributing Guide](CONTRIBUTING.md) | How to contribute, code standards, workflow |
-| [Project Constitution](docs/CONSTITUTION.md) | Project guidelines, code constraints, security standards |
-| [Requirements](docs/requirements.md) | Functional and non-functional requirements |
-| [Architecture](docs/architecture.md) | System architecture, data models, API docs, diagrams |
-| [Feature Plans](docs/plans/) | Detailed plans for each backend feature |
 
 ## License
 

@@ -13,6 +13,7 @@ import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { formatCurrency } from '@/lib/utils';
 import type { CategoryBreakdown } from '@/lib/types';
 import { CATEGORY_CONFIG, CATEGORY_COLORS } from '@/lib/types';
+import { getAllCategories } from '@/lib/api';
 
 interface CategoryDonutProps {
   data: CategoryBreakdown[];
@@ -57,9 +58,8 @@ export function CategoryDonut({ data, className }: CategoryDonutProps) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/categories/all')
-      .then((r) => r.json())
-      .then((data: any[]) => {
+    getAllCategories()
+      .then((data) => {
         if (cancelled) return;
         const map: Record<string, { name: string; color: string }> = {};
         for (const c of data) map[c.slug] = { name: c.name, color: c.color };

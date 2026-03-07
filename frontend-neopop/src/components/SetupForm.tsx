@@ -6,7 +6,6 @@ import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typograph
 import type { Bank } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
 import { Plus, Trash2, FolderOpen, CreditCard, Shield } from 'lucide-react';
-import axios from 'axios';
 
 interface CardEntry {
   bank: Bank;
@@ -68,15 +67,6 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
   }, [initialData]);
 
   const handleBrowse = async () => {
-    try {
-      const { data } = await axios.post('/api/settings/browse-folder');
-      if (data.path) {
-        setWatchFolder(data.path);
-        return;
-      }
-    } catch {
-      // Backend not available, fall through
-    }
     if ('showDirectoryPicker' in window) {
       try {
         const handle = await (window as Window & { showDirectoryPicker: (opts?: { mode?: string }) => Promise<{ name: string }> }).showDirectoryPicker({ mode: 'read' });

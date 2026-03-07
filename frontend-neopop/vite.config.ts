@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
@@ -10,12 +10,23 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
+  optimizeDeps: {
+    include: ['pdfjs-dist'],
+  },
+  worker: {
+    format: 'es',
+  },
+  test: {
+    environment: 'jsdom',
+    alias: {
+      'pdfjs-dist': 'pdfjs-dist/legacy/build/pdf.mjs',
     },
+    deps: {
+      optimizer: {
+        web: {
+          include: ['pdfjs-dist']
+        }
+      }
+    }
   },
 })
