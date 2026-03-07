@@ -1,5 +1,6 @@
 """Settings API endpoints."""
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,6 +10,33 @@ from sqlalchemy.orm import Session
 from backend.models.database import SessionLocal, get_db
 from backend.models.models import Card, Settings
 from backend.services.folder_watcher import start_watcher, stop_watcher
+
+
+def _validate_watch_folder(folder: Optional[str]) -> Optional[str]:
+    """Validate a user-provided watch folder path.
+
+    Raises HTTPException if the path is invalid or suspicious.
+    Returns the resolved path string, or None if folder is empty.
+    """
+    if not folder or not folder.strip():
+        return None
+
+    expanded = Path(folder).expanduser()
+    if not expanded.is_absolute():
+        raise HTTPException(status_code=400, detail="Watch folder must be an absolute path.")
+
+    resolved = expanded.resolve(strict=False)
+    home = Path.home().resolve()
+    if not resolved.is_relative_to(home) and not resolved.is_relative_to(Path("/Volumes")):
+        raise HTTPException(status_code=400, detail="Watch folder must be within your home directory.")
+
+    if not resolved.exists():
+        raise HTTPException(status_code=400, detail="Watch folder does not exist.")
+    if not resolved.is_dir():
+        raise HTTPException(status_code=400, detail="Watch folder path is not a directory.")
+
+    return str(resolved)
+
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -93,12 +121,14 @@ def setup(
     if existing:
         raise HTTPException(status_code=400, detail="Setup already completed. Use PUT /api/settings to update.")
 
+    validated_folder = _validate_watch_folder(body.watch_folder)
+
     settings = Settings(
         name=body.name,
         dob_day=body.dob_day,
         dob_month=body.dob_month,
         dob_year=body.dob_year,
-        watch_folder=body.watch_folder,
+        watch_folder=validated_folder,
     )
     db.add(settings)
     db.flush()
@@ -146,7 +176,7 @@ def update_settings(
     if body.dob_year is not None:
         settings.dob_year = body.dob_year
     if body.watch_folder is not None:
-        settings.watch_folder = body.watch_folder
+        settings.watch_folder = _validate_watch_folder(body.watch_folder)
 
     cards_added = 0
     if body.cards is not None:

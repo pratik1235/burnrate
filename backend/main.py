@@ -146,12 +146,14 @@ if _static_dir:
     @app.get("/{full_path:path}")
     async def _spa_fallback(full_path: str):
         """Serve index.html for all non-API, non-asset routes (SPA routing)."""
-        requested = (Path(_static_dir) / full_path).resolve()  # type: ignore[arg-type]
+        if ".." in full_path.split("/"):
+            return FileResponse(_index_html)
+        requested = (_static_root_resolved / full_path).resolve()
         if (
             requested.is_file()
-            and str(requested).startswith(str(_static_root_resolved))
+            and requested.is_relative_to(_static_root_resolved)
         ):
-            return FileResponse(requested)
+            return FileResponse(str(requested))
         return FileResponse(_index_html)
 
 

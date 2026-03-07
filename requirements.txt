@@ -1,9 +1,9 @@
-fastapi==0.115.0
-uvicorn==0.30.0
-sqlalchemy==2.0.35
-pikepdf==9.4.0
-pdfplumber==0.11.4
-watchdog==5.0.0
-python-multipart==0.0.12
+fastapi==0.115.12
+uvicorn==0.34.0
+sqlalchemy==2.0.40
+pikepdf==9.7.0
+pdfplumber==0.11.6
+watchdog==6.0.0
+python-multipart==0.0.20
 aiofiles==24.1.0
 platformdirs==4.3.6

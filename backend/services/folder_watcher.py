@@ -173,13 +173,39 @@ def _initial_scan(watch_dir: Path, handler: StatementWatchHandler) -> None:
         handler._enqueue_pdf(pdf_path, wait_for_stable=False)
 
 
+def _validate_watch_path(raw_path: str) -> Optional[Path]:
+    """Validate and resolve a watch folder path.
+
+    Returns the resolved Path if valid, or None if the path is
+    suspicious, non-existent, or not a directory.
+    """
+    if not raw_path or not raw_path.strip():
+        return None
+
+    expanded = Path(raw_path).expanduser()
+    if not expanded.is_absolute():
+        logger.warning("Watch path is not absolute: %s", raw_path)
+        return None
+
+    resolved = expanded.resolve(strict=False)
+    home = Path.home().resolve()
+    if not resolved.is_relative_to(home) and not resolved.is_relative_to(Path("/Volumes")):
+        logger.warning("Watch path is outside the user's home directory: %s", raw_path)
+        return None
+
+    if not resolved.exists() or not resolved.is_dir():
+        logger.warning("Watch path does not exist or is not a directory: %s", raw_path)
+        return None
+
+    return resolved
+
+
 def start_watcher(watch_path: str, db_session_factory: Callable) -> Optional[Observer]:
     """Create Observer, schedule handler, start. Returns observer for cleanup."""
-    path = Path(watch_path).expanduser().resolve()
-    path = _resolve_true_case(path)
-    if not path.exists() or not path.is_dir():
-        logger.warning("Watch path does not exist or is not a directory: %s", watch_path)
+    path = _validate_watch_path(watch_path)
+    if path is None:
         return None
+    path = _resolve_true_case(path)
 
     handler = StatementWatchHandler(db_session_factory)
     observer = Observer()
