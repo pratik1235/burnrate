@@ -94,8 +94,9 @@ export interface GetMerchantsResponse {
   merchants: MerchantSpend[];
 }
 
-const api = axios.create({
-  baseURL: '/api',
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+export const api = axios.create({
+  baseURL: isTauri ? 'http://127.0.0.1:8000/api' : '/api',
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });

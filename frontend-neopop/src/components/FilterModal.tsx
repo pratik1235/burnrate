@@ -7,6 +7,7 @@ import { Button } from '@cred/neopop-web/lib/components';
 import { CloseButton } from '@/components/CloseButton';
 import { useFilters, type Direction } from '@/contexts/FilterContext';
 import { useCards } from '@/hooks/useApi';
+import { getAllCategories, getTagDefinitions } from '@/lib/api';
 
 interface FilterModalProps {
   open: boolean;
@@ -30,21 +31,19 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/categories/all')
-      .then((r) => r.json())
-      .then((data: any[]) => {
+    getAllCategories()
+      .then((data) => {
         if (!cancelled) setAllCategories(data.map((c) => ({ slug: c.slug, name: c.name, color: c.color })));
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/tags')
-      .then((r) => r.json())
-      .then((data: any[]) => { if (!cancelled) setAvailableTags(data); })
-      .catch(() => {});
+    getTagDefinitions()
+      .then((data) => { if (!cancelled) setAvailableTags(data as unknown as { id: string; name: string }[]); })
+      .catch(() => { });
     return () => { cancelled = true; };
   }, []);
 

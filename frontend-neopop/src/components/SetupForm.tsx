@@ -6,7 +6,7 @@ import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typograph
 import type { Bank } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
 import { Plus, Trash2, FolderOpen, CreditCard, Shield } from 'lucide-react';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 interface CardEntry {
   bank: Bank;
@@ -69,7 +69,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
 
   const handleBrowse = async () => {
     try {
-      const { data } = await axios.post('/api/settings/browse-folder');
+      const { data } = await api.post('/settings/browse-folder');
       if (data.path) {
         setWatchFolder(data.path);
         return;
@@ -167,15 +167,15 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
               </Typography>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 8, overflow: 'hidden' }}>
                 <input
-                ref={dobDayRef}
+                  ref={dobDayRef}
                   value={dobDay}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 2);
-                  setDobDay(value);
-                  if (value.length === 2) {
-                    dobMonthRef.current?.focus();
-                  }
-                }}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 2);
+                    setDobDay(value);
+                    if (value.length === 2) {
+                      dobMonthRef.current?.focus();
+                    }
+                  }}
                   placeholder="DD"
                   maxLength={2}
                   style={{
@@ -193,15 +193,15 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                   }}
                 />
                 <input
-                ref={dobMonthRef}
+                  ref={dobMonthRef}
                   value={dobMonth}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 2);
-                  setDobMonth(value);
-                  if (value.length === 2) {
-                    dobYearRef.current?.focus();
-                  }
-                }}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 2);
+                    setDobMonth(value);
+                    if (value.length === 2) {
+                      dobYearRef.current?.focus();
+                    }
+                  }}
                   placeholder="MM"
                   maxLength={2}
                   style={{
@@ -219,7 +219,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                   }}
                 />
                 <input
-                ref={dobYearRef}
+                  ref={dobYearRef}
                   value={dobYear}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDobYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder="YYYY"
@@ -352,14 +352,14 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                   <Plus size={14} style={{ marginRight: 4 }} />
                   Add another card
                 </Row>
-                
+
               </Button>
             </div>
 
             <div style={{ overflow: 'hidden', minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <div style={{ flex: 1, minWidth: 120 }}>
-                <InputField
+                  <InputField
                     colorMode="dark"
                     placeholder="Path to statements folder"
                     label="Watch folder for new statements"

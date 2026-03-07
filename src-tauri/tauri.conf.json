@@ -21,13 +21,16 @@
         "center": true,
         "decorations": true,
         "resizable": true,
-        "url": "http://localhost:8000"
+        "url": "/"
       }
     ]
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/icon.icns",
       "icons/icon.ico",
@@ -38,18 +41,10 @@
     ],
     "macOS": {
       "minimumSystemVersion": "10.15"
-    }
+    },
+    "externalBin": [
+      "binaries/burnrate-server"
+    ]
   },
-  "plugins": {
-    "shell": {
-      "sidecar": true,
-      "scope": [
-        {
-          "name": "binaries/burnrate-server",
-          "sidecar": true,
-          "args": ["--host", "127.0.0.1", "--port", { "validator": "\\d+" }]
-        }
-      ]
-    }
-  }
+  "plugins": {}
 }

@@ -33,6 +33,7 @@ fn main() {
                     match event {
                         CommandEvent::Stdout(line) => {
                             let s = String::from_utf8_lossy(&line);
+                            println!("SIDECAR STDOUT: {}", s);
                             if s.contains("Application startup complete") {
                                 if let Some(window) = app_handle.get_webview_window("main") {
                                     let _ = window.eval("window.location.reload()");
@@ -41,13 +42,17 @@ fn main() {
                         }
                         CommandEvent::Stderr(line) => {
                             let s = String::from_utf8_lossy(&line);
+                            println!("SIDECAR STDERR: {}", s);
                             if s.contains("Application startup complete") {
                                 if let Some(window) = app_handle.get_webview_window("main") {
                                     let _ = window.eval("window.location.reload()");
                                 }
                             }
                         }
-                        CommandEvent::Terminated(_) => break,
+                        CommandEvent::Terminated(payload) => {
+                            println!("SIDECAR TERMINATED: {:?}", payload);
+                            break;
+                        }
                         _ => {}
                     }
                 }

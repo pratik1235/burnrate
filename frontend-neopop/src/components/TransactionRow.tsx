@@ -5,7 +5,7 @@ import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { formatCurrency } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
 import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
-import { updateTransactionTags } from '@/lib/api';
+import { updateTransactionTags, getAllCategories, getTagDefinitions } from '@/lib/api';
 import {
   UtensilsCrossed,
   ShoppingBag,
@@ -26,9 +26,8 @@ let _categoryCachePromise: Promise<void> | null = null;
 function loadCategoryCache(): Promise<void> {
   if (_categoryCache) return Promise.resolve();
   if (_categoryCachePromise) return _categoryCachePromise;
-  _categoryCachePromise = fetch('/api/categories/all')
-    .then((r) => r.json())
-    .then((data: any[]) => {
+  _categoryCachePromise = getAllCategories()
+    .then((data) => {
       _categoryCache = {};
       for (const c of data) {
         _categoryCache![c.slug] = { name: c.name, color: c.color, icon: c.icon };
@@ -75,10 +74,9 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/tags')
-      .then((r) => r.json())
-      .then((data: any[]) => { if (!cancelled) setAvailableTags(data.map((t: any) => t.name)); })
-      .catch(() => {});
+    getTagDefinitions()
+      .then((data) => { if (!cancelled) setAvailableTags(data.map((t: any) => t.name)); })
+      .catch(() => { });
     return () => { cancelled = true; };
   }, []);
 
@@ -139,7 +137,7 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
           >
             {transaction.merchant}
           </Typography>
-          
+
           {tags.length > 0 && (
             <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', overflow: 'hidden', flexShrink: 0 }}>
               {tags.map((tag) => (

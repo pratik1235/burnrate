@@ -108,6 +108,8 @@ app.add_middleware(
         "http://localhost:5174",
         "http://localhost:6006",
         "http://localhost:6007",
+        "tauri://localhost",
+        "https://tauri.localhost",
     ],
     allow_credentials=True,
     allow_methods=["*"],

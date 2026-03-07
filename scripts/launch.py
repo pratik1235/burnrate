@@ -48,12 +48,11 @@ def main() -> None:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
-    threading.Thread(target=_open_browser, args=(port,), daemon=True).start()
-
     import uvicorn
+    from backend.main import app
 
     uvicorn.run(
-        "backend.main:app",
+        app,
         host="127.0.0.1",
         port=port,
         log_level="info",

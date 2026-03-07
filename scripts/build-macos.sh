@@ -41,10 +41,15 @@ pip install --quiet --upgrade pip
 pip install --quiet pyinstaller
 pip install --quiet -r requirements.txt
 
+# Force charset_normalizer to be pure Python to prevent PyInstaller mypyc bundling errors
+pip uninstall -y charset-normalizer || true
+pip install charset-normalizer --no-binary :all:
+
 python -m PyInstaller \
     --name burnrate-server \
     --onefile \
     --noconfirm \
+    --add-data "frontend-neopop/dist:static" \
     --hidden-import uvicorn.logging \
     --hidden-import uvicorn.loops \
     --hidden-import uvicorn.loops.auto \
@@ -70,6 +75,7 @@ python -m PyInstaller \
     --hidden-import backend.routers.tags \
     --hidden-import backend.routers.transactions \
     --collect-all pdfplumber \
+    --collect-all charset_normalizer \
     scripts/launch.py
 
 mkdir -p src-tauri/binaries
@@ -97,12 +103,14 @@ echo ""
 
 # ---- Step 5: Build Tauri app ----
 echo "==> [5/5] Building Tauri native app..."
-CI=false cargo tauri build
+CI=false cargo tauri build --bundles app
 echo ""
 
 # ---- Prepare artifacts ----
 APP_PATH=$(find src-tauri/target/release/bundle/macos -name "*.app" -type d 2>/dev/null | head -1)
 if [ -n "$APP_PATH" ]; then
+  echo "==> Deep signing the app bundle to prevent 'damaged' errors..."
+  codesign --force --deep --sign - "$APP_PATH"
   echo "==> Clearing quarantine attributes on ${APP_PATH}..."
   xattr -cr "$APP_PATH" 2>/dev/null || true
 fi

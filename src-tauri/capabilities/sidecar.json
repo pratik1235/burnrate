@@ -1,0 +1,27 @@
+{
+    "identifier": "sidecar-capability",
+    "description": "Allow burnrate-server sidecar execution",
+    "windows": [
+        "main"
+    ],
+    "permissions": [
+        "core:default",
+        {
+            "identifier": "shell:allow-execute",
+            "allow": [
+                {
+                    "name": "binaries/burnrate-server",
+                    "sidecar": true,
+                    "args": [
+                        "--host",
+                        "127.0.0.1",
+                        "--port",
+                        {
+                            "validator": "\\d+"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
