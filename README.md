@@ -4,6 +4,8 @@
 
 Burnrate is a personal finance analytics app that runs entirely on your laptop. Your financial data never leaves your machine — no cloud, no servers, no tracking.
 
+**[→ Website & demo](https://pratik1235.github.io/burnrate)**
+
 ![Dashboard](assets/screenshot_dashboard.png)
 
 ## Features
