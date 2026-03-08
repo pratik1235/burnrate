@@ -79,6 +79,7 @@ export const CATEGORY_COLORS: Record<Category, string> = {
   health: '#10B981',
   groceries: '#14B8A6',
   cc_payment: '#6B7280',
+  cashback: '#000000',  // TODO: Add a proper color for cashback
   other: '#9CA3AF',
 };
 
@@ -92,5 +93,6 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; icon: string; co
   health: { label: 'Health', icon: 'Heart', color: CATEGORY_COLORS.health },
   groceries: { label: 'Groceries', icon: 'ShoppingCart', color: CATEGORY_COLORS.groceries },
   cc_payment: { label: 'CC Bill Payment', icon: 'CreditCard', color: CATEGORY_COLORS.cc_payment },
+  cashback: { label: 'Cashback', icon: 'DollarSign', color: CATEGORY_COLORS.cashback }, // TODO: Add a proper icon for cashback
   other: { label: 'Other', icon: 'MoreHorizontal', color: CATEGORY_COLORS.other },
 };

@@ -168,7 +168,6 @@ class IDFCFirstBankParser(BaseParser):
 
             # If lengths match, we can safely zip them. If descriptions are split weirdly
             # due to text wrapping, we join them as a fallback.
-            print(len(dates_raw) == len(amounts_raw))
             if len(dates_raw) == len(amounts_raw):
                 for i in range(len(dates_raw)):
                     parsed_date = self._parse_numeric_date(dates_raw[i])
