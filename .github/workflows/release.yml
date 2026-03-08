@@ -83,6 +83,11 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt pyinstaller
 
+      - name: Force pure-Python charset_normalizer
+        run: |
+          pip uninstall -y charset-normalizer || true
+          pip install charset-normalizer --no-binary :all:
+
       - name: Install frontend dependencies
         working-directory: frontend-neopop
         run: npm ci
@@ -112,21 +117,9 @@ jobs:
             --hidden-import uvicorn.protocols.websockets.auto \
             --hidden-import uvicorn.lifespan \
             --hidden-import uvicorn.lifespan.on \
-            --hidden-import backend.parsers.hdfc \
-            --hidden-import backend.parsers.icici \
-            --hidden-import backend.parsers.axis \
-            --hidden-import backend.parsers.federal \
-            --hidden-import backend.parsers.indian_bank \
-            --hidden-import backend.parsers.generic \
-            --hidden-import backend.parsers.detector \
-            --hidden-import backend.routers.analytics \
-            --hidden-import backend.routers.cards \
-            --hidden-import backend.routers.categories \
-            --hidden-import backend.routers.settings \
-            --hidden-import backend.routers.statements \
-            --hidden-import backend.routers.tags \
-            --hidden-import backend.routers.transactions \
+            --collect-all backend \
             --collect-all pdfplumber \
+            --collect-all charset_normalizer \
             scripts/launch.py
           mkdir -p src-tauri/binaries
           cp "dist/burnrate-server" "src-tauri/binaries/burnrate-server-${TRIPLE}"
@@ -178,6 +171,11 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt pyinstaller
 
+      - name: Force pure-Python charset_normalizer
+        run: |
+          pip uninstall -y charset-normalizer || true
+          pip install charset-normalizer --no-binary :all:
+
       - name: Install frontend dependencies
         working-directory: frontend-neopop
         run: npm ci
@@ -207,21 +205,9 @@ jobs:
             --hidden-import uvicorn.protocols.websockets.auto \
             --hidden-import uvicorn.lifespan \
             --hidden-import uvicorn.lifespan.on \
-            --hidden-import backend.parsers.hdfc \
-            --hidden-import backend.parsers.icici \
-            --hidden-import backend.parsers.axis \
-            --hidden-import backend.parsers.federal \
-            --hidden-import backend.parsers.indian_bank \
-            --hidden-import backend.parsers.generic \
-            --hidden-import backend.parsers.detector \
-            --hidden-import backend.routers.analytics \
-            --hidden-import backend.routers.cards \
-            --hidden-import backend.routers.categories \
-            --hidden-import backend.routers.settings \
-            --hidden-import backend.routers.statements \
-            --hidden-import backend.routers.tags \
-            --hidden-import backend.routers.transactions \
+            --collect-all backend \
             --collect-all pdfplumber \
+            --collect-all charset_normalizer \
             scripts/launch.py
           mkdir -p src-tauri/binaries
           cp "dist/burnrate-server" "src-tauri/binaries/burnrate-server-${TRIPLE}"
@@ -302,20 +288,9 @@ jobs:
             --hidden-import uvicorn.protocols.websockets.auto `
             --hidden-import uvicorn.lifespan `
             --hidden-import uvicorn.lifespan.on `
-            --hidden-import backend.parsers.hdfc `
-            --hidden-import backend.parsers.icici `
-            --hidden-import backend.parsers.axis `
-            --hidden-import backend.parsers.federal `
-            --hidden-import backend.parsers.indian_bank `
-            --hidden-import backend.parsers.generic `
-            --hidden-import backend.parsers.detector `
-            --hidden-import backend.routers.analytics `
-            --hidden-import backend.routers.cards `
-            --hidden-import backend.routers.categories `
-            --hidden-import backend.routers.settings `
-            --hidden-import backend.routers.statements `
-            --hidden-import backend.routers.tags `
-            --hidden-import backend.routers.transactions `
+            --collect-all backend `
+            --collect-all pdfplumber `
+            --collect-all charset_normalizer `
             scripts/launch.py
 
       - name: Copy icon into dist for installer
