@@ -45,7 +45,7 @@ pip install --quiet -r requirements.txt
 pip uninstall -y charset-normalizer || true
 pip install charset-normalizer --no-binary :all:
 
-python -m PyInstaller \
+PYTHONPATH=. python -m PyInstaller \
     --name burnrate-server \
     --onefile \
     --noconfirm \

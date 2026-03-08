@@ -101,6 +101,8 @@ jobs:
           bash scripts/generate-icons.sh
 
       - name: Build Python sidecar
+        env:
+          PYTHONPATH: .
         run: |
           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
           pyinstaller \
@@ -190,6 +192,8 @@ jobs:
           bash scripts/generate-icons.sh
 
       - name: Build Python sidecar
+        env:
+          PYTHONPATH: .
         run: |
           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
           pyinstaller \
@@ -273,6 +277,8 @@ jobs:
           node ../scripts/generate-icons.mjs
 
       - name: Build Windows executable
+        env:
+          PYTHONPATH: .
         run: |
           pyinstaller `
             --name Burnrate `

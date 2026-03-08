@@ -13,6 +13,7 @@ call npm run build
 cd ..
 
 echo ==> Building Windows app with PyInstaller...
+set PYTHONPATH=.
 python -m PyInstaller ^
     --name Burnrate ^
     --windowed ^
