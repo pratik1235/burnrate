@@ -30,6 +30,7 @@ jobs:
       - name: Copy assets into site
         run: |
           cp -r assets/screenshot_*.png site/ 2>/dev/null || true
+          cp assets/burnrate-demo.mp4 site/ 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

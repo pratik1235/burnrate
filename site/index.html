@@ -350,6 +350,24 @@
       color: var(--white);
     }
 
+    /* --- VIDEO --- */
+    .video-container {
+      position: relative;
+      max-width: 960px;
+      margin: 0 auto;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+    }
+
+    .video-container video {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: var(--black);
+    }
+
     /* --- PRIVACY --- */
     .privacy-grid {
       display: grid;
@@ -522,6 +540,7 @@
       <span>Burnrate</span>
     </a>
     <ul class="nav-links">
+      <li><a href="#demo">Demo</a></li>
       <li><a href="#features">Features</a></li>
       <li><a href="#privacy">Privacy</a></li>
       <li><a href="#install">Install</a></li>
@@ -578,6 +597,21 @@
       <button class="screenshot-tab" onclick="showScreenshot('analytics', this)">Analytics</button>
       <button class="screenshot-tab" onclick="showScreenshot('cards', this)">Cards</button>
       <button class="screenshot-tab" onclick="showScreenshot('setup', this)">Setup</button>
+    </div>
+  </section>
+
+  <!-- DEMO VIDEO -->
+  <section class="screenshot-section" id="demo">
+    <div class="section-label">Product Demo</div>
+    <h2 class="section-title">See Burnrate in action</h2>
+    <p class="section-desc" style="margin-left:auto;margin-right:auto;">
+      From importing your first PDF statement to exploring rich analytics &mdash; all running locally on your machine.
+    </p>
+    <div class="video-container">
+      <video controls preload="metadata" playsinline>
+        <source src="burnrate-demo.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
     </div>
   </section>
 

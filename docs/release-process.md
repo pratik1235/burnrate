@@ -8,13 +8,15 @@ This document describes the release process for Burnrate, including pre-release 
 
 Burnrate produces the following release artifacts:
 
-| Artifact | Platform | Description |
-|----------|----------|-------------|
-| **Docker image** | linux/amd64, linux/arm64 | Multi-arch image pushed to Docker Hub |
-| **macOS DMG** | Apple Silicon (aarch64) | Native Tauri app with PyInstaller sidecar |
-| **macOS DMG** | Intel (x86_64) | Native Tauri app with PyInstaller sidecar |
-| **Windows installer** | x86_64 | PyInstaller + Inno Setup `.exe` |
-| **Homebrew formula** | macOS | Auto-updated in `pratik1235/homebrew-burnrate` tap |
+
+| Artifact              | Platform                 | Description                                        |
+| --------------------- | ------------------------ | -------------------------------------------------- |
+| **Docker image**      | linux/amd64, linux/arm64 | Multi-arch image pushed to Docker Hub              |
+| **macOS DMG**         | Apple Silicon (aarch64)  | Native Tauri app with PyInstaller sidecar          |
+| **macOS DMG**         | Intel (x86_64)           | Native Tauri app with PyInstaller sidecar          |
+| **Windows installer** | x86_64                   | PyInstaller + Inno Setup `.exe`                    |
+| **Homebrew formula**  | macOS                    | Auto-updated in `pratik1235/homebrew-burnrate` tap |
+
 
 ---
 
@@ -22,11 +24,11 @@ Burnrate produces the following release artifacts:
 
 Before creating a release, complete these steps:
 
-- [ ] **Version bump** — Update version in all locations (see §6)
-- [ ] **Changelog** — Document notable changes for the release notes
-- [ ] **Local testing** — Run the app locally; verify statement import, analytics, tags
-- [ ] **macOS build** — Run `bash scripts/build-macos.sh` and test the DMG
-- [ ] **Commit and push** — Ensure all changes are committed and pushed to `main`
+- **Version bump** — Update version in all locations (see §6)
+- **Changelog** — Document notable changes for the release notes
+- **Local testing** — Run the app locally; verify statement import, analytics, tags
+- **macOS build** — Run `bash scripts/build-macos.sh` and test the DMG
+- **Commit and push** — Ensure all changes are committed and pushed to `main`
 
 ---
 
@@ -128,10 +130,10 @@ Update the release artifact references in the readme.md file.
 
 ### 5.2 Verify artifacts -- Optional
 
-- [ ] Download and test the macOS DMG on Apple Silicon and/or Intel
-- [ ] Download and test the Windows installer
-- [ ] Pull and run the Docker image
-- [ ] Run `brew upgrade burnrate` and verify the Homebrew formula
+- Download and test the macOS DMG on Apple Silicon and/or Intel
+- Download and test the Windows installer
+- Pull and run the Docker image
+- Run `brew upgrade burnrate` and verify the Homebrew formula
 
 ### 5.3 Homebrew formula SHA
 
@@ -150,12 +152,14 @@ SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
 
 Update the version in these files when cutting a release:
 
-| File | Location |
-|------|----------|
-| `src-tauri/tauri.conf.json` | `"version": "0.2.1"` |
-| `src-tauri/Cargo.toml` | `version = "0.2.1"` |
-| `scripts/burnrate.iss` | `AppVersion=0.2.1` |
+
+| File                          | Location                                                          |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `src-tauri/tauri.conf.json`   | `"version": "0.2.1"`                                              |
+| `src-tauri/Cargo.toml`        | `version = "0.2.1"`                                               |
+| `scripts/burnrate.iss`        | `AppVersion=0.2.1`                                                |
 | `HomebrewFormula/burnrate.rb` | `url "https://github.com/.../archive/v0.2.1.tar.gz"` and `sha256` |
+
 
 The `frontend-neopop/package.json` uses `"version": "0.0.0"` (private package) and does not need to be updated.
 

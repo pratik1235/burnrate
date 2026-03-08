@@ -60,20 +60,7 @@ python -m PyInstaller \
     --hidden-import uvicorn.protocols.websockets.auto \
     --hidden-import uvicorn.lifespan \
     --hidden-import uvicorn.lifespan.on \
-    --hidden-import backend.parsers.hdfc \
-    --hidden-import backend.parsers.icici \
-    --hidden-import backend.parsers.axis \
-    --hidden-import backend.parsers.federal \
-    --hidden-import backend.parsers.indian_bank \
-    --hidden-import backend.parsers.generic \
-    --hidden-import backend.parsers.detector \
-    --hidden-import backend.routers.analytics \
-    --hidden-import backend.routers.cards \
-    --hidden-import backend.routers.categories \
-    --hidden-import backend.routers.settings \
-    --hidden-import backend.routers.statements \
-    --hidden-import backend.routers.tags \
-    --hidden-import backend.routers.transactions \
+    --collect-all backend \
     --collect-all pdfplumber \
     --collect-all charset_normalizer \
     scripts/launch.py

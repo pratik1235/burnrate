@@ -4,6 +4,8 @@
 
 Burnrate is a personal finance analytics app that runs entirely on your laptop. Your financial data never leaves your machine — no cloud, no servers, no tracking.
 
+**[→ Website & demo](https://pratik1235.github.io/burnrate)**
+
 ![Dashboard](assets/screenshot_dashboard.png)
 
 ## Features
@@ -43,8 +45,8 @@ Then open http://localhost:8000 in your browser.
 ### Docker
 
 ```bash
-docker pull pratik1235/burnrate:v0.2.0
-docker run -p 8000:8000 -v burnrate_data:/data pratik1235/burnrate:v0.2.0
+docker pull pratik1235/burnrate:v0.2.4
+docker run -p 8000:8000 -v burnrate_data:/data pratik1235/burnrate:v0.2.4
 ```
 
 ### macOS — Homebrew
