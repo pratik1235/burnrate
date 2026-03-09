@@ -101,12 +101,15 @@ jobs:
           bash scripts/generate-icons.sh
 
       - name: Build Python sidecar
+        env:
+          PYTHONPATH: .
         run: |
           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
           pyinstaller \
             --name burnrate-server \
             --onefile \
             --noconfirm \
+            --paths . \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.loops \
             --hidden-import uvicorn.loops.auto \
@@ -189,12 +192,15 @@ jobs:
           bash scripts/generate-icons.sh
 
       - name: Build Python sidecar
+        env:
+          PYTHONPATH: .
         run: |
           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
           pyinstaller \
             --name burnrate-server \
             --onefile \
             --noconfirm \
+            --paths . \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.loops \
             --hidden-import uvicorn.loops.auto \
@@ -271,6 +277,8 @@ jobs:
           node ../scripts/generate-icons.mjs
 
       - name: Build Windows executable
+        env:
+          PYTHONPATH: .
         run: |
           pyinstaller `
             --name Burnrate `
@@ -278,6 +286,7 @@ jobs:
             --noconfirm `
             --icon "src-tauri/icons/icon.ico" `
             --add-data "frontend-neopop/dist;static" `
+            --paths . `
             --hidden-import uvicorn.logging `
             --hidden-import uvicorn.loops `
             --hidden-import uvicorn.loops.auto `

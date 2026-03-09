@@ -43,10 +43,14 @@ def main() -> None:
     if static_dir:
         os.environ.setdefault("BURNRATE_STATIC_DIR", static_dir)
 
-    # Ensure project root is importable
-    project_root = str(Path(__file__).resolve().parent.parent)
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
+    if getattr(sys, "frozen", False):
+        # PyInstaller bundle: sys._MEIPASS is already on sys.path.
+        # No additional path manipulation needed.
+        pass
+    else:
+        project_root = str(Path(__file__).resolve().parent.parent)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
 
     import uvicorn
     from backend.main import app

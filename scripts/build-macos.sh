@@ -45,11 +45,12 @@ pip install --quiet -r requirements.txt
 pip uninstall -y charset-normalizer || true
 pip install charset-normalizer --no-binary :all:
 
-python -m PyInstaller \
+PYTHONPATH=. python -m PyInstaller \
     --name burnrate-server \
     --onefile \
     --noconfirm \
     --add-data "frontend-neopop/dist:static" \
+    --paths . \
     --hidden-import uvicorn.logging \
     --hidden-import uvicorn.loops \
     --hidden-import uvicorn.loops.auto \
