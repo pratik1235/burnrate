@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
-from backend.models.models import Statement, Transaction
+from backend.models.models import Statement
 from backend.services.analytics import (
     compute_net_spend,
     get_category_breakdown,

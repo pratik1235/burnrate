@@ -23,6 +23,7 @@ def _get_parsers() -> Dict[str, Type]:
     from backend.parsers.federal import FederalBankParser
     from backend.parsers.generic import GenericParser
     from backend.parsers.hdfc import HDFCParser
+    from backend.parsers.idfc_first import IDFCFirstBankParser
     from backend.parsers.icici import ICICIParser
     from backend.parsers.indian_bank import IndianBankParser
 
@@ -32,6 +33,7 @@ def _get_parsers() -> Dict[str, Type]:
         "axis": AxisParser,
         "federal": FederalBankParser,
         "indian_bank": IndianBankParser,
+        "idfc_first": IDFCFirstBankParser,
     }
 
 

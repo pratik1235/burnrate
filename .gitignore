@@ -83,3 +83,6 @@ src-tauri/gen/
 
 # PyInstaller spec files
 *.spec
+
+# Editor files
+.vscode/

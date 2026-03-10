@@ -38,7 +38,7 @@ def upload_statement(
         raise HTTPException(status_code=413, detail="File too large (max 50 MB)")
     with open(persistent_path, "wb") as f:
         f.write(content)
-
+        
     result = process_statement(
         pdf_path=persistent_path,
         bank=bank.lower() if bank else None,

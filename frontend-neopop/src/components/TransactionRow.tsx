@@ -18,6 +18,7 @@ import {
   Heart,
   ShoppingCart,
   CreditCard,
+  Coins,
   MoreHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -52,6 +53,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ShoppingCart,
   CreditCard,
   MoreHorizontal,
+  Coins,
 };
 
 const TagBtn = styled.div`
@@ -128,6 +130,9 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
   const catLabel = dynamicCat?.name ?? CATEGORY_CONFIG[transaction.category]?.label ?? transaction.category;
   const catIcon = dynamicCat?.icon ?? CATEGORY_CONFIG[transaction.category]?.icon ?? 'MoreHorizontal';
   const Icon = ICON_MAP[catIcon] ?? MoreHorizontal;
+  console.log("catLabel", catLabel);
+  console.log("catIcon", catIcon);
+  console.log("icon", Icon);
   const bankConfig = BANK_CONFIG[transaction.bank] ?? BANK_CONFIG.hdfc;
   const isCredit = transaction.type === 'credit';
   const isCcPayment = transaction.category === 'cc_payment';
@@ -165,7 +170,7 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
               {tags.map((tag) => (
                 <Tag
                   key={tag}
-                  colorConfig={{ background: 'rgba(255,135,68,0.15)', color: colorPalette.rss[500] }}
+                  colorConfig={{ background: 'rgba(88, 57, 41, 0.15)', color: colorPalette.rss[500] }}
                   colorMode="dark"
                 >
                   {tag}

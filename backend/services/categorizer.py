@@ -13,6 +13,9 @@ def categorize(merchant_name: str, db_session=None) -> str:
         return "other"
     lower = merchant_name.lower()
 
+    if "cashback" in lower:
+        return "cashback"
+
     close_session = False
     if db_session is None:
         db_session = SessionLocal()
