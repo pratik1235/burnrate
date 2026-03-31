@@ -25,7 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.models.database import SessionLocal, init_db
 from backend.models.models import CategoryDefinition, Settings
-from backend.routers import analytics, cards, categories, settings, statements, tags, transactions
+from backend.routers import analytics, cards, categories, gmail, settings, statements, tags, transactions
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +98,26 @@ async def lifespan(app: FastAPI):
             daemon=True,
         ).start()
 
+    def _gmail_startup_sync() -> None:
+        import time
+
+        time.sleep(2)
+        db = SessionLocal()
+        try:
+            from backend.models.models import OAuthCredential
+
+            if not db.query(OAuthCredential).filter(OAuthCredential.provider == "google_gmail").first():
+                return
+            from backend.services import gmail_sync as _gs
+
+            _gs.run_gmail_sync(db, force=False)
+        except Exception:
+            logger.exception("Gmail startup sync failed")
+        finally:
+            db.close()
+
+    threading.Thread(target=_gmail_startup_sync, name="gmail-startup-sync", daemon=True).start()
+
     yield
 
     from backend.routers.settings import get_watcher_observer
@@ -147,6 +167,7 @@ app.include_router(transactions.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
 app.include_router(tags.router, prefix="/api")
+app.include_router(gmail.router, prefix="/api")
 
 _project_root_for_static = Path(__file__).resolve().parent.parent
 _static_candidates = [

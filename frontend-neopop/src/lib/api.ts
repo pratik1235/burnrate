@@ -465,3 +465,35 @@ export async function reparseAllStatements(): Promise<{ status: string; total: n
   const { data } = await api.post<{ status: string; total: number; success: number; failed: number; skipped: number }>('/statements/reparse-all', {}, { timeout: 300000 });
   return data;
 }
+
+export interface GmailStatusResponse {
+  configured: boolean;
+  connected: boolean;
+  last_sync: string | null;
+}
+
+export async function getGmailStatus(): Promise<GmailStatusResponse> {
+  const { data } = await api.get<GmailStatusResponse>('/gmail/status');
+  return data;
+}
+
+export async function startGmailAuth(): Promise<{ auth_url: string }> {
+  const { data } = await api.post<{ auth_url: string }>('/gmail/auth/start');
+  return data;
+}
+
+export async function disconnectGmail(): Promise<{ status: string }> {
+  const { data } = await api.post<{ status: string }>('/gmail/disconnect');
+  return data;
+}
+
+export async function triggerGmailSync(): Promise<{
+  status: string;
+  messages_scanned?: number;
+  attachments_queued?: number;
+  reason?: string;
+  seconds_remaining?: number;
+}> {
+  const { data } = await api.post('/gmail/sync', {}, { timeout: 120000 });
+  return data;
+}

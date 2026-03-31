@@ -7,3 +7,7 @@ watchdog==6.0.0
 python-multipart==0.0.20
 aiofiles==24.1.0
 platformdirs==4.3.6
+cryptography==44.0.2
+google-auth==2.38.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.161.0

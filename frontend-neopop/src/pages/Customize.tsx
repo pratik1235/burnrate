@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { StatUpload } from '@/components/StatUpload';
 import { Button, Typography, ElevatedCard, Tag, InputField, Row, Column } from '@cred/neopop-web/lib/components';
@@ -19,11 +19,14 @@ import {
   deleteTagDefinition,
   uploadStatement,
   uploadStatementsBulk,
+  getGmailStatus,
+  startGmailAuth,
+  disconnectGmail,
 } from '@/lib/api';
 import type { Statement } from '@/lib/types';
-import type { CategoryResponse, TagDefinitionResponse } from '@/lib/api';
+import type { CategoryResponse, TagDefinitionResponse, GmailStatusResponse } from '@/lib/api';
 import { toast } from '@/components/Toast';
-import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus, CreditCard, Landmark, Lock } from 'lucide-react';
+import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus, CreditCard, Landmark, Lock, Mail } from 'lucide-react';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { CloseButton } from '@/components/CloseButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -1067,11 +1070,129 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
   );
 }
 
+function GmailAutosyncModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [status, setStatus] = useState<GmailStatusResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    getGmailStatus()
+      .then((s) => {
+        if (!cancelled) setStatus(s);
+      })
+      .catch(() => {
+        if (!cancelled) setStatus(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const handleConnect = async () => {
+    try {
+      const { auth_url: authUrl } = await startGmailAuth();
+      window.location.href = authUrl;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not start Gmail sign-in');
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await disconnectGmail();
+      toast.success('Gmail disconnected');
+      setStatus(await getGmailStatus());
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Disconnect failed');
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <ModalOverlay>
+      <ModalBackdrop onClick={onClose} />
+      <ElevatedCard
+        backgroundColor={colorPalette.black[90]}
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 480,
+          maxHeight: '80vh',
+          overflow: 'auto',
+          boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
+            Autosync statements
+          </Typography>
+          <CloseButton onClick={onClose} variant="modal" />
+        </div>
+        <div style={{ padding: 20 }}>
+          <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.7)" style={{ marginBottom: 16 }}>
+            Optional: connect Gmail with read-only access. Burnrate searches for statement-like attachments and saves them to your watch folder (or uploads), then runs the same import pipeline as manual drops. You can disconnect anytime.
+          </Typography>
+          {loading && (
+            <Typography fontType={FontType.BODY} fontSize={13} color="rgba(255,255,255,0.5)">
+              Loading…
+            </Typography>
+          )}
+          {!loading && status && !status.configured && (
+            <Typography fontType={FontType.BODY} fontSize={13} color={colorPalette.rss[400]}>
+              Gmail autosync is not enabled on this server (missing <code style={{ fontSize: 12 }}>GOOGLE_OAUTH_CLIENT_ID</code>).
+            </Typography>
+          )}
+          {!loading && status?.configured && (
+            <Row style={{ gap: 12, marginTop: 8 }}>
+              {status.connected ? (
+                <Button kind="primary" colorMode="dark" onClick={() => void handleDisconnect()}>
+                  Disconnect Gmail
+                </Button>
+              ) : (
+                <Button kind="primary" colorMode="dark" onClick={() => void handleConnect()}>
+                  Connect Gmail
+                </Button>
+              )}
+            </Row>
+          )}
+        </div>
+      </ElevatedCard>
+    </ModalOverlay>
+  );
+}
+
 export function Customize() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [reparseModalOpen, setReparseModalOpen] = useState(false);
   const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
+  const [gmailModalOpen, setGmailModalOpen] = useState(false);
+
+  useEffect(() => {
+    const g = searchParams.get('gmail');
+    if (g === 'connected') {
+      toast.success('Gmail connected');
+      setSearchParams({}, { replace: true });
+    } else if (g === 'error') {
+      toast.error('Gmail connection failed');
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleCCUpload = async (file: File, password?: string) => {
     const loadingId = toast.loading('Processing card statement...');
@@ -1178,6 +1299,16 @@ export function Customize() {
         </div>
 
         <CardsGrid>
+          <FeatureCard onClick={() => setGmailModalOpen(true)}>
+            <Mail size={24} color={colorPalette.info[500]} />
+            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+              Autosync statements
+            </Typography>
+            <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+              Optional Gmail import for statement attachments (read-only OAuth).
+            </Typography>
+          </FeatureCard>
+
           <FeatureCard onClick={() => setTagsModalOpen(true)}>
             <TagIcon size={24} color={colorPalette.rss[500]} />
             <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
@@ -1219,6 +1350,7 @@ export function Customize() {
           </FeatureCard>
         </CardsGrid>
 
+        <GmailAutosyncModal open={gmailModalOpen} onClose={() => setGmailModalOpen(false)} />
         <DefineTagsModal open={tagsModalOpen} onClose={() => setTagsModalOpen(false)} />
         <ReparseRemoveModal open={reparseModalOpen} onClose={() => setReparseModalOpen(false)} />
         <DefineCategoriesModal open={categoriesModalOpen} onClose={() => setCategoriesModalOpen(false)} />

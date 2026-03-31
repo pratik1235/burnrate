@@ -71,6 +71,7 @@ def _run_migrations(engine_ref) -> None:
         ("statements", "source", "VARCHAR(4) NOT NULL DEFAULT 'CC'"),
         ("statements", "status", "VARCHAR(20) NOT NULL DEFAULT 'success'"),
         ("transactions", "source", "VARCHAR(4) NOT NULL DEFAULT 'CC'"),
+        ("settings", "last_gmail_sync", "DATETIME"),
     ]
 
     with engine_ref.connect() as conn:

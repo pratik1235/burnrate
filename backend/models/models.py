@@ -35,6 +35,7 @@ class Settings(Base):
     dob_month = Column(String(2), nullable=True)
     dob_year = Column(String(4), nullable=True)
     watch_folder = Column(String(1024), nullable=True)
+    last_gmail_sync = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -98,6 +99,29 @@ class Transaction(Base):
 
     statement = relationship("Statement", back_populates="transactions")
     tags = relationship("TransactionTag", back_populates="transaction", cascade="all, delete-orphan")
+
+
+class OAuthPending(Base):
+    """Temporary PKCE verifier keyed by OAuth state (CSRF token)."""
+
+    __tablename__ = "oauth_pending"
+
+    state = Column(String(128), primary_key=True)
+    code_verifier = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class OAuthCredential(Base):
+    """Encrypted OAuth tokens for optional Gmail integration."""
+
+    __tablename__ = "oauth_credentials"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider = Column(String(32), nullable=False, unique=True, default="google_gmail")
+    encrypted_refresh_token = Column(Text, nullable=False)
+    encrypted_access_token = Column(Text, nullable=True)
+    access_token_expires_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class TransactionTag(Base):
