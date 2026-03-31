@@ -22,6 +22,8 @@ export interface Transaction {
   bank: Bank;
   cardLast4: string;
   source: Source;
+  /** ISO 4217 (e.g. INR, USD) */
+  currency?: string;
   tags?: string[];
 }
 
@@ -33,6 +35,7 @@ export interface Statement {
   periodEnd: string;
   transactionCount: number;
   totalSpend: number;
+  currency?: string;
   source: Source;
   status: 'success' | 'parse_error' | 'password_needed';
   importedAt: string;
@@ -83,6 +86,7 @@ export const CATEGORY_COLORS: Record<Category, string> = {
   health: '#10B981',
   groceries: '#14B8A6',
   cc_payment: '#6B7280',
+  cashback: '#06C270',
   other: '#9CA3AF',
 };
 
@@ -96,5 +100,6 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; icon: string; co
   health: { label: 'Health', icon: 'Heart', color: CATEGORY_COLORS.health },
   groceries: { label: 'Groceries', icon: 'ShoppingCart', color: CATEGORY_COLORS.groceries },
   cc_payment: { label: 'CC Bill Payment', icon: 'CreditCard', color: CATEGORY_COLORS.cc_payment },
+  cashback: { label: 'Cashback', icon: 'Coins', color: CATEGORY_COLORS.cashback },
   other: { label: 'Other', icon: 'MoreHorizontal', color: CATEGORY_COLORS.other },
 };

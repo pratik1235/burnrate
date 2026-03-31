@@ -20,6 +20,8 @@ interface SetupFormData {
   dobYear: string;
   cards: CardEntry[];
   watchFolder: string;
+  /** Empty = no preference (amounts still follow each transaction's currency) */
+  displayCurrency: string;
 }
 
 export interface SetupFormInitialData {
@@ -29,6 +31,7 @@ export interface SetupFormInitialData {
   dobYear?: string;
   cards?: CardEntry[];
   watchFolder?: string;
+  displayCurrency?: string;
 }
 
 interface SetupFormProps {
@@ -49,6 +52,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
   const [dobYear, setDobYear] = useState('');
   const [cards, setCards] = useState<CardEntry[]>([{ bank: 'hdfc', last4: '' }]);
   const [watchFolder, setWatchFolder] = useState('');
+  const [displayCurrency, setDisplayCurrency] = useState('');
 
   const dobDayRef = useRef<HTMLInputElement | null>(null);
   const dobMonthRef = useRef<HTMLInputElement | null>(null);
@@ -66,6 +70,9 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
       if (initialData.dobMonth) setDobMonth(initialData.dobMonth);
       if (initialData.dobYear) setDobYear(initialData.dobYear);
       if (initialData.watchFolder) setWatchFolder(initialData.watchFolder);
+      if (initialData.displayCurrency !== undefined) {
+        setDisplayCurrency(initialData.displayCurrency ?? '');
+      }
       if (initialData.cards && initialData.cards.length > 0) {
         setCards(initialData.cards);
       }
@@ -106,7 +113,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit?.({ name, dobDay, dobMonth, dobYear, cards, watchFolder });
+    onSubmit?.({ name, dobDay, dobMonth, dobYear, cards, watchFolder, displayCurrency });
   };
 
   return (
@@ -382,6 +389,36 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
               </div>
               <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 4 }}>
                 Tip: Sync your Google Drive here for auto-import
+              </Typography>
+            </div>
+
+            <div style={{ overflow: 'hidden', minWidth: 0 }}>
+              <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.6)" style={{ marginBottom: 6 }}>
+                Display preference (optional)
+              </Typography>
+              <select
+                value={displayCurrency}
+                onChange={(e) => setDisplayCurrency(e.target.value)}
+                style={{
+                  width: '100%',
+                  maxWidth: 280,
+                  boxSizing: 'border-box',
+                  backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                  color: '#ffffff',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  outline: 'none',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">Auto (from transaction currency)</option>
+                <option value="INR">INR</option>
+                <option value="USD">USD</option>
+              </select>
+              <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)" style={{ marginTop: 4 }}>
+                Does not convert amounts; used for empty states and ordering only.
               </Typography>
             </div>
 

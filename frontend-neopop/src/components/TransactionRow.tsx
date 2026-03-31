@@ -18,6 +18,7 @@ import {
   Heart,
   ShoppingCart,
   CreditCard,
+  Coins,
   MoreHorizontal,
   EyeOff,
   Eye,
@@ -53,6 +54,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Heart,
   ShoppingCart,
   CreditCard,
+  Coins,
   MoreHorizontal,
 };
 
@@ -349,7 +351,7 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
           fontWeight={FontWeights.SEMI_BOLD}
           color={isCredit ? mainColors.green : mainColors.white}
         >
-          {isCredit ? '+' : '-'}{formatCurrency(transaction.amount)}
+          {isCredit ? '+' : '-'}{formatCurrency(transaction.amount, transaction.currency ?? 'INR')}
         </Typography>
         <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 4 }}>
           {new Date(transaction.date).toLocaleDateString('en-IN', {

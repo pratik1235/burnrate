@@ -15,6 +15,9 @@ import {
   type SetupProfilePayload,
   type GetTransactionsParams,
   type GetSummaryResponse,
+  type CategoryBlockByCurrency,
+  type TrendsBlockByCurrency,
+  type MerchantsBlockByCurrency,
 } from '@/lib/api';
 
 export function useSettings(): {
@@ -91,12 +94,21 @@ const EMPTY_SUMMARY: GetSummaryResponse = {
   deltaPercent: 0,
   period: 'This month',
   sparklineData: [{ value: 0 }],
+  mixedCurrency: false,
 };
+
+function isUsableSummary(res: GetSummaryResponse | null | undefined): boolean {
+  if (!res) return false;
+  if (res.mixedCurrency) return true;
+  return typeof res.totalSpend === 'number';
+}
 
 export function useTransactions(filters: TransactionFilters = {}) {
   const [transactions, setTransactions] = useState<import('@/lib/types').Transaction[]>([]);
   const [total, setTotal] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0);
+  const [totalAmount, setTotalAmount] = useState<number | null>(0);
+  const [totalsByCurrency, setTotalsByCurrency] = useState<{ currency: string; amount: number }[]>([]);
+  const [mixedCurrency, setMixedCurrency] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -124,12 +136,17 @@ export function useTransactions(filters: TransactionFilters = {}) {
       const result = await apiGetTransactions(params);
       setTransactions(Array.isArray(result?.transactions) ? result.transactions : []);
       setTotal(typeof result?.total === 'number' ? result.total : 0);
-      setTotalAmount(typeof result?.totalAmount === 'number' ? result.totalAmount : 0);
+      const ta = result?.totalAmount;
+      setTotalAmount(typeof ta === 'number' ? ta : ta === null ? null : 0);
+      setTotalsByCurrency(Array.isArray(result?.totalsByCurrency) ? result.totalsByCurrency : []);
+      setMixedCurrency(!!result?.mixedCurrency);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
       setTransactions([]);
       setTotal(0);
       setTotalAmount(0);
+      setTotalsByCurrency([]);
+      setMixedCurrency(false);
     } finally {
       setLoading(false);
     }
@@ -176,7 +193,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
         if (!cancelled) {
           setTransactions(Array.isArray(result?.transactions) ? result.transactions : []);
           setTotal(typeof result?.total === 'number' ? result.total : 0);
-          setTotalAmount(typeof result?.totalAmount === 'number' ? result.totalAmount : 0);
+          const ta = result?.totalAmount;
+          setTotalAmount(typeof ta === 'number' ? ta : ta === null ? null : 0);
+          setTotalsByCurrency(Array.isArray(result?.totalsByCurrency) ? result.totalsByCurrency : []);
+          setMixedCurrency(!!result?.mixedCurrency);
         }
       } catch (e) {
         if (!cancelled) {
@@ -184,6 +204,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
           setTransactions([]);
           setTotal(0);
           setTotalAmount(0);
+          setTotalsByCurrency([]);
+          setMixedCurrency(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -207,7 +229,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.offset,
   ]);
 
-  return { transactions, total, totalAmount, loading, error, refetch };
+  return { transactions, total, totalAmount, totalsByCurrency, mixedCurrency, loading, error, refetch };
 }
 
 export interface AnalyticsFilters {
@@ -226,8 +248,11 @@ export interface AnalyticsFilters {
 export function useAnalytics(filters: AnalyticsFilters = {}) {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [categories, setCategories] = useState<import('@/lib/types').CategoryBreakdown[]>([]);
+  const [categoriesByCurrency, setCategoriesByCurrency] = useState<CategoryBlockByCurrency[]>([]);
   const [trends, setTrends] = useState<import('@/lib/types').MonthlyTrend[]>([]);
+  const [trendsByCurrency, setTrendsByCurrency] = useState<TrendsBlockByCurrency[]>([]);
   const [merchants, setMerchants] = useState<import('@/lib/types').MerchantSpend[]>([]);
+  const [merchantsByCurrency, setMerchantsByCurrency] = useState<MerchantsBlockByCurrency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -256,20 +281,37 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
           getTrends(apiParams),
           getMerchants(apiParams),
         ]);
-      setSummary(
-        summaryRes && typeof summaryRes.totalSpend === 'number'
-          ? summaryRes
-          : EMPTY_SUMMARY
-      );
-      setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
-      setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
-      setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+      setSummary(isUsableSummary(summaryRes) ? summaryRes! : EMPTY_SUMMARY);
+      if (categoriesRes?.mixedCurrency && categoriesRes.byCurrency?.length) {
+        setCategories([]);
+        setCategoriesByCurrency(categoriesRes.byCurrency);
+      } else {
+        setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
+        setCategoriesByCurrency([]);
+      }
+      if (trendsRes?.mixedCurrency && trendsRes.trendsByCurrency?.length) {
+        setTrends([]);
+        setTrendsByCurrency(trendsRes.trendsByCurrency);
+      } else {
+        setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
+        setTrendsByCurrency([]);
+      }
+      if (merchantsRes?.mixedCurrency && merchantsRes.merchantsByCurrency?.length) {
+        setMerchants([]);
+        setMerchantsByCurrency(merchantsRes.merchantsByCurrency);
+      } else {
+        setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+        setMerchantsByCurrency([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
       setSummary(EMPTY_SUMMARY);
       setCategories([]);
+      setCategoriesByCurrency([]);
       setTrends([]);
+      setTrendsByCurrency([]);
       setMerchants([]);
+      setMerchantsByCurrency([]);
     } finally {
       setLoading(false);
     }
@@ -314,20 +356,39 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
             getMerchants(apiParams),
           ]);
         if (!cancelled) {
-          setSummary(
-            summaryRes && typeof summaryRes.totalSpend === 'number' ? summaryRes : EMPTY_SUMMARY
-          );
-          setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
-          setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
-          setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+          setSummary(isUsableSummary(summaryRes) ? summaryRes! : EMPTY_SUMMARY);
+          if (categoriesRes?.mixedCurrency && categoriesRes.byCurrency?.length) {
+            setCategories([]);
+            setCategoriesByCurrency(categoriesRes.byCurrency);
+          } else {
+            setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
+            setCategoriesByCurrency([]);
+          }
+          if (trendsRes?.mixedCurrency && trendsRes.trendsByCurrency?.length) {
+            setTrends([]);
+            setTrendsByCurrency(trendsRes.trendsByCurrency);
+          } else {
+            setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
+            setTrendsByCurrency([]);
+          }
+          if (merchantsRes?.mixedCurrency && merchantsRes.merchantsByCurrency?.length) {
+            setMerchants([]);
+            setMerchantsByCurrency(merchantsRes.merchantsByCurrency);
+          } else {
+            setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+            setMerchantsByCurrency([]);
+          }
         }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e : new Error(String(e)));
           setSummary(EMPTY_SUMMARY);
           setCategories([]);
+          setCategoriesByCurrency([]);
           setTrends([]);
+          setTrendsByCurrency([]);
           setMerchants([]);
+          setMerchantsByCurrency([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -350,8 +411,11 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
   return {
     summary,
     categories,
+    categoriesByCurrency,
     trends,
+    trendsByCurrency,
     merchants,
+    merchantsByCurrency,
     loading,
     error,
     refetch,

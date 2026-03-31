@@ -104,17 +104,26 @@ function getDateRangeFromPreset(preset: Preset): { from?: string; to?: string } 
 
 function generateInsight(
   merchants: { merchant: string; amount: number; count: number }[],
-  categories: { category: string; amount: number }[]
+  categories: { category: string; amount: number }[],
+  mixed: boolean,
+  insightCurrency: string,
 ): string {
+  if (mixed) {
+    return 'You have spending in multiple currencies. Totals are shown separately—never combined without your own exchange rates.';
+  }
   const top = merchants[0];
   const topCat = categories[0];
   if (!top && !topCat) return 'Add more transactions to unlock insights!';
 
   const insights: string[] = [];
+  const compact = (amt: number) =>
+    insightCurrency === 'USD'
+      ? `$${(amt / 1000).toFixed(0)}k`
+      : `₹${(amt / 1000).toFixed(0)}k`;
 
   if (top && top.count >= 5) {
     insights.push(
-      `You ordered from ${top.merchant} ${top.count} times this period — that's ₹${(top.amount / 1000).toFixed(0)}k in total.`
+      `You ordered from ${top.merchant} ${top.count} times this period — that's ${compact(top.amount)} in total.`
     );
   }
   if (top && top.count >= 10) {
@@ -125,7 +134,7 @@ function generateInsight(
   if (topCat && topCat.amount > 20000) {
     const label = CATEGORY_CONFIG[topCat.category as keyof typeof CATEGORY_CONFIG]?.label ?? topCat.category;
     insights.push(
-      `Your biggest spend category is ${label} at ₹${(topCat.amount / 1000).toFixed(0)}k.`
+      `Your biggest spend category is ${label} at ${compact(topCat.amount)}.`
     );
   }
   if (merchants.some((m) => m.merchant.includes('Swiggy') || m.merchant.includes('Zomato'))) {
@@ -136,7 +145,7 @@ function generateInsight(
     const count = food.reduce((s, m) => s + m.count, 0);
     if (count >= 5) {
       insights.push(
-        `You ordered food delivery ${count} times (₹${(total / 1000).toFixed(0)}k). Your kitchen misses you.`
+        `You ordered food delivery ${count} times (${compact(total)}). Your kitchen misses you.`
       );
     }
   }
@@ -166,7 +175,16 @@ function AnalyticsContent() {
   // Derive active preset from the global filter dateRange (undefined when no date range set)
   const activePreset = useMemo(() => presetFromDateRange(filters.dateRange), [filters.dateRange]);
 
-  const { summary, categories, trends, merchants, loading } = useAnalytics({
+  const {
+    summary,
+    categories,
+    categoriesByCurrency,
+    trends,
+    trendsByCurrency,
+    merchants,
+    merchantsByCurrency,
+    loading,
+  } = useAnalytics({
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
@@ -181,21 +199,64 @@ function AnalyticsContent() {
   });
 
   const safeCategories = Array.isArray(categories) ? categories : [];
+  const safeCategoriesByCurrency = Array.isArray(categoriesByCurrency) ? categoriesByCurrency : [];
   const safeTrends = Array.isArray(trends) ? trends : [];
+  const safeTrendsByCurrency = Array.isArray(trendsByCurrency) ? trendsByCurrency : [];
   const safeMerchants = Array.isArray(merchants) ? merchants : [];
+  const safeMerchantsByCurrency = Array.isArray(merchantsByCurrency) ? merchantsByCurrency : [];
 
   const avgMonthlySpend = summary?.avgMonthlySpend ?? 0;
   const monthsInRange = summary?.monthsInRange ?? 0;
+  const mixedSummary = !!summary?.mixedCurrency;
+
+  const insightCurrency =
+    summary?.totalSpendByCurrency?.length === 1
+      ? summary.totalSpendByCurrency[0].currency
+      : 'INR';
+
+  const avgByCurrency = useMemo(() => {
+    if (!mixedSummary || !summary?.totalSpendByCurrency?.length || !monthsInRange) return null;
+    return summary.totalSpendByCurrency.map((t) => ({
+      currency: t.currency,
+      avg: t.amount / monthsInRange,
+    }));
+  }, [mixedSummary, summary?.totalSpendByCurrency, monthsInRange]);
 
   const creditUtilization = useMemo(() => {
-    const totalLimit = summary?.creditLimit || 0;
     const months = summary?.monthsInRange || 1;
-    if (totalLimit === 0) return { ratio: 0, spend: summary?.totalSpend ?? 0, limit: 0, months };
+    if (mixedSummary || (summary?.creditLimitByCurrency?.length ?? 0) > 0) {
+      return {
+        incomparable: true as const,
+        ratio: 0,
+        spend: 0,
+        limit: 0,
+        months,
+        byCurrency: summary?.creditLimitByCurrency ?? [],
+      };
+    }
+    const totalLimit = summary?.creditLimit || 0;
+    if (totalLimit === 0) {
+      return {
+        incomparable: false as const,
+        ratio: 0,
+        spend: summary?.totalSpend ?? 0,
+        limit: 0,
+        months,
+        byCurrency: [] as { currency: string; amount: number }[],
+      };
+    }
     const currentSpend = summary?.totalSpend ?? 0;
     const effectiveLimit = totalLimit * months;
     const ratio = Math.min(Math.round((currentSpend / effectiveLimit) * 100), 100);
-    return { ratio, spend: currentSpend, limit: totalLimit, months };
-  }, [summary]);
+    return {
+      incomparable: false as const,
+      ratio,
+      spend: currentSpend,
+      limit: totalLimit,
+      months,
+      byCurrency: [] as { currency: string; amount: number }[],
+    };
+  }, [summary, mixedSummary]);
 
   const cardSpend = useMemo(() => {
     const breakdown = summary?.cardBreakdown ?? [];
@@ -204,6 +265,7 @@ function AnalyticsContent() {
         bank: cb.bank as import('@/lib/types').Bank,
         last4: cb.last4,
         amount: cb.amount,
+        currency: cb.currency ?? 'INR',
       }))
       .sort((a, b) => b.amount - a.amount);
   }, [summary]);
@@ -212,9 +274,11 @@ function AnalyticsContent() {
     () =>
       generateInsight(
         safeMerchants,
-        safeCategories.map((c) => ({ category: c.category, amount: c.amount }))
+        safeCategories.map((c) => ({ category: c.category, amount: c.amount })),
+        mixedSummary || safeCategoriesByCurrency.length > 0,
+        insightCurrency,
       ),
-    [safeMerchants, safeCategories]
+    [safeMerchants, safeCategories, mixedSummary, safeCategoriesByCurrency.length, insightCurrency]
   );
 
   const periodLabel = (() => {
@@ -294,8 +358,21 @@ function AnalyticsContent() {
                   </Typography>
                 </div>
                 <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
-                  {formatCurrency(summary?.totalSpend ?? 0)}
+                  {mixedSummary && summary?.totalSpendByCurrency?.length ? (
+                    summary.totalSpendByCurrency
+                      .slice()
+                      .sort((a, b) => a.currency.localeCompare(b.currency))
+                      .map((t) => formatCurrency(t.amount, t.currency))
+                      .join(' · ')
+                  ) : (
+                    formatCurrency(summary?.totalSpend ?? 0, insightCurrency)
+                  )}
                 </Typography>
+                {mixedSummary && (
+                  <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)" style={{ marginBottom: 8 }}>
+                    Multiple currencies — not combined
+                  </Typography>
+                )}
                 <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
                   {periodLabel}
                 </Typography>
@@ -311,6 +388,14 @@ function AnalyticsContent() {
                 {!activePreset ? (
                   <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 12 }}>
                     Select a time window to calculate this metric
+                  </Typography>
+                ) : creditUtilization.incomparable ? (
+                  <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }}>
+                    {creditUtilization.byCurrency.length > 0
+                      ? creditUtilization.byCurrency
+                          .map((c) => `${c.currency}: ${formatCurrency(c.amount, c.currency)}`)
+                          .join(' · ')
+                      : 'Not comparable across mixed currencies'}
                   </Typography>
                 ) : creditUtilization.limit === 0 ? (
                   <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 8 }}>
@@ -331,7 +416,7 @@ function AnalyticsContent() {
                       }} />
                     </div>
                     <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
-                      {formatCurrency(creditUtilization.spend)} out of {formatCurrency(creditUtilization.limit)} × {creditUtilization.months} month{creditUtilization.months === 1 ? '' : 's'}
+                      {formatCurrency(creditUtilization.spend, insightCurrency)} out of {formatCurrency(creditUtilization.limit, insightCurrency)} × {creditUtilization.months} month{creditUtilization.months === 1 ? '' : 's'}
                     </Typography>
                   </>
                 )}
@@ -348,10 +433,21 @@ function AnalyticsContent() {
                   <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 12 }}>
                     Select a time window to calculate this metric
                   </Typography>
+                ) : avgByCurrency ? (
+                  <>
+                    {avgByCurrency.map((row) => (
+                      <Typography key={row.currency} fontType={FontType.BODY} fontSize={24} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em', marginBottom: 4 }}>
+                        {formatCurrency(row.avg, row.currency)}
+                      </Typography>
+                    ))}
+                    <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                      Avg / month across {monthsInRange} month{monthsInRange !== 1 ? 's' : ''}
+                    </Typography>
+                  </>
                 ) : (
                   <>
                     <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em', marginBottom: 8 }}>
-                      {formatCurrency(avgMonthlySpend)}
+                      {formatCurrency(avgMonthlySpend, insightCurrency)}
                     </Typography>
                     <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
                       Across {monthsInRange} month{monthsInRange !== 1 ? 's' : ''}
@@ -367,6 +463,12 @@ function AnalyticsContent() {
           <LeftColumn>
             {loading ? (
               <Skeleton style={{ height: 320 }} />
+            ) : safeCategoriesByCurrency.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {safeCategoriesByCurrency.map((block) => (
+                  <CategoryDonut key={block.currency} data={block.breakdown} currency={block.currency} />
+                ))}
+              </div>
             ) : safeCategories.length === 0 ? (
               <div style={{ padding: 20, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -374,10 +476,16 @@ function AnalyticsContent() {
                 </Typography>
               </div>
             ) : (
-              <CategoryDonut data={safeCategories} />
+              <CategoryDonut data={safeCategories} currency={insightCurrency} />
             )}
             {loading ? (
               <Skeleton style={{ height: 280 }} />
+            ) : safeMerchantsByCurrency.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {safeMerchantsByCurrency.map((block) => (
+                  <TopMerchants key={block.currency} data={block.merchants} currency={block.currency} />
+                ))}
+              </div>
             ) : safeMerchants.length === 0 ? (
               <div style={{ padding: 20, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -385,12 +493,18 @@ function AnalyticsContent() {
                 </Typography>
               </div>
             ) : (
-              <TopMerchants data={safeMerchants} />
+              <TopMerchants data={safeMerchants} currency={insightCurrency} />
             )}
           </LeftColumn>
           <RightColumn>
             {loading ? (
               <Skeleton style={{ height: 280 }} />
+            ) : safeTrendsByCurrency.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {safeTrendsByCurrency.map((block) => (
+                  <CashFlowChart key={block.currency} data={block.trends} currency={block.currency} />
+                ))}
+              </div>
             ) : safeTrends.length === 0 ? (
               <div style={{ padding: 20, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -398,7 +512,7 @@ function AnalyticsContent() {
                 </Typography>
               </div>
             ) : (
-              <CashFlowChart data={safeTrends} />
+              <CashFlowChart data={safeTrends} currency={insightCurrency} />
             )}
             {loading ? (
               <Skeleton style={{ height: 200 }} />

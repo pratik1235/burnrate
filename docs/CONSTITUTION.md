@@ -256,6 +256,13 @@ Plans must include:
 - **Category slugs must be stable.** They are used as keys in the database and API.
 - Do not rename slugs without migration logic; they may be referenced externally.
 
+### 8.6 Currency and analytics
+
+- **No outbound FX or exchange-rate APIs** in the default build. Combined totals across currencies require **user-maintained local rates** (future); until then the product must not silently merge unlike ISO 4217 codes.
+- **Per-row truth:** `transactions.currency` (and optional `statements.currency`) store the statement-native code (default INR for legacy rows).
+- **Analytics contract:** When filters span **more than one** currency, list endpoints return **per-currency splits** (`totalSpendByCurrency`, `totalsByCurrency`, `byCurrency`, etc.) and omit a single combined scalar where it would be misleading. Single-currency views keep backward-compatible numeric totals.
+- **Settings `display_currency`:** Optional UI preference only (e.g. ordering or copy); it does **not** convert stored amounts.
+
 ---
 
 ## 9. Performance

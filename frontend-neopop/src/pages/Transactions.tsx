@@ -93,7 +93,7 @@ function TransactionsContent() {
   const categoryFilter =
     filters.selectedCategories.length === 1 ? filters.selectedCategories[0] : undefined;
 
-  const { transactions, total, totalAmount, loading } = useTransactions({
+  const { transactions, total, totalAmount, totalsByCurrency, mixedCurrency, loading } = useTransactions({
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
     bankAccounts:
       filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
@@ -134,25 +134,56 @@ function TransactionsContent() {
   const safeTotal = typeof total === 'number' ? total : 0;
   const safeTotalAmount = typeof totalAmount === 'number' ? totalAmount : 0;
 
-  const { adjustedTotal, excludedAmount, excludedCount } = useMemo(() => {
-    if (excludedIds.size === 0) {
-      return { adjustedTotal: safeTotalAmount, excludedAmount: 0, excludedCount: 0 };
+  const { adjustedTotal, adjustedByCurrency, excludedAmount, excludedCount } = useMemo(() => {
+    if (!mixedCurrency) {
+      if (excludedIds.size === 0) {
+        return {
+          adjustedTotal: safeTotalAmount,
+          adjustedByCurrency: null as Record<string, number> | null,
+          excludedAmount: 0,
+          excludedCount: 0,
+        };
+      }
+      let excludedAmountSum = 0;
+      let count = 0;
+      for (const tx of safeTransactions) {
+        if (!excludedIds.has(tx.id)) continue;
+        if (tx.category === 'cc_payment') continue;
+        const signedAmount = tx.type === 'debit' ? tx.amount : -tx.amount;
+        excludedAmountSum += signedAmount;
+        count += 1;
+      }
+      return {
+        adjustedTotal: safeTotalAmount - excludedAmountSum,
+        adjustedByCurrency: null,
+        excludedAmount: excludedAmountSum,
+        excludedCount: count,
+      };
+    }
+    const buckets: Record<string, number> = {};
+    for (const t of totalsByCurrency) {
+      buckets[t.currency] = t.amount;
     }
     let excludedAmountSum = 0;
     let count = 0;
-    for (const tx of safeTransactions) {
-      if (!excludedIds.has(tx.id)) continue;
-      if (tx.category === 'cc_payment') continue;
-      const signedAmount = tx.type === 'debit' ? tx.amount : -tx.amount;
-      excludedAmountSum += signedAmount;
-      count += 1;
+    if (excludedIds.size > 0) {
+      for (const tx of safeTransactions) {
+        if (!excludedIds.has(tx.id) || tx.category === 'cc_payment') continue;
+        const c = (tx.currency || 'INR').toUpperCase().slice(0, 3);
+        if (buckets[c] === undefined) continue;
+        const signedAmount = tx.type === 'debit' ? tx.amount : -tx.amount;
+        buckets[c] -= signedAmount;
+        excludedAmountSum += signedAmount;
+        count += 1;
+      }
     }
     return {
-      adjustedTotal: safeTotalAmount - excludedAmountSum,
+      adjustedTotal: 0,
+      adjustedByCurrency: buckets,
       excludedAmount: excludedAmountSum,
       excludedCount: count,
     };
-  }, [safeTotalAmount, excludedIds, safeTransactions]);
+  }, [mixedCurrency, safeTotalAmount, totalsByCurrency, excludedIds, safeTransactions]);
 
   const handleToggleExclude = useCallback((id: string) => {
     setExcludedIds((prev) => {
@@ -211,7 +242,7 @@ function TransactionsContent() {
         tx.date,
         escapeCSV(tx.merchant),
         escapeCSV(catLabel),
-        'INR',
+        (tx.currency || 'INR').toUpperCase().slice(0, 3),
         signedAmount.toFixed(2),
         escapeCSV(card),
       ].join(',');
@@ -384,15 +415,34 @@ function TransactionsContent() {
               {safeTotal} transaction{safeTotal !== 1 ? 's' : ''}
             </Typography>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-                {formatCurrency(adjustedTotal)} spent
-              </Typography>
-              {excludedCount > 0 && (
+              {mixedCurrency && adjustedByCurrency ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8 }}>
+                  <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                    {Object.entries(adjustedByCurrency)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([cur, amt]) => `${formatCurrency(amt, cur)}`)
+                      .join(' · ')}
+                  </Typography>
+                  <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.55)">
+                    spent (multiple currencies — not combined)
+                  </Typography>
+                </div>
+              ) : (
+                <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                  {formatCurrency(adjustedTotal)} spent
+                </Typography>
+              )}
+              {excludedCount > 0 && !mixedCurrency && (
                 <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
                   ({formatCurrency(Math.abs(excludedAmount))} excluded from {excludedCount} txn{excludedCount !== 1 ? 's' : ''})
                 </Typography>
               )}
-              {adjustedTotal < 0 && (
+              {excludedCount > 0 && mixedCurrency && (
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                  ({excludedCount} txn{excludedCount !== 1 ? 's' : ''} excluded from totals)
+                </Typography>
+              )}
+              {!mixedCurrency && adjustedTotal < 0 && (
                 <div style={{ position: 'relative', display: 'inline-flex' }}>
                   <Typography
                     as="span"

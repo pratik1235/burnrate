@@ -12,6 +12,7 @@ __pycache__/
 dist/
 build/
 backend/venv/
+.venv/
 .venv-build/
 
 # Environment

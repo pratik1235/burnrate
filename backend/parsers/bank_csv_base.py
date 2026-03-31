@@ -13,6 +13,11 @@ from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
 from backend.parsers.base import BaseParser, ParsedStatement, ParsedTransaction
+from backend.parsers.currency_infer import (
+    hint_from_amount_string,
+    normalize_currency_code,
+    resolve_currency_from_hints,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,14 +140,15 @@ class BaseBankCSVParser(BaseParser):
 
         transactions = self._extract_transactions(rows, col_map, len(headers))
         account_last4 = self._extract_account_last4(rows, col_map, headers)
+        currency = self._resolve_csv_currency(headers, rows, col_map)
 
         period_start = min((t.date for t in transactions), default=None)
         period_end = max((t.date for t in transactions), default=None)
 
         logger.info(
-            "%s CSV parse: account=%s period=%s..%s txns=%d",
+            "%s CSV parse: account=%s period=%s..%s txns=%d currency=%s",
             self.bank_name, account_last4, period_start, period_end,
-            len(transactions),
+            len(transactions), currency,
         )
 
         return ParsedStatement(
@@ -151,7 +157,41 @@ class BaseBankCSVParser(BaseParser):
             period_end=period_end,
             transactions=transactions,
             card_last4=account_last4,
+            currency=currency,
         )
+
+    def _currency_column_index(self, headers: List[str]) -> Optional[int]:
+        for i, h in enumerate(headers):
+            hl = h.strip().lower()
+            if hl in ("currency", "curr", "txn currency", "transaction currency", "iso currency"):
+                return i
+            if "currency" in hl:
+                return i
+        return None
+
+    def _resolve_csv_currency(
+        self, headers: List[str], rows: List[List[str]], col_map: Dict[str, int],
+    ) -> str:
+        hints: List[Optional[str]] = []
+        curr_idx = self._currency_column_index(headers)
+        if curr_idx is not None:
+            for row in rows:
+                if curr_idx < len(row):
+                    c = normalize_currency_code(row[curr_idx])
+                    if c:
+                        hints.append(c)
+        for row in rows:
+            if len(row) < max(col_map.values()) + 1:
+                continue
+            if "debit" in col_map:
+                h = hint_from_amount_string(row[col_map["debit"]])
+                if h:
+                    hints.append(h)
+            if "credit" in col_map:
+                h = hint_from_amount_string(row[col_map["credit"]])
+                if h:
+                    hints.append(h)
+        return resolve_currency_from_hints(hints)
 
     @abstractmethod
     def _get_column_mapping(self, headers: List[str]) -> Optional[Dict[str, int]]:

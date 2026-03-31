@@ -241,6 +241,7 @@ def list_statements(
             "total_spend": s.total_spend,
             "total_amount_due": s.total_amount_due,
             "credit_limit": s.credit_limit,
+            "currency": (getattr(s, "currency", None) or "INR").upper()[:3],
             "source": getattr(s, "source", None) or "CC",
             "status": getattr(s, "status", None) or "success",
             "imported_at": s.imported_at.isoformat() if s.imported_at else None,

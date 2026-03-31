@@ -122,22 +122,39 @@ def list_transactions(
     metrics_q = q.filter(Transaction.category != "cc_payment")
     total_count = metrics_q.count()
 
-    total_amount_raw = (
+    by_cur = (
         db.query(
+            Transaction.currency,
             func.sum(
                 case(
                     (Transaction.type == "debit", Transaction.amount),
                     else_=-Transaction.amount,
                 )
-            )
+            ).label("net_amt"),
         )
         .filter(
             Transaction.category != "cc_payment",
             Transaction.id.in_(filtered_ids),
         )
-        .scalar() or 0.0
+        .group_by(Transaction.currency)
+        .all()
     )
-    total_amount = float(Decimal(str(total_amount_raw)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    totals_by_currency = [
+        {
+            "currency": (r.currency or "INR").upper()[:3],
+            "amount": float(
+                Decimal(str(r.net_amt or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            ),
+        }
+        for r in by_cur
+    ]
+    totals_by_currency.sort(key=lambda x: x["currency"])
+    if len(totals_by_currency) == 0:
+        total_amount: Optional[float] = 0.0
+    elif len(totals_by_currency) == 1:
+        total_amount = totals_by_currency[0]["amount"]
+    else:
+        total_amount = None
 
     rows = (
         q.options(joinedload(Transaction.tags))
@@ -162,12 +179,15 @@ def list_transactions(
                 "cardLast4": r.card_last4,
                 "cardId": r.card_id,
                 "source": getattr(r, "source", None) or "CC",
+                "currency": (getattr(r, "currency", None) or "INR").upper()[:3],
                 "tags": [t.tag for t in r.tags],
             }
             for r in rows
         ],
         "total": total_count,
         "totalAmount": total_amount,
+        "totalsByCurrency": totals_by_currency,
+        "mixedCurrency": len(totals_by_currency) > 1,
     }
 
 

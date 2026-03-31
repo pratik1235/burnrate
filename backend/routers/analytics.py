@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
-from backend.models.models import Statement, Transaction
+from backend.models.models import Statement
 from backend.services.analytics import (
     compute_net_spend,
     get_category_breakdown,
@@ -83,24 +83,44 @@ def analytics_summary(
         bank_pairs=bank_pairs,
     )
     total_spend = summary["total_spend"]
+    mixed = summary["mixed_currency"]
+    total_by_cur = summary["total_spend_by_currency"]
 
-    # Compute delta % relative to filter range.
-    # Compare the selected period to an equivalent prior period.
-    if from_date and to_date:
-        span = (to_date - from_date).days
-        prev_end = from_date - timedelta(days=1)
-        prev_start = prev_end - timedelta(days=span)
-        current_spend = total_spend
-        period_label = "vs prior period"
-    else:
-        today = date.today()
-        this_month_start = today.replace(day=1)
-        last_month_end = this_month_start - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1)
-        current_spend = compute_net_spend(
+    delta: Optional[int] = None
+    period_label = "vs prior period"
+    if not mixed and total_spend is not None:
+        if from_date and to_date:
+            span = (to_date - from_date).days
+            prev_end = from_date - timedelta(days=1)
+            prev_start = prev_end - timedelta(days=span)
+            current_spend = total_spend
+            period_label = "vs prior period"
+        else:
+            today = date.today()
+            this_month_start = today.replace(day=1)
+            last_month_end = this_month_start - timedelta(days=1)
+            last_month_start = last_month_end.replace(day=1)
+            current_spend = compute_net_spend(
+                db,
+                this_month_start,
+                today,
+                card_ids=card_ids,
+                categories=category_list,
+                direction=direction,
+                amount_min=amount_min,
+                amount_max=amount_max,
+                tags=tag_list,
+                source=src,
+                bank_pairs=bank_pairs,
+            )
+            prev_start = last_month_start
+            prev_end = last_month_end
+            period_label = "vs last month"
+
+        prev_spend = compute_net_spend(
             db,
-            this_month_start,
-            today,
+            prev_start,
+            prev_end,
             card_ids=card_ids,
             categories=category_list,
             direction=direction,
@@ -110,31 +130,13 @@ def analytics_summary(
             source=src,
             bank_pairs=bank_pairs,
         )
-        prev_start = last_month_start
-        prev_end = last_month_end
-        period_label = "vs last month"
+        delta = (
+            int((Decimal(str(current_spend)) - Decimal(str(prev_spend))) / Decimal(str(prev_spend)) * 100)
+            if prev_spend > 0
+            else 0
+        )
 
-    prev_spend = compute_net_spend(
-        db,
-        prev_start,
-        prev_end,
-        card_ids=card_ids,
-        categories=category_list,
-        direction=direction,
-        amount_min=amount_min,
-        amount_max=amount_max,
-        tags=tag_list,
-        source=src,
-        bank_pairs=bank_pairs,
-    )
-
-    delta = (
-        int((Decimal(str(current_spend)) - Decimal(str(prev_spend))) / Decimal(str(prev_spend)) * 100)
-        if prev_spend > 0
-        else 0
-    )
-
-    trends = get_monthly_trends(
+    trends_raw = get_monthly_trends(
         db,
         months=6,
         card_ids=card_ids,
@@ -146,42 +148,95 @@ def analytics_summary(
         source=src,
         bank_pairs=bank_pairs,
     )
-    sparkline = [{"value": t["spend"]} for t in trends]
+    sparkline_by_currency: Optional[List[Dict[str, Any]]] = None
+    if trends_raw.get("mixed_currency"):
+        sparkline = [{"value": 0}]
+        sparkline_by_currency = [
+            {
+                "currency": block["currency"],
+                "sparklineData": [{"value": t["spend"]} for t in block["trends"]],
+            }
+            for block in trends_raw["trends_by_currency"]
+        ]
+    else:
+        tz = trends_raw.get("trends") or []
+        sparkline = [{"value": t["spend"]} for t in tz] if tz else [{"value": 0}]
 
     statements = (
-        db.query(Statement.bank, Statement.card_last4, Statement.credit_limit, Statement.period_end, Statement.imported_at)
+        db.query(
+            Statement.bank,
+            Statement.card_last4,
+            Statement.credit_limit,
+            Statement.period_end,
+            Statement.imported_at,
+            Statement.currency,
+        )
         .filter(Statement.credit_limit.isnot(None))
         .all()
     )
     by_card: Dict[tuple, tuple] = {}
-    for bank, card_last4, credit_limit_val, period_end, imported_at in statements:
-        key = (bank or "", card_last4 or "")
+    for bank, card_last4, credit_limit_val, period_end, imported_at, stmt_currency in statements:
+        cur = (stmt_currency or "INR").upper()[:3]
+        key = (bank or "", card_last4 or "", cur)
         recency = (period_end or date.min, imported_at or datetime.min)
         if key not in by_card or recency > (by_card[key][0] or date.min, by_card[key][1] or datetime.min):
             by_card[key] = (period_end or date.min, imported_at or datetime.min, credit_limit_val or 0)
-    credit_limit = float(
-        sum((Decimal(str(v[2])) for v in by_card.values()), Decimal(0)).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-    )
+
+    limit_by_cur: Dict[str, Decimal] = {}
+    for key, (_, _, lim) in by_card.items():
+        cur = key[2]
+        limit_by_cur[cur] = limit_by_cur.get(cur, Decimal(0)) + Decimal(str(lim))
+
+    credit_limit: Optional[float] = None
+    credit_limit_by_currency: Optional[List[Dict[str, Any]]] = None
+    if len(limit_by_cur) <= 1:
+        if limit_by_cur:
+            credit_limit = float(
+                sum(limit_by_cur.values()).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            )
+    else:
+        credit_limit_by_currency = [
+            {
+                "currency": c,
+                "amount": float(v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)),
+            }
+            for c, v in sorted(limit_by_cur.items())
+        ]
 
     months = _months_in_range(from_date, to_date)
-    avg_monthly_spend = float((Decimal(str(total_spend)) / Decimal(months)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)) if months else 0
+    avg_monthly_spend: Optional[float] = None
+    if total_spend is not None and months:
+        avg_monthly_spend = float(
+            (Decimal(str(total_spend)) / Decimal(months)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        )
 
-    return {
+    out: Dict[str, Any] = {
         "totalSpend": total_spend,
+        "totalSpendByCurrency": total_by_cur,
+        "mixedCurrency": mixed,
         "deltaPercent": delta,
         "deltaLabel": period_label,
         "period": "This month",
         "sparklineData": sparkline if sparkline else [{"value": 0}],
         "cardBreakdown": [
-            {"bank": c["bank"], "last4": c["card_last4"], "amount": c["spend"], "count": c.get("count", 0)}
+            {
+                "bank": c["bank"],
+                "last4": c["card_last4"],
+                "currency": c.get("currency", "INR"),
+                "amount": c["spend"],
+                "count": c.get("count", 0),
+            }
             for c in summary["card_breakdown"]
         ],
         "creditLimit": credit_limit,
         "avgMonthlySpend": avg_monthly_spend,
         "monthsInRange": months,
     }
+    if credit_limit_by_currency is not None:
+        out["creditLimitByCurrency"] = credit_limit_by_currency
+    if sparkline_by_currency is not None:
+        out["sparklineByCurrency"] = sparkline_by_currency
+    return out
 
 
 @router.get("/categories")
@@ -215,7 +270,28 @@ def analytics_categories(
         source=src,
         bank_pairs=bank_pairs,
     )
+    if result.get("mixed_currency"):
+        return {
+            "mixedCurrency": True,
+            "byCurrency": [
+                {
+                    "currency": block["currency"],
+                    "breakdown": [
+                        {
+                            "category": c["category"],
+                            "amount": c["amount"],
+                            "percentage": c["percentage"],
+                            "count": c["count"],
+                        }
+                        for c in block["categories"]
+                    ],
+                }
+                for block in result["by_currency"]
+            ],
+        }
     return {
+        "mixedCurrency": False,
+        "currency": result.get("currency", "INR"),
         "breakdown": [
             {
                 "category": c["category"],
@@ -261,8 +337,21 @@ def analytics_trends(
         source=src,
         bank_pairs=bank_pairs,
     )
+    if data.get("mixed_currency"):
+        return {
+            "mixedCurrency": True,
+            "trendsByCurrency": [
+                {
+                    "currency": block["currency"],
+                    "trends": [{"month": t["month"], "spend": t["spend"]} for t in block["trends"]],
+                }
+                for block in data["trends_by_currency"]
+            ],
+        }
     return {
-        "trends": [{"month": t["month"], "spend": t["spend"]} for t in data],
+        "mixedCurrency": False,
+        "currency": data.get("currency", "INR"),
+        "trends": [{"month": t["month"], "spend": t["spend"]} for t in data.get("trends", [])],
     }
 
 
@@ -299,10 +388,26 @@ def analytics_merchants(
         source=src,
         bank_pairs=bank_pairs,
     )
+    if data.get("mixed_currency"):
+        return {
+            "mixedCurrency": True,
+            "merchantsByCurrency": [
+                {
+                    "currency": block["currency"],
+                    "merchants": [
+                        {"merchant": m["merchant"], "amount": m["amount"], "count": m["count"]}
+                        for m in block["merchants"]
+                    ],
+                }
+                for block in data["merchants_by_currency"]
+            ],
+        }
     return {
+        "mixedCurrency": False,
+        "currency": data.get("currency", "INR"),
         "merchants": [
-            {"merchant": m["merchant"], "amount": m["spend"], "count": m["count"]}
-            for m in data
+            {"merchant": m["merchant"], "amount": m["amount"], "count": m["count"]}
+            for m in data["merchants"]
         ],
     }
 
@@ -327,16 +432,19 @@ def statement_periods(
 
     periods = []
     for s in statements:
+        cur = (getattr(s, "currency", None) or "INR").upper()[:3]
         if s.period_start and s.period_end:
             net_spend = compute_net_spend(
                 db, s.period_start, s.period_end,
                 bank=s.bank, card_last4=s.card_last4,
+                currency=cur,
             )
         else:
             net_spend = s.total_spend
         periods.append({
             "bank": s.bank,
             "cardLast4": s.card_last4,
+            "currency": cur,
             "periodStart": s.period_start.isoformat() if s.period_start else None,
             "periodEnd": s.period_end.isoformat() if s.period_end else None,
             "totalAmountDue": s.total_amount_due,

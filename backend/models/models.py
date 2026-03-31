@@ -35,6 +35,7 @@ class Settings(Base):
     dob_month = Column(String(2), nullable=True)
     dob_year = Column(String(4), nullable=True)
     watch_folder = Column(String(1024), nullable=True)
+    display_currency = Column(String(3), nullable=True)
     last_gmail_sync = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -74,6 +75,7 @@ class Statement(Base):
     source = Column(String(4), nullable=False, default="CC", server_default="CC")
     status = Column(String(20), nullable=False, default="success")
     imported_at = Column(DateTime, default=datetime.utcnow)
+    currency = Column(String(3), nullable=False, default="INR", server_default="INR")
 
     transactions = relationship("Transaction", back_populates="statement", cascade="all, delete-orphan")
 
@@ -95,6 +97,7 @@ class Transaction(Base):
     bank = Column(String(50), nullable=True)
     card_last4 = Column(String(4), nullable=True)
     source = Column(String(4), nullable=False, default="CC", server_default="CC")
+    currency = Column(String(3), nullable=False, default="INR", server_default="INR")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     statement = relationship("Statement", back_populates="transactions")

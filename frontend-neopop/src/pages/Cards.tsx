@@ -122,10 +122,29 @@ export function Cards() {
   const [confirmRemove, setConfirmRemove] = useState<{ id: string; label: string } | null>(null);
 
   const cardSpendMap = safeCards.map((card) => {
-    const match = cardBreakdown.find(
+    const matches = cardBreakdown.filter(
       (cb) => cb.bank === card.bank && cb.last4 === card.last4
     );
-    return { ...card, spend: match?.amount ?? 0, txnCount: match?.count ?? 0 };
+    if (matches.length === 0) {
+      return { ...card, spend: 0, txnCount: 0, spendLines: undefined as { amount: number; currency: string }[] | undefined };
+    }
+    if (matches.length === 1) {
+      return {
+        ...card,
+        spend: matches[0].amount,
+        txnCount: matches[0].count,
+        spendLines: undefined as { amount: number; currency: string }[] | undefined,
+      };
+    }
+    return {
+      ...card,
+      spend: matches[0].amount,
+      txnCount: matches.reduce((s, m) => s + m.count, 0),
+      spendLines: matches.map((m) => ({
+        amount: m.amount,
+        currency: m.currency ?? 'INR',
+      })),
+    };
   });
 
   const handleRemoveCard = async (cardId: string, cardLabel: string) => {
@@ -241,14 +260,33 @@ export function Cards() {
                 />
                 <CardFooter>
                   <SpendInfo>
-                    <Typography
-                      fontType={FontType.BODY}
-                      fontSize={18}
-                      fontWeight={FontWeights.BOLD}
-                      color={mainColors.white}
-                    >
-                      {formatCurrency(card.spend)}
-                    </Typography>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      {card.spendLines && card.spendLines.length > 0 ? (
+                        card.spendLines
+                          .slice()
+                          .sort((a, b) => a.currency.localeCompare(b.currency))
+                          .map((line) => (
+                            <Typography
+                              key={line.currency}
+                              fontType={FontType.BODY}
+                              fontSize={18}
+                              fontWeight={FontWeights.BOLD}
+                              color={mainColors.white}
+                            >
+                              {formatCurrency(line.amount, line.currency)}
+                            </Typography>
+                          ))
+                      ) : (
+                        <Typography
+                          fontType={FontType.BODY}
+                          fontSize={18}
+                          fontWeight={FontWeights.BOLD}
+                          color={mainColors.white}
+                        >
+                          {formatCurrency(card.spend)}
+                        </Typography>
+                      )}
+                    </div>
                     <Typography
                       fontType={FontType.BODY}
                       fontSize={13}

@@ -28,6 +28,7 @@ class ParsedStatement:
     card_last4: Optional[str] = None
     total_amount_due: Optional[float] = None
     credit_limit: Optional[float] = None
+    currency: str = "INR"
 
 
 class BaseParser(ABC):

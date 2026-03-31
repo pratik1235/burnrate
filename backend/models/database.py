@@ -72,6 +72,9 @@ def _run_migrations(engine_ref) -> None:
         ("statements", "status", "VARCHAR(20) NOT NULL DEFAULT 'success'"),
         ("transactions", "source", "VARCHAR(4) NOT NULL DEFAULT 'CC'"),
         ("settings", "last_gmail_sync", "DATETIME"),
+        ("transactions", "currency", "VARCHAR(3) NOT NULL DEFAULT 'INR'"),
+        ("statements", "currency", "VARCHAR(3) NOT NULL DEFAULT 'INR'"),
+        ("settings", "display_currency", "VARCHAR(3)"),
     ]
 
     with engine_ref.connect() as conn:

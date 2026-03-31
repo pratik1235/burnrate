@@ -10,7 +10,7 @@
 PDF parsing extracts transactions and statement metadata from credit card statement PDFs. The system uses:
 
 1. **Base interface** — Abstract `BaseParser` with `parse(file_path) -> ParsedStatement`
-2. **Bank-specific parsers** — HDFC, ICICI, Axis, Federal, Indian Bank
+2. **Bank-specific parsers** — HDFC, ICICI, Axis, Federal, Indian Bank, IDFC FIRST
 3. **Generic parser** — Fallback for unsupported banks
 4. **Bank detector** — Identifies bank from filename, BIN patterns, PDF text
 
@@ -35,6 +35,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 | card_last4 | Optional[str] | Last 4 digits of card |
 | total_amount_due | Optional[float] | Amount due from statement |
 | credit_limit | Optional[float] | Credit limit from statement |
+| currency | str | ISO-style code (default INR); set when inferrable from document text |
 
 ### ParsedTransaction (Dataclass)
 
@@ -66,6 +67,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 
 3. **PDF text** — First page via pdfplumber:
    - Search for "hdfc", "icici bank", "axis bank", "sbi", "amex", etc.
+   - IDFC FIRST: "idfc first" or word-boundary `idfc`
    - Federal: "federal bank" (exclude "south indian bank")
    - Indian Bank: "indian bank" (exclude "south indian bank")
 
@@ -159,11 +161,27 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 
 ---
 
+### IDFC FIRST Parser
+
+**Location:** `backend/parsers/idfc_first.py`
+
+**Format:** Portal/email credit card PDF. Summary block: statement period `DD/Mon/YYYY - DD/Mon/YYYY`, card `(XX####)` or `XXXX ####`, Total Amount Due (often `Rs … DR`), Minimum Amount Due, Credit Limit, Payment Due Date.
+
+**Extracts:**
+- Period, card last4, total due, credit limit (regex over a bounded prefix of extracted text to avoid fragile cross-line matches)
+- Transactions: Prefer `extract_tables()` when a header row contains "Transaction" + "Date" and an amount column; split table cells on newlines and zip date/description/amount rows
+- Fallback: text lines matching `DD/MM/YYYY … amount DR|CR` (synthetic/smaller PDFs)
+- Currency: `infer_currency_from_document_text` (₹ / INR in document)
+
+**Encrypted PDFs:** There is no stable, publicly documented IDFC-specific password pattern in-repo. `pdf_unlock.generate_passwords` uses the **generic** candidate list for `idfc_first` (name/DOB/last4 variants). If auto-unlock fails, the user must use **Reparse** with a **manual password** (same flow as other banks). Do not log passwords (see Constitution §4.6). Add a dedicated `idfc_first` branch in `pdf_unlock.py` only after a verified format from official documentation or repeatable user reports.
+
+---
+
 ## Generic Parser
 
 **Location:** `backend/parsers/generic.py`
 
-**Purpose:** Fallback for banks without dedicated parser (SBI, Amex, IDFC, etc.).
+**Purpose:** Fallback for banks without dedicated parser (SBI, Amex, etc.).
 
 **Logic:**
 1. Extract all text from all pages via pdfplumber
@@ -179,7 +197,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 ## Parser Selection
 
 **In statement_processor:**
-- If `bank in PARSERS` (hdfc, icici, axis, federal, indian_bank): use dedicated parser
+- If `bank in PARSERS` (hdfc, icici, axis, federal, indian_bank, idfc_first): use dedicated parser
 - Else: `GenericParser(bank=bank)`
 
 ---
@@ -215,7 +233,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 
 | Scenario | Handling |
 |----------|----------|
-| Encrypted | Unlock before parse |
+| Encrypted | Unlock before parse (`pikepdf`); IDFC uses generic password guesses or manual password via Reparse |
 | Corrupted | pdfplumber may raise; exception propagates |
 | Scanned/image PDF | pdfplumber extracts nothing; no OCR |
 | Unusual layout | Parser regex may miss; generic fallback |
@@ -238,6 +256,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 | Axis | Available vs Credit Limit | Skip "available"; take max amount |
 | Federal | DD Mon YYYY | _parse_text_date |
 | Indian Bank | DD Mon (no year) | Infer from period_end |
+| IDFC FIRST | Table column drift | Text-line fallback; header row detection |
 | Generic | Weak patterns | May extract little |
 
 ---
@@ -264,7 +283,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 
 ### Existing Tests
 
-- **test_parsers.py:** HDFC, Axis, ICICI with fixture PDFs — card, period, count, amounts, merchants
+- **test_parsers.py:** HDFC, Axis, ICICI, IDFC FIRST (synthetic fixture) — card, period, count, amounts, merchants
 - **test_api.py:** Full upload flow exercises parsers
 
 ### Recommended Additional Tests
@@ -287,6 +306,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 | Axis | Statement Period DD/MM/YYYY | NNNN**NNNN | Rs. |
 | Federal | Statement Period / Billing | Card No. NNNNXXNNNN | — |
 | Indian Bank | Title (DD Mon YYYY) | NNNN-NNXX-XXXX-NNNN | — |
+| IDFC FIRST | DD/Mon/YYYY (statement period) | XX#### / XXXX #### | Rs / ₹ |
 | Generic | Statement/Billing/From-To | NNNNXXXXNNNN | — |
 
 ---
@@ -298,6 +318,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 - **Axis:** Strip known merchant category labels (MISC STORE, etc.)
 - **Federal:** Strip category labels, " IN", " INDIA"
 - **Indian Bank:** Strip mode codes (TOKEN_ECOM, POS, etc.), category labels, Ref#
+- **IDFC FIRST:** Strip UPI / UPICC prefixes; trim to 512 chars
 - **Generic:** Trim to 512; no special cleanup
 
 ---
@@ -311,6 +332,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 | Axis | DD/MM/YYYY |
 | Federal | DD/MM/YYYY, DD Mon YYYY |
 | Indian Bank | DD Mon (no year), DD/MM/YYYY |
+| IDFC FIRST | DD/Mon/YYYY (period), DD/MM/YYYY (txns) |
 | Generic | DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY |
 
 ---
@@ -322,6 +344,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 - **Axis:** `Cr` in amount column
 - **Federal:** `Cr` suffix
 - **Indian Bank:** Category in (repayment, refund, etc.)
+- **IDFC FIRST:** `CR` / `DR` suffix on amount
 - **Generic:** `Cr` suffix; else debit
 
 ---
@@ -375,6 +398,7 @@ PDF parsing extracts transactions and statement metadata from credit card statem
 - `backend/parsers/axis.py` — AxisParser
 - `backend/parsers/federal.py` — FederalBankParser
 - `backend/parsers/indian_bank.py` — IndianBankParser
+- `backend/parsers/idfc_first.py` — IDFCFirstBankParser
 
 ---
 

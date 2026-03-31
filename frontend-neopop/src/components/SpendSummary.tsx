@@ -6,8 +6,10 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 interface SpendSummaryProps {
-  totalSpend: number;
-  deltaPercent: number;
+  totalSpend: number | null;
+  mixedCurrency?: boolean;
+  totalSpendByCurrency?: { currency: string; amount: number }[];
+  deltaPercent: number | null;
   deltaLabel?: string;
   sparklineData: { value: number }[];
   period: string;
@@ -16,13 +18,16 @@ interface SpendSummaryProps {
 
 export function SpendSummary({
   totalSpend,
+  mixedCurrency,
+  totalSpendByCurrency,
   deltaPercent,
   deltaLabel = 'vs last month',
   sparklineData,
   period,
   className,
 }: SpendSummaryProps) {
-  const isUp = deltaPercent >= 0;
+  const isUp = (deltaPercent ?? 0) >= 0;
+  const showDelta = deltaPercent !== null && deltaPercent !== undefined;
 
   return (
     <div
@@ -34,24 +39,41 @@ export function SpendSummary({
       </Typography>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
         <div style={{ flex: 1 }}>
-          <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em' }}>
-            {formatCurrency(totalSpend)}
-          </Typography>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-            {isUp ? (
-              <TrendingUp size={14} color={mainColors.red} />
-            ) : (
-              <TrendingDown size={14} color={mainColors.green} />
-            )}
-            <Typography
-              fontType={FontType.BODY}
-              fontSize={12}
-              fontWeight={FontWeights.MEDIUM}
-              color={isUp ? mainColors.red : mainColors.green}
-            >
-              {isUp ? '+' : ''}{deltaPercent}% {deltaLabel}
+          {mixedCurrency && totalSpendByCurrency && totalSpendByCurrency.length > 0 ? (
+            <Typography fontType={FontType.BODY} fontSize={22} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em' }}>
+              {totalSpendByCurrency
+                .slice()
+                .sort((a, b) => a.currency.localeCompare(b.currency))
+                .map((t) => formatCurrency(t.amount, t.currency))
+                .join(' · ')}
             </Typography>
-          </div>
+          ) : (
+            <Typography fontType={FontType.BODY} fontSize={28} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ letterSpacing: '-0.02em' }}>
+              {formatCurrency(totalSpend ?? 0)}
+            </Typography>
+          )}
+          {mixedCurrency && (
+            <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)" style={{ marginTop: 4 }}>
+              Multiple currencies — not combined
+            </Typography>
+          )}
+          {showDelta && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              {isUp ? (
+                <TrendingUp size={14} color={mainColors.red} />
+              ) : (
+                <TrendingDown size={14} color={mainColors.green} />
+              )}
+              <Typography
+                fontType={FontType.BODY}
+                fontSize={12}
+                fontWeight={FontWeights.MEDIUM}
+                color={isUp ? mainColors.red : mainColors.green}
+              >
+                {isUp ? '+' : ''}{deltaPercent}% {deltaLabel}
+              </Typography>
+            </div>
+          )}
         </div>
 
         <div style={{ width: 128, height: 56 }}>

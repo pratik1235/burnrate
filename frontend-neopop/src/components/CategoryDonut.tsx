@@ -17,6 +17,8 @@ import { getAllCategories } from '@/lib/api';
 
 interface CategoryDonutProps {
   data: CategoryBreakdown[];
+  /** ISO 4217 for amounts */
+  currency?: string;
   className?: string;
 }
 
@@ -24,8 +26,10 @@ function CustomTooltip({
   active,
   payload,
   catMap,
+  currency,
 }: TooltipProps<number, string> & {
   catMap: Record<string, { name: string; color: string }>;
+  currency: string;
 }) {
   if (!active || !payload?.length) return null;
   const entry = payload[0];
@@ -46,13 +50,13 @@ function CustomTooltip({
         {catMap[category]?.name ?? config?.label ?? category}
       </Typography>
       <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-        {formatCurrency(entry.value as number)}
+        {formatCurrency(entry.value as number, currency)}
       </Typography>
     </div>
   );
 }
 
-export function CategoryDonut({ data, className }: CategoryDonutProps) {
+export function CategoryDonut({ data, currency = 'INR', className }: CategoryDonutProps) {
   const [catMap, setCatMap] = useState<Record<string, { name: string; color: string }>>({});
   const total = data.reduce((sum, d) => sum + d.amount, 0);
 
@@ -100,7 +104,7 @@ export function CategoryDonut({ data, className }: CategoryDonutProps) {
                   />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip catMap={catMap} />} />
+              <Tooltip content={<CustomTooltip catMap={catMap} currency={currency} />} />
             </PieChart>
           </ResponsiveContainer>
         </div>

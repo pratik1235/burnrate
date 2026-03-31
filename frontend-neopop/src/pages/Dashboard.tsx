@@ -219,7 +219,7 @@ function StatementPeriodsModal({
                   <div style={{ textAlign: 'right' }}>
                      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}> Statement Due</Typography>
                     <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.BOLD} color={colorPalette.rss[500]}>
-                      {formatCurrency(p.totalAmountDue ?? 0)}
+                      {formatCurrency(p.totalAmountDue ?? 0, p.currency ?? 'INR')}
                     </Typography>
                   </div>
                 </div>
@@ -256,7 +256,7 @@ function DashboardContent() {
     amountMax: filters.amountRange.max,
   };
 
-  const { summary, trends, loading } = useAnalytics({
+  const { summary, trends, trendsByCurrency, loading } = useAnalytics({
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
@@ -279,25 +279,45 @@ function DashboardContent() {
   const safeCards = Array.isArray(cards) ? cards : [];
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
 
-  const safeSummary = summary && typeof summary.totalSpend === 'number' ? summary : {
-    totalSpend: 0,
-    deltaPercent: 0,
-    deltaLabel: 'vs last month',
-    period: 'This month',
-    sparklineData: [{ value: 0 }],
-    cardBreakdown: [],
-  };
+  const safeSummary =
+    summary && (summary.mixedCurrency || typeof summary.totalSpend === 'number')
+      ? summary
+      : {
+          totalSpend: 0,
+          mixedCurrency: false,
+          deltaPercent: 0,
+          deltaLabel: 'vs last month',
+          period: 'This month',
+          sparklineData: [{ value: 0 }],
+          cardBreakdown: [],
+        };
   const safeTrends = Array.isArray(trends) ? trends : [];
+  const safeTrendsByCurrency = Array.isArray(trendsByCurrency) ? trendsByCurrency : [];
 
   const cardBreakdown = safeSummary.cardBreakdown ?? [];
   const cardSpendByCard = safeCards.map((card) => {
-    const match = cardBreakdown.find(
+    const matches = cardBreakdown.filter(
       (cb) => cb.bank === card.bank && cb.last4 === card.last4
     );
+    if (matches.length === 0) {
+      return { ...card, spend: 0, count: 0, spendLines: undefined as { amount: number; currency: string }[] | undefined };
+    }
+    if (matches.length === 1) {
+      return {
+        ...card,
+        spend: matches[0].amount,
+        count: matches[0].count,
+        spendLines: undefined as { amount: number; currency: string }[] | undefined,
+      };
+    }
     return {
       ...card,
-      spend: match?.amount ?? 0,
-      count: match?.count ?? 0,
+      spend: matches[0].amount,
+      count: matches.reduce((s, m) => s + m.count, 0),
+      spendLines: matches.map((m) => ({
+        amount: m.amount,
+        currency: m.currency ?? 'INR',
+      })),
     };
   });
 
@@ -435,9 +455,15 @@ function DashboardContent() {
             <ClickableSpend style={{ flex: '1.2 1 0', minWidth: 280 }} onClick={handleSpendClick}>
               <SpendSummary
                 totalSpend={safeSummary.totalSpend}
-                deltaPercent={safeSummary.deltaPercent}
+                mixedCurrency={safeSummary.mixedCurrency}
+                totalSpendByCurrency={safeSummary.totalSpendByCurrency}
+                deltaPercent={safeSummary.deltaPercent ?? null}
                 deltaLabel={safeSummary.deltaLabel ?? 'vs last month'}
-                sparklineData={safeSummary.sparklineData ?? [{ value: 0 }]}
+                sparklineData={
+                  safeSummary.sparklineByCurrency?.[0]?.sparklineData ??
+                  safeSummary.sparklineData ??
+                  [{ value: 0 }]
+                }
                 period={periodLabel}
               />
             </ClickableSpend>
@@ -469,6 +495,7 @@ function DashboardContent() {
                   bank={card.bank}
                   last4={card.last4}
                   totalSpend={info?.spend ?? 0}
+                  spendLines={info?.spendLines}
                   transactionCount={info?.count ?? 0}
                 />
               );
@@ -485,6 +512,12 @@ function DashboardContent() {
           </SectionHeader>
           {loading ? (
             <Skeleton height="280px" />
+          ) : safeTrendsByCurrency.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {safeTrendsByCurrency.map((block) => (
+                <CashFlowChart key={block.currency} data={block.trends} currency={block.currency} />
+              ))}
+            </div>
           ) : safeTrends.length === 0 ? (
             <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
               No spending data yet. Import statements to see your cash flow.

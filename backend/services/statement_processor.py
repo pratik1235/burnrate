@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {".pdf", ".csv"}
 
 
+def _parsed_currency(parsed) -> str:
+    c = getattr(parsed, "currency", None) or "INR"
+    if isinstance(c, str) and len(c) >= 3:
+        return c[:3].upper()
+    return "INR"
+
+
 def _get_parsers() -> Dict[str, Type]:
     """Lazy-load PDF parsers (and thus pdfplumber) only when processing is triggered."""
     from backend.parsers.axis import AxisParser
@@ -26,6 +33,7 @@ def _get_parsers() -> Dict[str, Type]:
     from backend.parsers.generic import GenericParser
     from backend.parsers.hdfc import HDFCParser
     from backend.parsers.icici import ICICIParser
+    from backend.parsers.idfc_first import IDFCFirstBankParser
     from backend.parsers.indian_bank import IndianBankParser
 
     return {
@@ -34,6 +42,7 @@ def _get_parsers() -> Dict[str, Type]:
         "axis": AxisParser,
         "federal": FederalBankParser,
         "indian_bank": IndianBankParser,
+        "idfc_first": IDFCFirstBankParser,
     }
 
 
@@ -363,6 +372,7 @@ def process_statement(
                 credit_limit=getattr(parsed, "credit_limit", None),
                 source=source,
                 status="parse_error",
+                currency=_parsed_currency(parsed),
             )
             db_session.add(statement)
             db_session.commit()
@@ -387,6 +397,7 @@ def process_statement(
             Decimal(0),
         )
         total_spend = float(total_decimal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        cur = _parsed_currency(parsed)
         statement = Statement(
             bank=bank,
             card_last4=card_last4,
@@ -400,6 +411,7 @@ def process_statement(
             credit_limit=getattr(parsed, "credit_limit", None),
             source=source,
             status="success",
+            currency=cur,
         )
         db_session.add(statement)
         db_session.flush()
@@ -418,6 +430,7 @@ def process_statement(
                 card_last4=card_last4,
                 card_id=card_id,
                 source=source,
+                currency=cur,
             )
             db_session.add(tx)
 
@@ -503,6 +516,7 @@ def _process_csv_statement(
             total_spend=0.0,
             source=source,
             status="parse_error",
+            currency=_parsed_currency(parsed),
         )
         db_session.add(statement)
         db_session.commit()
@@ -528,6 +542,7 @@ def _process_csv_statement(
     )
     total_spend = float(total_decimal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
+    cur = _parsed_currency(parsed)
     statement = Statement(
         bank=bank,
         card_last4=card_last4,
@@ -539,6 +554,7 @@ def _process_csv_statement(
         total_spend=total_spend,
         source=source,
         status="success",
+        currency=cur,
     )
     db_session.add(statement)
     db_session.flush()
@@ -557,6 +573,7 @@ def _process_csv_statement(
             card_last4=card_last4,
             card_id=None,
             source=source,
+            currency=cur,
         )
         db_session.add(tx)
 

@@ -10,11 +10,13 @@ interface CardWidgetProps {
   bank: Bank;
   last4: string;
   totalSpend: number;
+  /** When multiple currency rows exist for this card */
+  spendLines?: { amount: number; currency: string }[];
   transactionCount: number;
   className?: string;
 }
 
-export function CardWidget({ bank, last4, totalSpend, transactionCount, className }: CardWidgetProps) {
+export function CardWidget({ bank, last4, totalSpend, spendLines, transactionCount, className }: CardWidgetProps) {
   const config = BANK_CONFIG[bank];
 
   return (
@@ -52,9 +54,22 @@ export function CardWidget({ bank, last4, totalSpend, transactionCount, classNam
         <CreditCard size={18} color="rgba(255,255,255,0.5)" />
       </div>
 
-      <Typography fontType={FontType.BODY} fontSize={24} fontWeight={FontWeights.BOLD} color={mainColors.white} style={{ marginBottom: 4 }}>
-        {formatCurrency(totalSpend)}
-      </Typography>
+      <div style={{ marginBottom: 4 }}>
+        {spendLines && spendLines.length > 0 ? (
+          spendLines
+            .slice()
+            .sort((a, b) => a.currency.localeCompare(b.currency))
+            .map((line) => (
+              <Typography key={line.currency} fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.BOLD} color={mainColors.white}>
+                {formatCurrency(line.amount, line.currency)}
+              </Typography>
+            ))
+        ) : (
+          <Typography fontType={FontType.BODY} fontSize={24} fontWeight={FontWeights.BOLD} color={mainColors.white}>
+            {formatCurrency(totalSpend)}
+          </Typography>
+        )}
+      </div>
       <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)">
         {transactionCount} transaction{transactionCount !== 1 ? 's' : ''}
       </Typography>
