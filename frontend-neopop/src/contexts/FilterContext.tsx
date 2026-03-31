@@ -12,6 +12,8 @@ export type SourceFilter = 'all' | 'CC' | 'BANK';
 
 export interface FilterState {
   selectedCards: string[];
+  /** BANK account keys `bank:last4` from GET /transactions/bank-accounts */
+  selectedBankAccounts: string[];
   selectedCategories: string[];
   selectedTags: string[];
   dateRange: { from?: string; to?: string };
@@ -29,6 +31,7 @@ export interface FilterContextValue {
 
 const defaultState: FilterState = {
   selectedCards: [],
+  selectedBankAccounts: [],
   selectedCategories: [],
   selectedTags: [],
   dateRange: {},
@@ -56,6 +59,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const hasActiveFilters = useMemo(() => {
     return (
       filters.selectedCards.length > 0 ||
+      filters.selectedBankAccounts.length > 0 ||
       filters.selectedCategories.length > 0 ||
       filters.selectedTags.length > 0 ||
       !!filters.dateRange.from ||

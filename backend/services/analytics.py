@@ -8,12 +8,13 @@ CC payment transactions are excluded entirely; legitimate refunds/reversals
 
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from backend.models.models import Transaction, TransactionTag
+from backend.services.transaction_query import apply_source_account_filters
 
 
 def _date_filter(q, from_date: Optional[date], to_date: Optional[date]):
@@ -26,16 +27,13 @@ def _date_filter(q, from_date: Optional[date], to_date: Optional[date]):
 
 def _apply_filters(
     q,
-    card_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
     amount_min: Optional[float] = None,
     amount_max: Optional[float] = None,
     tags: Optional[List[str]] = None,
 ):
-    """Apply common filters to a transaction query."""
-    if card_ids:
-        q = q.filter(Transaction.card_id.in_(card_ids))
+    """Apply common filters (card/source scoping is apply_source_account_filters)."""
     if categories:
         q = q.filter(Transaction.category.in_(categories))
     if direction == "incoming":
@@ -64,6 +62,8 @@ def compute_net_spend(
     amount_min: Optional[float] = None,
     amount_max: Optional[float] = None,
     tags: Optional[List[str]] = None,
+    source: Optional[str] = None,
+    bank_pairs: Optional[List[Tuple[str, str]]] = None,
 ) -> float:
     """Single source of truth for net spend calculation.
 
@@ -87,7 +87,8 @@ def compute_net_spend(
         q = q.filter(Transaction.bank == bank)
     if card_last4:
         q = q.filter(Transaction.card_last4 == card_last4)
-    q = _apply_filters(q, card_ids, categories, direction, amount_min, amount_max, tags)
+    q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
+    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
     raw = q.scalar() or 0.0
     d = Decimal(str(raw)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return float(d)
@@ -103,6 +104,8 @@ def get_summary(
     amount_min: Optional[float] = None,
     amount_max: Optional[float] = None,
     tags: Optional[List[str]] = None,
+    source: Optional[str] = None,
+    bank_pairs: Optional[List[Tuple[str, str]]] = None,
 ) -> Dict[str, Any]:
     """Total spend and card-wise breakdown."""
     total = compute_net_spend(
@@ -115,6 +118,8 @@ def get_summary(
         amount_min=amount_min,
         amount_max=amount_max,
         tags=tags,
+        source=source,
+        bank_pairs=bank_pairs,
     )
 
     # Per-card net spend: debits − credits (excluding cc_payment)
@@ -133,7 +138,8 @@ def get_summary(
         .filter(Transaction.category != "cc_payment")
     )
     card_q = _date_filter(card_q, from_date, to_date)
-    card_q = _apply_filters(card_q, card_ids, categories, direction, amount_min, amount_max, tags)
+    card_q = apply_source_account_filters(card_q, source, card_ids, bank_pairs or [])
+    card_q = _apply_filters(card_q, categories, direction, amount_min, amount_max, tags)
     card_rows = card_q.group_by(Transaction.bank, Transaction.card_last4).all()
 
     return {
@@ -160,6 +166,8 @@ def get_category_breakdown(
     amount_min: Optional[float] = None,
     amount_max: Optional[float] = None,
     tags: Optional[List[str]] = None,
+    source: Optional[str] = None,
+    bank_pairs: Optional[List[Tuple[str, str]]] = None,
 ) -> Dict[str, Any]:
     """Category amounts and percentages."""
     q = (
@@ -175,7 +183,8 @@ def get_category_breakdown(
     else:
         q = q.filter(Transaction.type == "debit")
     q = _date_filter(q, from_date, to_date)
-    q = _apply_filters(q, card_ids, categories, direction, amount_min, amount_max, tags)
+    q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
+    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
     rows = q.group_by(Transaction.category).all()
 
     total_decimal = sum((Decimal(str(r.amount or 0)) for r in rows), Decimal(0))
@@ -192,12 +201,25 @@ def get_category_breakdown(
     return {"total": total_float, "categories": categories}
 
 
-def get_monthly_trends(db: Session, months: int = 12) -> List[Dict[str, Any]]:
+def get_monthly_trends(
+    db: Session,
+    months: int = 12,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    card_ids: Optional[List[str]] = None,
+    categories: Optional[List[str]] = None,
+    direction: Optional[str] = None,
+    amount_min: Optional[float] = None,
+    amount_max: Optional[float] = None,
+    tags: Optional[List[str]] = None,
+    source: Optional[str] = None,
+    bank_pairs: Optional[List[Tuple[str, str]]] = None,
+) -> List[Dict[str, Any]]:
     """Monthly net spend aggregation (debits − non-cc credits)."""
-    end = date.today()
-    start = end - timedelta(days=months * 31)
+    end = to_date or date.today()
+    start = from_date or (end - timedelta(days=months * 31))
 
-    rows = (
+    q = (
         db.query(
             func.strftime("%Y-%m", Transaction.date).label("month"),
             func.sum(
@@ -210,7 +232,11 @@ def get_monthly_trends(db: Session, months: int = 12) -> List[Dict[str, Any]]:
         .filter(Transaction.category != "cc_payment")
         .filter(Transaction.date >= start)
         .filter(Transaction.date <= end)
-        .group_by(func.strftime("%Y-%m", Transaction.date))
+    )
+    q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
+    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
+    rows = (
+        q.group_by(func.strftime("%Y-%m", Transaction.date))
         .order_by("month")
         .all()
     )
@@ -232,6 +258,8 @@ def get_top_merchants(
     amount_max: Optional[float] = None,
     tags: Optional[List[str]] = None,
     limit: int = 10,
+    source: Optional[str] = None,
+    bank_pairs: Optional[List[Tuple[str, str]]] = None,
 ) -> List[Dict[str, Any]]:
     """Top merchants by spend."""
     q = (
@@ -247,7 +275,8 @@ def get_top_merchants(
     else:
         q = q.filter(Transaction.type == "debit")
     q = _date_filter(q, from_date, to_date)
-    q = _apply_filters(q, card_ids, categories, direction, amount_min, amount_max, tags)
+    q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
+    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
     rows = (
         q.group_by(Transaction.merchant)
         .order_by(func.sum(Transaction.amount).desc())

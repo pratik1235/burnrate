@@ -95,6 +95,8 @@ function TransactionsContent() {
 
   const { transactions, total, totalAmount, loading } = useTransactions({
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
+    bankAccounts:
+      filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
     category: categoryFilter,
     search: searchQuery || undefined,
     tags: filters.selectedTags?.length ? filters.selectedTags.join(',') : undefined,
@@ -113,7 +115,19 @@ function TransactionsContent() {
     setPage(0);
     setExcludedIds(new Set());
     setExclusionMode(false);
-  }, [filters.selectedCards, filters.selectedCategories, filters.selectedTags, filters.dateRange.from, filters.dateRange.to, filters.amountRange.min, filters.amountRange.max, filters.direction, filters.source, searchQuery]);
+  }, [
+    filters.selectedCards,
+    filters.selectedBankAccounts,
+    filters.selectedCategories,
+    filters.selectedTags,
+    filters.dateRange.from,
+    filters.dateRange.to,
+    filters.amountRange.min,
+    filters.amountRange.max,
+    filters.direction,
+    filters.source,
+    searchQuery,
+  ]);
 
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
   const safeCards = Array.isArray(cards) ? cards : [];
@@ -245,6 +259,7 @@ function TransactionsContent() {
 
   const activeCount =
     filters.selectedCards.length +
+    filters.selectedBankAccounts.length +
     filters.selectedCategories.length +
     (filters.selectedTags?.length ?? 0) +
     (filters.dateRange.from ? 1 : 0) +

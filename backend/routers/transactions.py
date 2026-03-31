@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from backend.models.database import get_db
 from backend.models.models import Transaction, TransactionTag
+from backend.services.transaction_query import apply_source_account_filters, parse_bank_accounts_param
 
 
 def _escape_like(value: str) -> str:
@@ -24,18 +25,48 @@ class UpdateTagsPayload(BaseModel):
     tags: List[str]
 
 
+@router.get("/bank-accounts")
+def list_bank_account_keys(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Distinct BANK-source (bank, last4) pairs for filter UI."""
+    rows = (
+        db.query(Transaction.bank, Transaction.card_last4)
+        .filter(Transaction.source == "BANK")
+        .filter(Transaction.bank.isnot(None))
+        .filter(Transaction.card_last4.isnot(None))
+        .distinct()
+        .all()
+    )
+    accounts = []
+    for bank, last4 in rows:
+        if not bank or not last4:
+            continue
+        b = bank.lower()
+        accounts.append({"bank": b, "last4": last4, "id": f"{b}:{last4}"})
+    accounts.sort(key=lambda x: (x["bank"], x["last4"]))
+    return {"accounts": accounts}
+
+
 @router.get("")
 def list_transactions(
     db: Session = Depends(get_db),
     card: Optional[str] = Query(None, description="Filter by card UUID"),
     cards: Optional[str] = Query(None, description="Comma-separated card UUIDs"),
+    bank_accounts: Optional[str] = Query(
+        None,
+        description="Comma-separated bank:last4 keys for BANK transactions (e.g. hdfc:1234)",
+    ),
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
     category: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     tags: Optional[str] = Query(None, description="Comma-separated tag names to filter by"),
     direction: Optional[str] = Query(None, description="incoming or outgoing"),
-    source: Optional[str] = Query(None, description="Filter by source: CC or BANK"),
+    source: Optional[str] = Query(
+        None,
+        description="Filter by source: CC, BANK, or omit / all for both (combined with card/bank filters)",
+    ),
     amount_min: Optional[float] = Query(None),
     amount_max: Optional[float] = Query(None),
     limit: int = Query(100, ge=1, le=500),
@@ -43,14 +74,18 @@ def list_transactions(
 ) -> Dict[str, Any]:
     """Query transactions with filters. Returns {transactions: [...], total: N, totalAmount: F}."""
     q = db.query(Transaction)
-    if source:
-        q = q.filter(Transaction.source == source.upper())
+
+    card_ids: Optional[List[str]] = None
     if cards:
-        card_ids = [c.strip() for c in cards.split(",") if c.strip()]
-        if card_ids:
-            q = q.filter(Transaction.card_id.in_(card_ids))
+        card_ids = [c.strip() for c in cards.split(",") if c.strip()] or None
     elif card:
-        q = q.filter(Transaction.card_id == card)
+        card_ids = [card]
+
+    bank_pairs = parse_bank_accounts_param(bank_accounts)
+    src = source.strip().upper() if source and source.strip() else None
+    if src == "ALL":
+        src = None
+    q = apply_source_account_filters(q, src, card_ids, bank_pairs)
     if from_date:
         q = q.filter(Transaction.date >= from_date)
     if to_date:

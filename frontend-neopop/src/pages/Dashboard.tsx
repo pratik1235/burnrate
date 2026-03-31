@@ -100,6 +100,7 @@ const ClickableSpend = styled.div`
 function countActiveFilters(filters: ReturnType<typeof useFilters>['filters']): number {
   let count = 0;
   count += filters.selectedCards.length;
+  count += filters.selectedBankAccounts.length;
   count += filters.selectedCategories.length;
   count += filters.selectedTags.length;
   if (filters.dateRange.from) count++;
@@ -107,6 +108,7 @@ function countActiveFilters(filters: ReturnType<typeof useFilters>['filters']): 
   if (filters.amountRange.min !== undefined) count++;
   if (filters.amountRange.max !== undefined) count++;
   if (filters.direction !== 'all') count++;
+  if (filters.source !== 'all') count++;
   return count;
 }
 
@@ -242,11 +244,14 @@ function DashboardContent() {
 
   const filterParams = {
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
+    bankAccounts:
+      filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     category: filters.selectedCategories.length === 1 ? filters.selectedCategories[0] : undefined,
     tags: filters.selectedTags?.length > 0 ? filters.selectedTags.join(',') : undefined,
     direction: filters.direction !== 'all' ? filters.direction : undefined,
+    source: filters.source !== 'all' ? filters.source : undefined,
     amountMin: filters.amountRange.min,
     amountMax: filters.amountRange.max,
   };
@@ -255,11 +260,14 @@ function DashboardContent() {
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
+    bankAccounts:
+      filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
     categories: filters.selectedCategories.length > 0 ? filters.selectedCategories.join(',') : undefined,
     tags: filters.selectedTags?.length > 0 ? filters.selectedTags.join(',') : undefined,
     direction: filters.direction !== 'all' ? filters.direction : undefined,
     amountMin: filters.amountRange.min,
     amountMax: filters.amountRange.max,
+    source: filters.source !== 'all' ? filters.source : undefined,
   });
   const { transactions, loading: txLoading } = useTransactions({
     ...filterParams,

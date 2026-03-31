@@ -170,11 +170,14 @@ function AnalyticsContent() {
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
+    bankAccounts:
+      filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
     categories: filters.selectedCategories.length > 0 ? filters.selectedCategories.join(',') : undefined,
     tags: filters.selectedTags?.length > 0 ? filters.selectedTags.join(',') : undefined,
     direction: filters.direction !== 'all' ? filters.direction : undefined,
     amountMin: filters.amountRange.min,
     amountMax: filters.amountRange.max,
+    source: filters.source !== 'all' ? filters.source : undefined,
   });
 
   const safeCategories = Array.isArray(categories) ? categories : [];
@@ -231,13 +234,15 @@ function AnalyticsContent() {
 
   const activeCount =
     filters.selectedCards.length +
+    filters.selectedBankAccounts.length +
     filters.selectedCategories.length +
     filters.selectedTags.length +
     (filters.dateRange.from ? 1 : 0) +
     (filters.dateRange.to ? 1 : 0) +
     (filters.amountRange.min !== undefined ? 1 : 0) +
     (filters.amountRange.max !== undefined ? 1 : 0) +
-    (filters.direction !== 'all' ? 1 : 0);
+    (filters.direction !== 'all' ? 1 : 0) +
+    (filters.source !== 'all' ? 1 : 0);
 
   return (
     <PageLayout>

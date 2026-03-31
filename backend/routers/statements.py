@@ -2,11 +2,13 @@
 
 import concurrent.futures
 import os
+from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from sqlalchemy import or_
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -203,12 +205,30 @@ def reparse_all_statements(db: Session = Depends(get_db)) -> Dict[str, Any]:
 @router.get("")
 def list_statements(
     source: Optional[str] = Query(None, description="Filter by source: CC or BANK"),
+    banks: Optional[str] = Query(
+        None,
+        description="Comma-separated bank slugs (e.g. hdfc,icici)",
+    ),
+    from_date: Optional[date] = Query(None, alias="from", description="Filter by period overlap"),
+    to_date: Optional[date] = Query(None, alias="to"),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
-    """List all imported statements, optionally filtered by source."""
+    """List all imported statements, optionally filtered by source, bank, and date range."""
     q = db.query(Statement).order_by(Statement.imported_at.desc())
     if source:
         q = q.filter(Statement.source == source.upper())
+    if banks and banks.strip():
+        bank_list = [b.strip().lower() for b in banks.split(",") if b.strip()]
+        if bank_list:
+            q = q.filter(Statement.bank.in_(bank_list))
+    if from_date:
+        q = q.filter(
+            or_(Statement.period_end.is_(None), Statement.period_end >= from_date)
+        )
+    if to_date:
+        q = q.filter(
+            or_(Statement.period_start.is_(None), Statement.period_start <= to_date)
+        )
     statements = q.all()
     return [
         {

@@ -72,6 +72,7 @@ export async function submitSetup(data: SetupProfilePayload): Promise<Settings> 
 export interface TransactionFilters {
   card?: string;
   cards?: string;
+  bankAccounts?: string;
   from?: string;
   to?: string;
   category?: Category;
@@ -113,9 +114,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (filters.to) params.to = filters.to;
       if (filters.category) params.category = filters.category;
       if (filters.search) params.search = filters.search;
-      if (filters.tags) (params as Record<string, unknown>).tags = filters.tags;
+      if (filters.tags) params.tags = filters.tags;
       if (filters.direction) params.direction = filters.direction;
       if (filters.source) params.source = filters.source;
+      if (filters.bankAccounts) params.bank_accounts = filters.bankAccounts;
       if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
       if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
 
@@ -141,6 +143,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.tags,
     filters.direction,
     filters.source,
+    filters.bankAccounts,
     filters.amountMin,
     filters.amountMax,
     filters.limit,
@@ -163,9 +166,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
         if (filters.to) params.to = filters.to;
         if (filters.category) params.category = filters.category;
         if (filters.search) params.search = filters.search;
-        if (filters.tags) (params as Record<string, unknown>).tags = filters.tags;
+        if (filters.tags) params.tags = filters.tags;
         if (filters.direction) params.direction = filters.direction;
         if (filters.source) params.source = filters.source;
+        if (filters.bankAccounts) params.bank_accounts = filters.bankAccounts;
         if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
         if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
         const result = await apiGetTransactions(params);
@@ -196,6 +200,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.tags,
     filters.direction,
     filters.source,
+    filters.bankAccounts,
     filters.amountMin,
     filters.amountMax,
     filters.limit,
@@ -214,6 +219,8 @@ export interface AnalyticsFilters {
   direction?: string;
   amountMin?: number;
   amountMax?: number;
+  source?: string;
+  bankAccounts?: string;
 }
 
 export function useAnalytics(filters: AnalyticsFilters = {}) {
@@ -237,6 +244,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
         ...(filters.direction ? { direction: filters.direction } : {}),
         ...(filters.amountMin !== undefined ? { amount_min: filters.amountMin } : {}),
         ...(filters.amountMax !== undefined ? { amount_max: filters.amountMax } : {}),
+        ...(filters.source ? { source: filters.source } : {}),
+        ...(filters.bankAccounts ? { bank_accounts: filters.bankAccounts } : {}),
       };
       const hasParams = Object.keys(params).length > 0;
       const apiParams = hasParams ? params : undefined;
@@ -273,6 +282,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
     filters.direction,
     filters.amountMin,
     filters.amountMax,
+    filters.source,
+    filters.bankAccounts,
   ]);
 
   useEffect(() => {
@@ -290,6 +301,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
           ...(filters.direction ? { direction: filters.direction } : {}),
           ...(filters.amountMin !== undefined ? { amount_min: filters.amountMin } : {}),
           ...(filters.amountMax !== undefined ? { amount_max: filters.amountMax } : {}),
+          ...(filters.source ? { source: filters.source } : {}),
+          ...(filters.bankAccounts ? { bank_accounts: filters.bankAccounts } : {}),
         };
         const hasParams = Object.keys(params).length > 0;
         const apiParams = hasParams ? params : undefined;
@@ -330,6 +343,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
     filters.direction,
     filters.amountMin,
     filters.amountMax,
+    filters.source,
+    filters.bankAccounts,
   ]);
 
   return {

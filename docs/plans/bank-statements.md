@@ -59,10 +59,17 @@ All CSV bank parsers extend `BaseBankCSVParser` which itself extends `BaseParser
 
 ### `GET /api/statements`
 - Include `source` field in response
+- Optional query params: `banks` (comma-separated slugs), `from` / `to` (filter statements whose period overlaps the range; rows with missing period bounds may still match loosely via `period_end` / `period_start` null handling)
 
 ### `GET /api/transactions`
 - Include `source` field in response
-- New query param: `source` (filter by CC/BANK)
+- Query params: `source` (omit or `all` for union logic with card/bank filters), `cards` (comma-separated card UUIDs), `bank_accounts` (comma-separated `bank:last4` keys for BANK rows). When `source` is omitted, **Cards** and **Bank accounts** combine with OR semantics (CC rows for selected cards ∪ BANK rows for selected account keys).
+
+### `GET /api/transactions/bank-accounts`
+- Returns distinct `{ id, bank, last4 }` for `source=BANK` transactions (for filter UI).
+
+### Analytics endpoints
+- `source` and `bank_accounts` query params mirror transaction list semantics for summary, categories, merchants, and trends.
 
 ## Analytics Adjustments
 

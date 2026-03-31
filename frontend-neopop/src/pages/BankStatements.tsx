@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { StatUpload } from '@/components/StatUpload';
+import { FilterModal, type BankStatementFilterValues } from '@/components/FilterModal';
 import { Button, Typography, InputField } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import {
   getStatements,
+  type GetStatementsParams,
   deleteStatement,
   reparseStatement,
   uploadStatement,
@@ -16,7 +18,7 @@ import {
 import type { Statement } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
 import { toast } from '@/components/Toast';
-import { Trash2, RefreshCw, AlertTriangle, Lock, Landmark } from 'lucide-react';
+import { Trash2, RefreshCw, AlertTriangle, Lock, Landmark, SlidersHorizontal } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import styled from 'styled-components';
 
@@ -38,11 +40,28 @@ export function BankStatements() {
   const [actioning, setActioning] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [passwordInputs, setPasswordInputs] = useState<Record<string, string>>({});
+  const [stmtFilters, setStmtFilters] = useState<BankStatementFilterValues>({ banks: [] });
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [availableBanks, setAvailableBanks] = useState<string[]>([]);
+
+  const refreshBankSlugs = useCallback(async () => {
+    try {
+      const rows = await getStatements('BANK');
+      const slugs = [...new Set(rows.map((r) => r.bank.toLowerCase()))].sort();
+      setAvailableBanks(slugs);
+    } catch {
+      setAvailableBanks([]);
+    }
+  }, []);
 
   const fetchStatements = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getStatements('BANK');
+      const params: GetStatementsParams = { source: 'BANK' };
+      if (stmtFilters.banks.length > 0) params.banks = stmtFilters.banks.join(',');
+      if (stmtFilters.from) params.from = stmtFilters.from;
+      if (stmtFilters.to) params.to = stmtFilters.to;
+      const data = await getStatements(params);
       setStatements(data);
     } catch {
       toast.error('Failed to load bank statements');
@@ -50,7 +69,11 @@ export function BankStatements() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [stmtFilters]);
+
+  useEffect(() => {
+    refreshBankSlugs();
+  }, [refreshBankSlugs]);
 
   useEffect(() => {
     fetchStatements();
@@ -72,6 +95,7 @@ export function BankStatements() {
         toast.success(
           `${result.count ?? 0} transactions imported from ${(result.bank ?? '').toUpperCase()} bank statement`
         );
+        await refreshBankSlugs();
         await fetchStatements();
       } else if (result.status === 'duplicate') {
         toast.info(result.message ?? 'Statement already imported');
@@ -97,6 +121,7 @@ export function BankStatements() {
 
       if (result.success > 0) {
         toast.success(`${result.success} of ${result.total} bank statements imported`);
+        await refreshBankSlugs();
         await fetchStatements();
       }
       if (result.success === 0) {
@@ -182,6 +207,20 @@ export function BankStatements() {
               Bank Statements
             </Typography>
           </div>
+          <Button
+            variant={
+              stmtFilters.banks.length > 0 || stmtFilters.from || stmtFilters.to ? 'secondary' : 'primary'
+            }
+            kind="elevated"
+            size="small"
+            colorMode="dark"
+            onClick={() => setFilterOpen(true)}
+          >
+            <SlidersHorizontal size={14} style={{ marginRight: 6 }} />
+            Filters
+            {(stmtFilters.banks.length > 0 || stmtFilters.from || stmtFilters.to) &&
+              ` (${stmtFilters.banks.length + (stmtFilters.from ? 1 : 0) + (stmtFilters.to ? 1 : 0)})`}
+          </Button>
         </div>
 
         <div style={{ marginBottom: 32 }}>
@@ -348,6 +387,14 @@ export function BankStatements() {
         variant="danger"
         onConfirm={executeRemove}
         onCancel={() => setConfirmDeleteId(null)}
+      />
+      <FilterModal
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        variant="bankStatements"
+        availableBanks={availableBanks}
+        bankStatementFilters={stmtFilters}
+        onApplyBankStatements={(f) => setStmtFilters(f)}
       />
     </PageLayout>
   );

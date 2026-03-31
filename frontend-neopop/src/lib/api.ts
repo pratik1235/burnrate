@@ -47,10 +47,13 @@ export interface SetupProfilePayload {
 export interface GetTransactionsParams {
   card?: string;
   cards?: string;
+  /** Comma-separated bank:last4 for BANK transactions */
+  bank_accounts?: string;
   from?: string;
   to?: string;
   category?: Category;
   search?: string;
+  tags?: string;
   direction?: string;
   source?: string;
   amount_min?: number;
@@ -231,10 +234,25 @@ interface StatementRaw {
   imported_at: string | null;
 }
 
-export async function getStatements(source?: Source): Promise<Statement[]> {
-  const params: Record<string, string> = {};
-  if (source) params.source = source;
-  const { data } = await api.get<StatementRaw[]>('/statements', { params });
+export interface GetStatementsParams {
+  source?: Source;
+  /** Comma-separated bank slugs */
+  banks?: string;
+  from?: string;
+  to?: string;
+}
+
+export async function getStatements(params?: Source | GetStatementsParams): Promise<Statement[]> {
+  const q: Record<string, string> = {};
+  if (typeof params === 'string' || params === undefined) {
+    if (params) q.source = params;
+  } else {
+    if (params.source) q.source = params.source;
+    if (params.banks) q.banks = params.banks;
+    if (params.from) q.from = params.from;
+    if (params.to) q.to = params.to;
+  }
+  const { data } = await api.get<StatementRaw[]>('/statements', { params: q });
   return data.map((s) => ({
     id: s.id,
     bank: s.bank as Bank,
@@ -259,6 +277,13 @@ export async function retryWithPassword(
     { timeout: 60000 },
   );
   return data;
+}
+
+export async function getBankAccountKeys(): Promise<{ id: string; bank: string; last4: string }[]> {
+  const { data } = await api.get<{ accounts: { id: string; bank: string; last4: string }[] }>(
+    '/transactions/bank-accounts'
+  );
+  return Array.isArray(data?.accounts) ? data.accounts : [];
 }
 
 export async function getTransactions(
@@ -304,6 +329,8 @@ export interface AnalyticsParams {
   direction?: string;
   amount_min?: number;
   amount_max?: number;
+  source?: string;
+  bank_accounts?: string;
 }
 
 export async function getSummary(params?: AnalyticsParams): Promise<GetSummaryResponse> {
