@@ -19,6 +19,8 @@ import {
   ShoppingCart,
   CreditCard,
   MoreHorizontal,
+  EyeOff,
+  Eye,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -60,7 +62,7 @@ const TagBtn = styled.div`
   flex-shrink: 0;
 `;
 
-const RowContainer = styled.div<{ $isCcPayment: boolean }>`
+const RowContainer = styled.div<{ $isCcPayment: boolean; $isExcluded: boolean }>`
   display: flex;
   align-items: center;
   gap: 16px;
@@ -68,7 +70,8 @@ const RowContainer = styled.div<{ $isCcPayment: boolean }>`
   background-color: ${({ $isCcPayment }) => $isCcPayment ? 'rgba(107,114,128,0.08)' : 'rgba(255,255,255,0.03)'};
   border-radius: 8px;
   margin-bottom: 4px;
-  opacity: ${({ $isCcPayment }) => $isCcPayment ? 0.7 : 1};
+  opacity: ${({ $isCcPayment, $isExcluded }) => ($isExcluded ? 0.35 : $isCcPayment ? 0.7 : 1)};
+  filter: ${({ $isExcluded }) => ($isExcluded ? 'grayscale(40%)' : 'none')};
 
   &:hover ${TagBtn} {
     opacity: 1;
@@ -78,9 +81,12 @@ const RowContainer = styled.div<{ $isCcPayment: boolean }>`
 interface TransactionRowProps {
   transaction: Transaction;
   className?: string;
+  exclusionMode?: boolean;
+  isExcluded?: boolean;
+  onToggleExclude?: (id: string) => void;
 }
 
-export function TransactionRow({ transaction, className }: TransactionRowProps) {
+export function TransactionRow({ transaction, className, exclusionMode, isExcluded, onToggleExclude }: TransactionRowProps) {
   const [tags, setTags] = useState<string[]>(transaction.tags ?? []);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [catMap, setCatMap] = useState<Record<string, { name: string; color: string; icon: string }>>({});
@@ -132,8 +138,36 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
   const isCredit = transaction.type === 'credit';
   const isCcPayment = transaction.category === 'cc_payment';
 
+  const handleToggleExclude = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleExclude?.(transaction.id);
+  };
+
+  const showExcludeIcon = exclusionMode && onToggleExclude;
+
   return (
-    <RowContainer $isCcPayment={isCcPayment} className={className}>
+    <RowContainer $isCcPayment={isCcPayment} $isExcluded={!!isExcluded} className={className}>
+      {showExcludeIcon && (
+        <button
+          type="button"
+          onClick={handleToggleExclude}
+          aria-label={isExcluded ? 'Include transaction' : 'Exclude transaction'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 32,
+            height: 32,
+            flexShrink: 0,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'rgba(255,255,255,0.6)',
+          }}
+        >
+          {isExcluded ? <Eye size={18} /> : <EyeOff size={18} />}
+        </button>
+      )}
       <div
         style={{
           width: 40,
@@ -266,6 +300,22 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
 
         {/* Category row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+          
+          
+          <Typography
+            as="span"
+            fontType={FontType.BODY}
+            fontSize={10}
+            fontWeight={FontWeights.BOLD}
+            color={transaction.source === 'BANK' ? '#3B82F6' : colorPalette.rss[500]}
+            style={{
+              padding: '1px 5px',
+              borderRadius: 3,
+              background: transaction.source === 'BANK' ? 'rgba(59,130,246,0.15)' : 'rgba(255,135,68,0.15)',
+            }}
+          >
+            {transaction.source === 'BANK' ? 'BANK' : 'CC'}
+          </Typography>
           <Typography
             as="span"
             fontType={FontType.BODY}
@@ -282,14 +332,14 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
           >
             {catLabel}
           </Typography>
+          <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+            {bankConfig.name} {transaction.cardLast4 ? `...${transaction.cardLast4}` : ''}
+          </Typography> 
           {isCcPayment && (
             <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
               Not included in spends
             </Typography>
           )}
-          <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
-            {bankConfig.name} ...{transaction.cardLast4}
-          </Typography>
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>

@@ -12,6 +12,7 @@ const sampleTransaction: Transaction = {
   cardId: 'c1',
   bank: 'hdfc',
   cardLast4: '4521',
+  source: 'CC',
 };
 
 const meta = {

@@ -16,9 +16,11 @@ from backend.services.pdf_unlock import _validate_pdf_path, generate_passwords, 
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_EXTENSIONS = {".pdf", ".csv"}
+
 
 def _get_parsers() -> Dict[str, Type]:
-    """Lazy-load parsers (and thus pdfplumber) only when processing is triggered."""
+    """Lazy-load PDF parsers (and thus pdfplumber) only when processing is triggered."""
     from backend.parsers.axis import AxisParser
     from backend.parsers.federal import FederalBankParser
     from backend.parsers.generic import GenericParser
@@ -32,6 +34,21 @@ def _get_parsers() -> Dict[str, Type]:
         "axis": AxisParser,
         "federal": FederalBankParser,
         "indian_bank": IndianBankParser,
+    }
+
+
+def _get_bank_csv_parsers() -> Dict[str, Type]:
+    """Lazy-load bank account CSV parsers."""
+    from backend.parsers.axis_bank_csv import AxisBankCSVParser
+    from backend.parsers.hdfc_bank_csv import HDFCBankCSVParser
+    from backend.parsers.icici_bank_csv import ICICIBankCSVParser
+    from backend.parsers.sbi_bank_csv import SBIBankCSVParser
+
+    return {
+        "hdfc": HDFCBankCSVParser,
+        "icici": ICICIBankCSVParser,
+        "sbi": SBIBankCSVParser,
+        "axis": AxisBankCSVParser,
     }
 
 
@@ -64,16 +81,50 @@ def _get_card_last4s(db: Session, bank: Optional[str] = None) -> list:
     return [c.last4 for c in cards]
 
 
+def _is_csv(file_path: str) -> bool:
+    return file_path.lower().endswith(".csv")
+
+
+def _create_password_needed_statement(
+    db_session: Session,
+    file_hash: str,
+    file_path: str,
+    bank: Optional[str],
+    source: str,
+) -> None:
+    """Persist a minimal Statement record so that password-protected files
+    appear in the Reparse/Remove UI for the user to supply a password."""
+    stmt = Statement(
+        bank=bank or "unknown",
+        card_last4=None,
+        period_start=None,
+        period_end=None,
+        file_hash=file_hash,
+        file_path=file_path,
+        transaction_count=0,
+        total_spend=0.0,
+        source=source,
+        status="password_needed",
+    )
+    db_session.add(stmt)
+    db_session.commit()
+
+
 def process_statement(
     pdf_path: str,
     bank: Optional[str] = None,
     db_session: Optional[Session] = None,
     db_session_factory: Optional[Callable] = None,
     manual_password: Optional[str] = None,
+    source: str = "CC",
 ) -> Dict:
     """
-    Process a statement PDF: unlock, parse, categorize, persist.
+    Process a statement file (PDF or CSV): unlock, parse, categorize, persist.
     Returns summary dict { status, count, period, bank }.
+
+    Source is auto-determined from file type: CSV files are always treated as
+    bank account statements (source=BANK), PDF files as credit card statements
+    (source=CC).
     """
     close_session = False
     if db_session is None and db_session_factory:
@@ -83,7 +134,12 @@ def process_statement(
         db_session = SessionLocal()
         close_session = True
 
-    working_path = pdf_path  # may be reassigned to a temp unlocked file
+    is_csv = _is_csv(pdf_path)
+    if is_csv:
+        source = "BANK"
+    elif source == "BANK" and not is_csv:
+        source = "CC"
+    working_path = pdf_path
 
     try:
         if not os.path.isfile(pdf_path):
@@ -93,7 +149,6 @@ def process_statement(
 
         file_hash = _compute_hash(pdf_path)
 
-        # Check for duplicate
         existing = db_session.query(Statement).filter(Statement.file_hash == file_hash).first()
         if existing:
             return {
@@ -104,10 +159,19 @@ def process_statement(
                 "bank": None,
             }
 
-        # Detect bank if not provided
+        if is_csv:
+            return _process_csv_statement(
+                csv_path=pdf_path,
+                file_hash=file_hash,
+                bank=bank,
+                source=source,
+                db_session=db_session,
+            )
+
+        # ---------- PDF processing (existing logic) ----------
+
         if not bank:
             from backend.parsers.detector import detect_bank
-
             bank = detect_bank(pdf_path)
 
         profile = _get_user_profile(db_session)
@@ -121,19 +185,20 @@ def process_statement(
                 working_path = unlocked
                 if not bank:
                     from backend.parsers.detector import detect_bank
-
                     detected = detect_bank(working_path)
                     if detected and detected in SUPPORTED_BANKS:
                         bank = detected
             else:
+                _create_password_needed_statement(
+                    db_session, file_hash, pdf_path, bank, source,
+                )
                 return {
-                    "status": "error",
+                    "status": "password_needed",
                     "message": "Could not unlock PDF with provided password",
                     "count": 0,
                 }
         elif encrypted and profile:
             if bank:
-                # Detected bank — try its passwords (works for dedicated and generic banks)
                 passwords = generate_passwords(
                     bank=bank,
                     name=profile.name,
@@ -146,13 +211,15 @@ def process_statement(
                 if unlocked:
                     working_path = unlocked
                 else:
+                    _create_password_needed_statement(
+                        db_session, file_hash, pdf_path, bank, source,
+                    )
                     return {
-                        "status": "error",
-                        "message": "Could not unlock PDF - wrong password",
+                        "status": "password_needed",
+                        "message": "Could not unlock PDF - enter password for this statement to be processed",
                         "count": 0,
                     }
             else:
-                # Bank unknown — try every supported bank's passwords until one works
                 unlocked = None
                 for try_bank in SUPPORTED_BANKS:
                     try_card_last4s = _get_card_last4s(db_session, bank=try_bank)
@@ -172,18 +239,28 @@ def process_statement(
                         break
 
                 if not unlocked:
+                    _create_password_needed_statement(
+                        db_session, file_hash, pdf_path, bank, source,
+                    )
                     return {
-                        "status": "error",
-                        "message": "Could not unlock PDF - tried all bank password formats",
+                        "status": "password_needed",
+                        "message": "Could not unlock PDF - enter password for this statement to be processed",
                         "count": 0,
                     }
 
-                # Confirm bank from PDF content now that it's unlocked
                 from backend.parsers.detector import detect_bank
-
                 detected = detect_bank(working_path)
                 if detected and detected in SUPPORTED_BANKS:
                     bank = detected
+        elif encrypted:
+            _create_password_needed_statement(
+                db_session, file_hash, pdf_path, bank, source,
+            )
+            return {
+                "status": "password_needed",
+                "message": "PDF is password-protected - enter password for this statement to be processed",
+                "count": 0,
+            }
 
         if not bank:
             return {
@@ -192,8 +269,6 @@ def process_statement(
                 "count": 0,
             }
 
-        # Early card check: skip before parsing if no cards from this
-        # bank are registered at all — avoids wasting time on PDF parsing.
         registered_cards = db_session.query(Card).filter(Card.bank == bank).all()
         if not registered_cards:
             logger.warning(
@@ -211,7 +286,6 @@ def process_statement(
                 "card_last4": None,
             }
 
-        # Parse — use dedicated parser if available, else generic
         from backend.parsers.generic import GenericParser
 
         parsers = _get_parsers()
@@ -221,7 +295,6 @@ def process_statement(
             parser = GenericParser(bank=bank)
         parsed = parser.parse(working_path)
 
-        # Resolve card_last4 from parsed data or registered cards
         card_last4 = getattr(parsed, "card_last4", None)
         card_id = None
         if card_last4:
@@ -270,9 +343,6 @@ def process_statement(
                     "card_last4": None,
                 }
 
-        # Detect parse failures: if the parser returned nothing useful,
-        # record the statement with status='parse_error' so the file hash
-        # prevents re-processing, while keeping it visible for user action.
         is_parse_error = (
             len(parsed.transactions) == 0
             and parsed.period_start is None
@@ -291,6 +361,7 @@ def process_statement(
                 total_spend=0.0,
                 total_amount_due=getattr(parsed, "total_amount_due", None),
                 credit_limit=getattr(parsed, "credit_limit", None),
+                source=source,
                 status="parse_error",
             )
             db_session.add(statement)
@@ -311,7 +382,6 @@ def process_statement(
                 "bank": bank,
             }
 
-        # Create Statement record
         total_decimal = sum(
             (Decimal(str(t.amount)) for t in parsed.transactions if t.type == "debit"),
             Decimal(0),
@@ -328,12 +398,12 @@ def process_statement(
             total_spend=total_spend,
             total_amount_due=getattr(parsed, "total_amount_due", None),
             credit_limit=getattr(parsed, "credit_limit", None),
+            source=source,
             status="success",
         )
         db_session.add(statement)
         db_session.flush()
 
-        # Insert transactions
         for pt in parsed.transactions:
             category = categorize(pt.merchant, db_session=db_session)
             tx = Transaction(
@@ -347,6 +417,7 @@ def process_statement(
                 bank=bank,
                 card_last4=card_last4,
                 card_id=card_id,
+                source=source,
             )
             db_session.add(tx)
 
@@ -374,7 +445,6 @@ def process_statement(
             "bank": bank,
         }
     finally:
-        # Always clean up temp unlocked PDF
         if working_path != pdf_path and os.path.isfile(working_path):
             try:
                 os.remove(working_path)
@@ -382,3 +452,122 @@ def process_statement(
                 pass
         if close_session and db_session:
             db_session.close()
+
+
+def _process_csv_statement(
+    csv_path: str,
+    file_hash: str,
+    bank: Optional[str],
+    source: str,
+    db_session: Session,
+) -> Dict:
+    """Process a CSV bank statement: detect bank, parse, categorize, persist."""
+    if not bank:
+        from backend.parsers.detector import detect_bank_csv
+        bank = detect_bank_csv(csv_path)
+
+    if not bank:
+        return {
+            "status": "error",
+            "message": "Could not detect bank from CSV filename or content",
+            "count": 0,
+        }
+
+    from backend.parsers.generic_bank_csv import GenericBankCSVParser
+
+    csv_parsers = _get_bank_csv_parsers()
+    if bank in csv_parsers:
+        parser = csv_parsers[bank]()
+    else:
+        parser = GenericBankCSVParser(bank=bank)
+
+    parsed = parser.parse(csv_path)
+
+    card_last4 = getattr(parsed, "card_last4", None)
+
+    is_parse_error = (
+        len(parsed.transactions) == 0
+        and parsed.period_start is None
+        and parsed.period_end is None
+    )
+
+    if is_parse_error:
+        statement = Statement(
+            bank=bank,
+            card_last4=card_last4,
+            period_start=None,
+            period_end=None,
+            file_hash=file_hash,
+            file_path=csv_path,
+            transaction_count=0,
+            total_spend=0.0,
+            source=source,
+            status="parse_error",
+        )
+        db_session.add(statement)
+        db_session.commit()
+
+        logger.warning(
+            "CSV parse error for %s (%s): no transactions extracted",
+            csv_path, bank,
+        )
+        return {
+            "status": "parse_error",
+            "message": (
+                f"Could not extract transactions from this {bank.upper()} CSV. "
+                f"The format may not be supported yet."
+            ),
+            "count": 0,
+            "period": None,
+            "bank": bank,
+        }
+
+    total_decimal = sum(
+        (Decimal(str(t.amount)) for t in parsed.transactions if t.type == "debit"),
+        Decimal(0),
+    )
+    total_spend = float(total_decimal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    statement = Statement(
+        bank=bank,
+        card_last4=card_last4,
+        period_start=parsed.period_start,
+        period_end=parsed.period_end,
+        file_hash=file_hash,
+        file_path=csv_path,
+        transaction_count=len(parsed.transactions),
+        total_spend=total_spend,
+        source=source,
+        status="success",
+    )
+    db_session.add(statement)
+    db_session.flush()
+
+    for pt in parsed.transactions:
+        category = categorize(pt.merchant, db_session=db_session)
+        tx = Transaction(
+            statement_id=statement.id,
+            date=pt.date,
+            merchant=pt.merchant,
+            amount=pt.amount,
+            type=pt.type,
+            category=category,
+            description=pt.description,
+            bank=bank,
+            card_last4=card_last4,
+            card_id=None,
+            source=source,
+        )
+        db_session.add(tx)
+
+    db_session.commit()
+
+    return {
+        "status": "success",
+        "count": len(parsed.transactions),
+        "period": {
+            "start": parsed.period_start.isoformat() if parsed.period_start else None,
+            "end": parsed.period_end.isoformat() if parsed.period_end else None,
+        },
+        "bank": bank,
+    }

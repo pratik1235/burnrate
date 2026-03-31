@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 export type Direction = 'all' | 'incoming' | 'outgoing';
+export type SourceFilter = 'all' | 'CC' | 'BANK';
 
 export interface FilterState {
   selectedCards: string[];
@@ -16,6 +17,7 @@ export interface FilterState {
   dateRange: { from?: string; to?: string };
   amountRange: { min?: number; max?: number };
   direction: Direction;
+  source: SourceFilter;
 }
 
 export interface FilterContextValue {
@@ -32,6 +34,7 @@ const defaultState: FilterState = {
   dateRange: {},
   amountRange: {},
   direction: 'all',
+  source: 'all',
 };
 
 const FilterContext = createContext<FilterContextValue | null>(null);
@@ -59,7 +62,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       !!filters.dateRange.to ||
       filters.amountRange.min !== undefined ||
       filters.amountRange.max !== undefined ||
-      filters.direction !== 'all'
+      filters.direction !== 'all' ||
+      filters.source !== 'all'
     );
   }, [filters]);
 

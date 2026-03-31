@@ -78,6 +78,7 @@ export interface TransactionFilters {
   search?: string;
   tags?: string;
   direction?: string;
+  source?: string;
   amountMin?: number;
   amountMax?: number;
   limit?: number;
@@ -114,6 +115,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (filters.search) params.search = filters.search;
       if (filters.tags) (params as Record<string, unknown>).tags = filters.tags;
       if (filters.direction) params.direction = filters.direction;
+      if (filters.source) params.source = filters.source;
       if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
       if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
 
@@ -138,6 +140,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.search,
     filters.tags,
     filters.direction,
+    filters.source,
     filters.amountMin,
     filters.amountMax,
     filters.limit,
@@ -162,6 +165,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
         if (filters.search) params.search = filters.search;
         if (filters.tags) (params as Record<string, unknown>).tags = filters.tags;
         if (filters.direction) params.direction = filters.direction;
+        if (filters.source) params.source = filters.source;
         if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
         if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
         const result = await apiGetTransactions(params);
@@ -191,6 +195,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.search,
     filters.tags,
     filters.direction,
+    filters.source,
     filters.amountMin,
     filters.amountMax,
     filters.limit,

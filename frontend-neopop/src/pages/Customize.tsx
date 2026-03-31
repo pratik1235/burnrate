@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
+import { StatUpload } from '@/components/StatUpload';
 import { Button, Typography, ElevatedCard, Tag, InputField, Row, Column } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import {
@@ -8,6 +9,7 @@ import {
   deleteStatement,
   reparseStatement,
   reparseAllStatements,
+  retryWithPassword,
   getAllCategories,
   createCategory,
   updateCategory,
@@ -15,11 +17,13 @@ import {
   getTagDefinitions,
   createTagDefinition,
   deleteTagDefinition,
+  uploadStatement,
+  uploadStatementsBulk,
 } from '@/lib/api';
 import type { Statement } from '@/lib/types';
 import type { CategoryResponse, TagDefinitionResponse } from '@/lib/api';
 import { toast } from '@/components/Toast';
-import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus } from 'lucide-react';
+import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus, CreditCard, Landmark, Lock } from 'lucide-react';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { CloseButton } from '@/components/CloseButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -66,16 +70,6 @@ const FeatureCard = styled.div`
     background: rgba(255, 255, 255, 0.04);
     border-color: rgba(255, 255, 255, 0.12);
   }
-`;
-
-const PlaceholderCard = styled.div`
-  border: 1px dashed rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 120px;
 `;
 
 const ModalOverlay = styled.div`
@@ -307,6 +301,7 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
   const [actioning, setActioning] = useState<string | null>(null);
   const [reparseAllRunning, setReparseAllRunning] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [passwordInputs, setPasswordInputs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
@@ -394,6 +389,27 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
     }
   };
 
+  const handlePasswordSubmit = async (stmtId: string) => {
+    const pwd = (passwordInputs[stmtId] ?? '').trim();
+    if (!pwd) return;
+    setActioning(stmtId);
+    try {
+      const result = await retryWithPassword(stmtId, pwd);
+      if (result.status === 'success') {
+        toast.success(`Unlocked and imported ${result.count ?? 0} transactions`);
+        setPasswordInputs((prev) => { const next = { ...prev }; delete next[stmtId]; return next; });
+        const list = await getStatements();
+        setStatements(list);
+      } else {
+        toast.error(result.message ?? 'Could not unlock with this password');
+      }
+    } catch {
+      toast.error('Failed to unlock statement');
+    } finally {
+      setActioning(null);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -436,7 +452,6 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
             style={{ marginBottom: 20 }}
           >
             <RefreshCw size={14} style={{ marginRight: 6 }} />
-            {/* todo: use typography */}
             {reparseAllRunning ? 'Reparsing...' : 'Reparse All'}
           </Button>
 
@@ -452,53 +467,59 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[...statements]
                 .sort((a, b) => {
-                  if (a.status === 'parse_error' && b.status !== 'parse_error') return -1;
-                  if (a.status !== 'parse_error' && b.status === 'parse_error') return 1;
-                  return 0;
+                  const priority = (s: Statement) => s.status === 'password_needed' ? 0 : s.status === 'parse_error' ? 1 : 2;
+                  return priority(a) - priority(b);
                 })
                 .map((s) => {
                   const isError = s.status === 'parse_error';
+                  const needsPassword = s.status === 'password_needed';
+                  const sourceLabel = s.source === 'BANK' ? 'BANK' : 'CC';
                   return (
                     <div
                       key={s.id}
                       style={{
                         padding: '14px 16px',
-                        border: isError
+                        border: isError || needsPassword
                           ? '1px solid rgba(229,161,0,0.4)'
                           : '1px solid rgba(255,255,255,0.08)',
                         borderRadius: 12,
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 8,
-                        background: isError ? 'rgba(229,161,0,0.04)' : 'transparent',
+                        background: isError || needsPassword ? 'rgba(229,161,0,0.04)' : 'transparent',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Column alignItems="stretch" gap={5}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Typography as="span" fontType={FontType.BODY} fontSize={10} fontWeight={FontWeights.BOLD} color={sourceLabel === 'BANK' ? colorPalette.info[500] : colorPalette.rss[500]} style={{ padding: '1px 6px', borderRadius: 4, background: sourceLabel === 'BANK' ? 'rgba(59,130,246,0.15)' : 'rgba(255,135,68,0.15)' }}>
+                              {sourceLabel}
+                            </Typography>
                             <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-                              {s.bank.toUpperCase()} ...{s.cardLast4}
+                              {s.bank.toUpperCase()} {s.cardLast4 ? `...${s.cardLast4}` : ''}
                             </Typography>
                             {isError && (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  padding: '2px 8px',
-                                  borderRadius: 6,
-                                  background: 'rgba(229,161,0,0.15)',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: 'rgba(229,161,0,0.15)', whiteSpace: 'nowrap' }}>
                                 <AlertTriangle size={11} />
                                 <Typography as="span" fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.SEMI_BOLD} color={colorPalette.warning[500]}>
                                   Parse Error
                                 </Typography>
                               </span>
                             )}
+                            {needsPassword && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: 'rgba(255,135,68,0.15)', whiteSpace: 'nowrap' }}>
+                                <Lock size={11} />
+                                <Typography as="span" fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.SEMI_BOLD} color={colorPalette.rss[500]}>
+                                  Password Required
+                                </Typography>
+                              </span>
+                            )}
                           </div>
-                          {isError ? (
+                          {needsPassword ? (
+                            <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color={colorPalette.rss[500]} style={{ marginTop: 2 }}>
+                              Enter password for this statement to be processed
+                            </Typography>
+                          ) : isError ? (
                             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(229,161,0,0.7)" style={{ marginTop: 2 }}>
                               Could not extract data from this PDF. Try reparsing.
                             </Typography>
@@ -515,42 +536,16 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
                         </Column>
                         <Column alignItems="center" gap={2}>
                           <Row alignItems='center' justifyContent="space-evenly" gap={20}>
-                            <Button
-                              variant="primary"
-                              kind="elevated"
-                              size="small"
-                              colorMode="dark"
-                              onClick={() => handleReparse(s.id)}
-                              disabled={!!actioning}
-                              style={{ minWidth: 'auto', marginRight: 10 }}
-                            >
-                              <Row
-                                gap={4}
-                                alignItems="center"
-                                justifyContent="center"
-                              >
-                                <RefreshCw size={14} style={{ marginRight: 5 }} />
-                                {isError ? 'Retry' : 'Refresh'}
-                              </Row>
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              kind="elevated"
-                              size="small"
-                              colorMode="dark"
-                              onClick={() => handleRemove(s.id)}
-                              disabled={!!actioning}
-                              style={{
-                                minWidth: 'auto',
-                                color: mainColors.red,
-                                borderColor: 'rgba(238,77,55,0.4)',
-                              }}
-                            >
-                              <Row
-                                gap={4}
-                                alignItems="center"
-                                justifyContent="center"
-                              >
+                            {!needsPassword && (
+                              <Button variant="primary" kind="elevated" size="small" colorMode="dark" onClick={() => handleReparse(s.id)} disabled={!!actioning} style={{ minWidth: 'auto', marginRight: 10 }}>
+                                <Row gap={4} alignItems="center" justifyContent="center">
+                                  <RefreshCw size={14} style={{ marginRight: 5 }} />
+                                  {isError ? 'Retry' : 'Refresh'}
+                                </Row>
+                              </Button>
+                            )}
+                            <Button variant="secondary" kind="elevated" size="small" colorMode="dark" onClick={() => handleRemove(s.id)} disabled={!!actioning} style={{ minWidth: 'auto', color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}>
+                              <Row gap={4} alignItems="center" justifyContent="center">
                                 <Trash2 size={14} style={{ marginRight: 4 }} />
                                 Remove
                               </Row>
@@ -558,6 +553,26 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
                           </Row>
                         </Column>
                       </div>
+                      {needsPassword && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                          <InputField
+                            colorMode="dark"
+                            type="password"
+                            placeholder="Statement password"
+                            value={passwordInputs[s.id] ?? ''}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setPasswordInputs((prev) => ({ ...prev, [s.id]: e.target.value }))
+                            }
+                            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                              e.key === 'Enter' && handlePasswordSubmit(s.id)
+                            }
+                            style={{ flex: 1, backgroundColor: colorPalette.black[100], border: '1px solid rgba(255,255,255,0.2)', borderRadius: 0, padding: '6px 12px', fontSize: 14, color: '#ffffff' }}
+                          />
+                          <Button variant="primary" kind="elevated" size="small" colorMode="dark" onClick={() => handlePasswordSubmit(s.id)} disabled={!!actioning || !(passwordInputs[s.id] ?? '').trim()}>
+                            Unlock
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1058,10 +1073,110 @@ export function Customize() {
   const [reparseModalOpen, setReparseModalOpen] = useState(false);
   const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
 
+  const handleCCUpload = async (file: File, password?: string) => {
+    const loadingId = toast.loading('Processing card statement...');
+    try {
+      const result = await uploadStatement(file, undefined, password, 'CC');
+      toast.dismiss(loadingId);
+      if (result.status === 'success') {
+        toast.success(`${result.count ?? 0} transactions imported from ${(result.bank ?? '').toUpperCase()} statement`);
+      } else if (result.status === 'duplicate') {
+        toast.info(result.message ?? 'Statement already imported');
+      } else {
+        toast.error(result.message ?? 'Processing failed');
+      }
+      return result;
+    } catch (err) {
+      toast.dismiss(loadingId);
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
+      return { status: 'error', message: 'Upload failed', count: 0 };
+    }
+  };
+
+  const handleCCBulkUpload = async (files: File[]) => {
+    const loadingId = toast.loading(`Processing ${files.length} card statements...`);
+    try {
+      const result = await uploadStatementsBulk(files, undefined, undefined, 'CC');
+      toast.dismiss(loadingId);
+      if (result.success > 0) toast.success(`${result.success} of ${result.total} statements imported`);
+      else if (result.duplicate > 0) toast.info('All statements already imported');
+      else if (result.failed > 0) toast.error(`${result.failed} of ${result.total} statements failed`);
+      return result;
+    } catch (err) {
+      toast.dismiss(loadingId);
+      toast.error(err instanceof Error ? err.message : 'Bulk upload failed');
+      return { status: 'error', total: files.length, success: 0, failed: files.length, duplicate: 0, skipped: 0 };
+    }
+  };
+
+  const handleBankUpload = async (file: File, password?: string) => {
+    const loadingId = toast.loading('Processing bank statement...');
+    try {
+      const result = await uploadStatement(file, undefined, password, 'BANK');
+      toast.dismiss(loadingId);
+      if (result.status === 'success') {
+        toast.success(`${result.count ?? 0} transactions imported from ${(result.bank ?? '').toUpperCase()} bank statement`);
+      } else if (result.status === 'duplicate') {
+        toast.info(result.message ?? 'Statement already imported');
+      } else {
+        toast.error(result.message ?? 'Processing failed');
+      }
+      return result;
+    } catch (err) {
+      toast.dismiss(loadingId);
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
+      return { status: 'error', message: 'Upload failed', count: 0 };
+    }
+  };
+
+  const handleBankBulkUpload = async (files: File[]) => {
+    const loadingId = toast.loading(`Processing ${files.length} bank statements...`);
+    try {
+      const result = await uploadStatementsBulk(files, undefined, undefined, 'BANK');
+      toast.dismiss(loadingId);
+      if (result.success > 0) toast.success(`${result.success} of ${result.total} bank statements imported`);
+      else if (result.duplicate > 0) toast.info('All statements already imported');
+      else if (result.failed > 0) toast.error(`${result.failed} of ${result.total} statements failed`);
+      return result;
+    } catch (err) {
+      toast.dismiss(loadingId);
+      toast.error(err instanceof Error ? err.message : 'Bulk upload failed');
+      return { status: 'error', total: files.length, success: 0, failed: files.length, duplicate: 0, skipped: 0 };
+    }
+  };
+
   return (
     <PageLayout>
       <Navbar activeTab="customize" onTabChange={(tab) => navigate(`/${tab}`)} />
       <Content>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <CreditCard size={18} color={colorPalette.rss[500]} />
+              <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                Drop Card Statement PDFs
+              </Typography>
+            </div>
+            <StatUpload onUpload={handleCCUpload} onBulkUpload={handleCCBulkUpload} compact />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Landmark size={18} color={colorPalette.info[500]} />
+              <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                Drop Bank Statement CSVs
+              </Typography>
+            </div>
+            <StatUpload
+              onUpload={handleBankUpload}
+              onBulkUpload={handleBankBulkUpload}
+              compact
+              acceptTypes={{ 'text/csv': ['.csv'] }}
+              idleText="Drop Bank Statement CSVs"
+              subtitleText="CSV files — drop multiple for bulk import"
+            />
+          </div>
+        </div>
+
         <CardsGrid>
           <FeatureCard onClick={() => setTagsModalOpen(true)}>
             <TagIcon size={24} color={colorPalette.rss[500]} />
@@ -1102,12 +1217,6 @@ export function Customize() {
               Report a bug or suggest a feature on GitHub.
             </Typography>
           </FeatureCard>
-
-          <PlaceholderCard>
-            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
-              Coming soon
-            </Typography>
-          </PlaceholderCard>
         </CardsGrid>
 
         <DefineTagsModal open={tagsModalOpen} onClose={() => setTagsModalOpen(false)} />

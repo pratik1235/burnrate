@@ -65,7 +65,12 @@ def compute_net_spend(
     amount_max: Optional[float] = None,
     tags: Optional[List[str]] = None,
 ) -> float:
-    """Single source of truth for net spend calculation."""
+    """Single source of truth for net spend calculation.
+
+    Excludes all cc_payment transactions. Also excludes cc_payment-category
+    transactions from BANK source to avoid double-counting credit card bill
+    payments that appear in both bank and card statements.
+    """
     q = (
         db.query(
             func.sum(

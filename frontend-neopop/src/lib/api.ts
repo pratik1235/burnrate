@@ -6,6 +6,7 @@ import type {
   CategoryBreakdown,
   MerchantSpend,
   MonthlyTrend,
+  Source,
   Statement,
   Transaction,
 } from '@/lib/types';
@@ -51,6 +52,7 @@ export interface GetTransactionsParams {
   category?: Category;
   search?: string;
   direction?: string;
+  source?: string;
   amount_min?: number;
   amount_max?: number;
   limit?: number;
@@ -162,12 +164,14 @@ export interface UploadStatementResult {
 export async function uploadStatement(
   file: File,
   bank?: Bank,
-  password?: string
+  password?: string,
+  source?: Source
 ): Promise<UploadStatementResult> {
   const formData = new FormData();
   formData.append('file', file);
   if (bank) formData.append('bank', bank);
   if (password) formData.append('password', password);
+  if (source) formData.append('source', source);
   const { data } = await api.post<UploadStatementResult>(
     '/statements/upload',
     formData,
@@ -193,7 +197,8 @@ export interface BulkUploadResult {
 export async function uploadStatementsBulk(
   files: File[],
   bank?: Bank,
-  password?: string
+  password?: string,
+  source?: Source
 ): Promise<BulkUploadResult> {
   const formData = new FormData();
   for (const file of files) {
@@ -201,6 +206,7 @@ export async function uploadStatementsBulk(
   }
   if (bank) formData.append('bank', bank);
   if (password) formData.append('password', password);
+  if (source) formData.append('source', source);
   const { data } = await api.post<BulkUploadResult>(
     '/statements/upload-bulk',
     formData,
@@ -220,12 +226,15 @@ interface StatementRaw {
   period_end: string | null;
   transaction_count: number;
   total_spend: number;
+  source: string | null;
   status: string | null;
   imported_at: string | null;
 }
 
-export async function getStatements(): Promise<Statement[]> {
-  const { data } = await api.get<StatementRaw[]>('/statements');
+export async function getStatements(source?: Source): Promise<Statement[]> {
+  const params: Record<string, string> = {};
+  if (source) params.source = source;
+  const { data } = await api.get<StatementRaw[]>('/statements', { params });
   return data.map((s) => ({
     id: s.id,
     bank: s.bank as Bank,
@@ -234,9 +243,22 @@ export async function getStatements(): Promise<Statement[]> {
     periodEnd: s.period_end ?? '',
     transactionCount: s.transaction_count,
     totalSpend: s.total_spend,
-    status: (s.status as 'success' | 'parse_error') ?? 'success',
+    source: (s.source as Source) ?? 'CC',
+    status: (s.status as 'success' | 'parse_error' | 'password_needed') ?? 'success',
     importedAt: s.imported_at ?? '',
   }));
+}
+
+export async function retryWithPassword(
+  statementId: string,
+  password: string,
+): Promise<UploadStatementResult> {
+  const { data } = await api.post<UploadStatementResult>(
+    `/statements/${statementId}/reparse-with-password`,
+    { password },
+    { timeout: 60000 },
+  );
+  return data;
 }
 
 export async function getTransactions(

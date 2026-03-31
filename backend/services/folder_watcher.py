@@ -66,14 +66,16 @@ def _wait_for_file_stable(path: Path, timeout: float = 15.0, interval: float = 0
 
 
 class StatementWatchHandler(FileSystemEventHandler):
-    """Handler for new PDF files in watch directory."""
+    """Handler for new PDF/CSV statement files in watch directory."""
+
+    ALLOWED_EXTENSIONS = {".pdf", ".csv"}
 
     def __init__(self, db_session_factory: Callable):
         super().__init__()
         self.db_session_factory = db_session_factory
 
-    def _enqueue_pdf(self, path: Path, *, wait_for_stable: bool = True):
-        """Submit a PDF to the processing queue.
+    def _enqueue_file(self, path: Path, *, wait_for_stable: bool = True):
+        """Submit a statement file to the processing queue.
 
         Args:
             wait_for_stable: When True (the default, used for live
@@ -81,7 +83,9 @@ class StatementWatchHandler(FileSystemEventHandler):
                 changing.  Set to False for the initial scan where
                 files are already fully written.
         """
-        logger.info("Detected new PDF: %s", path.name)
+        is_csv = path.suffix.lower() == ".csv"
+        source = "BANK" if is_csv else "CC"
+        logger.info("Detected new %s: %s", "CSV" if is_csv else "PDF", path.name)
 
         if wait_for_stable and not _wait_for_file_stable(path):
             logger.warning("File %s did not stabilize within timeout, processing anyway", path.name)
@@ -89,6 +93,7 @@ class StatementWatchHandler(FileSystemEventHandler):
         future = processing_queue.submit(
             pdf_path=str(path),
             db_session_factory=self.db_session_factory,
+            source=source,
         )
         future.add_done_callback(
             lambda f: self._on_done(path.name, f)
@@ -108,7 +113,7 @@ class StatementWatchHandler(FileSystemEventHandler):
 
     @staticmethod
     def _should_process(path: Path) -> bool:
-        if path.suffix.lower() != ".pdf":
+        if path.suffix.lower() not in StatementWatchHandler.ALLOWED_EXTENSIONS:
             return False
         if "_unlocked" in path.stem:
             return False
@@ -119,14 +124,14 @@ class StatementWatchHandler(FileSystemEventHandler):
             return
         path = Path(event.src_path)
         if self._should_process(path):
-            self._enqueue_pdf(path)
+            self._enqueue_file(path)
 
     def on_moved(self, event):
         if event.is_directory:
             return
         path = Path(event.dest_path)
         if self._should_process(path):
-            self._enqueue_pdf(path)
+            self._enqueue_file(path)
 
 
 def _resolve_true_case(path: Path) -> Path:
@@ -152,25 +157,27 @@ def _resolve_true_case(path: Path) -> Path:
 
 
 def _initial_scan(watch_dir: Path, handler: StatementWatchHandler) -> None:
-    """Scan the watch directory for existing PDFs and enqueue any that
+    """Scan the watch directory for existing PDFs/CSVs and enqueue any that
     haven't been imported yet.  Deduplication happens inside
     ``process_statement`` via file-hash, so it's safe to submit
     everything — already-imported files will be skipped cheaply."""
-    pdfs = sorted(watch_dir.rglob("*.pdf"))
-    if not pdfs:
+    files = sorted(
+        f for ext in ("*.pdf", "*.csv") for f in watch_dir.rglob(ext)
+    )
+    if not files:
         return
 
-    eligible = [p for p in pdfs if handler._should_process(p)]
+    eligible = [p for p in files if handler._should_process(p)]
     if not eligible:
         return
 
     logger.info(
-        "Initial scan: found %d PDF(s) in %s — submitting for processing",
+        "Initial scan: found %d statement file(s) in %s — submitting for processing",
         len(eligible),
         watch_dir,
     )
-    for pdf_path in eligible:
-        handler._enqueue_pdf(pdf_path, wait_for_stable=False)
+    for file_path in eligible:
+        handler._enqueue_file(file_path, wait_for_stable=False)
 
 
 def _validate_watch_path(raw_path: str) -> Optional[Path]:

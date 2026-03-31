@@ -55,8 +55,39 @@ def get_db():
         db.close()
 
 
+def _run_migrations(engine_ref) -> None:
+    """Add columns that were introduced after the initial schema.
+
+    SQLAlchemy's ``create_all`` only creates missing *tables*; it won't
+    ALTER existing tables to add new columns.  This function inspects
+    the live schema and issues ALTER TABLE statements for any columns
+    that are defined in the models but absent from the database.
+    """
+    from sqlalchemy import inspect as sa_inspect, text
+
+    inspector = sa_inspect(engine_ref)
+
+    migrations: list[tuple[str, str, str]] = [
+        ("statements", "source", "VARCHAR(4) NOT NULL DEFAULT 'CC'"),
+        ("statements", "status", "VARCHAR(20) NOT NULL DEFAULT 'success'"),
+        ("transactions", "source", "VARCHAR(4) NOT NULL DEFAULT 'CC'"),
+    ]
+
+    with engine_ref.connect() as conn:
+        for table, column, col_def in migrations:
+            if table not in inspector.get_table_names():
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            if column not in existing:
+                conn.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {col_def}"
+                ))
+                conn.commit()
+
+
 def init_db() -> None:
     """Create all tables and ensure data directory exists."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     from backend.models import models  # noqa: F401 - imports models for table creation
     Base.metadata.create_all(bind=engine)
+    _run_migrations(engine)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { TransactionRow } from '@/components/TransactionRow';
@@ -11,7 +11,7 @@ import { Button, SearchBar } from '@cred/neopop-web/lib/components';
 import { Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
-import { SlidersHorizontal, Download } from 'lucide-react';
+import { SlidersHorizontal, Download, EyeOff } from 'lucide-react';
 import { CloseButton } from '@/components/CloseButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import styled from 'styled-components';
@@ -85,7 +85,10 @@ function TransactionsContent() {
   const [page, setPage] = useState(0);
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [searchTooltipVisible, setSearchTooltipVisible] = useState(false);
+  const [excludeTooltipVisible, setExcludeTooltipVisible] = useState(false);
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(() => new Set());
+  const [exclusionMode, setExclusionMode] = useState(false);
 
   const categoryFilter =
     filters.selectedCategories.length === 1 ? filters.selectedCategories[0] : undefined;
@@ -98,6 +101,7 @@ function TransactionsContent() {
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     direction: filters.direction !== 'all' ? filters.direction : undefined,
+    source: filters.source !== 'all' ? filters.source : undefined,
     amountMin: filters.amountRange.min,
     amountMax: filters.amountRange.max,
     limit: (page + 1) * PAGE_SIZE,
@@ -107,11 +111,48 @@ function TransactionsContent() {
 
   useEffect(() => {
     setPage(0);
-  }, [filters.selectedCards, filters.selectedCategories, filters.selectedTags, filters.dateRange.from, filters.dateRange.to, filters.amountRange.min, filters.amountRange.max, filters.direction, searchQuery]);
+    setExcludedIds(new Set());
+    setExclusionMode(false);
+  }, [filters.selectedCards, filters.selectedCategories, filters.selectedTags, filters.dateRange.from, filters.dateRange.to, filters.amountRange.min, filters.amountRange.max, filters.direction, filters.source, searchQuery]);
 
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
   const safeCards = Array.isArray(cards) ? cards : [];
   const safeTotal = typeof total === 'number' ? total : 0;
+  const safeTotalAmount = typeof totalAmount === 'number' ? totalAmount : 0;
+
+  const { adjustedTotal, excludedAmount, excludedCount } = useMemo(() => {
+    if (excludedIds.size === 0) {
+      return { adjustedTotal: safeTotalAmount, excludedAmount: 0, excludedCount: 0 };
+    }
+    let excludedAmountSum = 0;
+    let count = 0;
+    for (const tx of safeTransactions) {
+      if (!excludedIds.has(tx.id)) continue;
+      if (tx.category === 'cc_payment') continue;
+      const signedAmount = tx.type === 'debit' ? tx.amount : -tx.amount;
+      excludedAmountSum += signedAmount;
+      count += 1;
+    }
+    return {
+      adjustedTotal: safeTotalAmount - excludedAmountSum,
+      excludedAmount: excludedAmountSum,
+      excludedCount: count,
+    };
+  }, [safeTotalAmount, excludedIds, safeTransactions]);
+
+  const handleToggleExclude = useCallback((id: string) => {
+    setExcludedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleResetExclusions = useCallback(() => {
+    setExcludedIds(new Set());
+    setExclusionMode(false);
+  }, []);
 
   const handleCardToggle = (cardId: string) => {
     setFilters({
@@ -210,7 +251,8 @@ function TransactionsContent() {
     (filters.dateRange.to ? 1 : 0) +
     (filters.amountRange.min !== undefined ? 1 : 0) +
     (filters.amountRange.max !== undefined ? 1 : 0) +
-    (filters.direction !== 'all' ? 1 : 0);
+    (filters.direction !== 'all' ? 1 : 0) +
+    (filters.source !== 'all' ? 1 : 0);
 
   return (
     <PageLayout>
@@ -326,11 +368,16 @@ function TransactionsContent() {
             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
               {safeTotal} transaction{safeTotal !== 1 ? 's' : ''}
             </Typography>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-                {formatCurrency(totalAmount)} spent
+                {formatCurrency(adjustedTotal)} spent
               </Typography>
-              {totalAmount < 0 && (
+              {excludedCount > 0 && (
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                  ({formatCurrency(Math.abs(excludedAmount))} excluded from {excludedCount} txn{excludedCount !== 1 ? 's' : ''})
+                </Typography>
+              )}
+              {adjustedTotal < 0 && (
                 <div style={{ position: 'relative', display: 'inline-flex' }}>
                   <Typography
                     as="span"
@@ -378,16 +425,81 @@ function TransactionsContent() {
               )}
             </div>
           </div>
-          <Button
-            variant="primary"
-            kind="elevated"
-            size="small"
-            colorMode="dark"
-            onClick={handleExport}
-          >
-            <Download size={14} style={{ marginRight: 6 }} />
-            Export
-          </Button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div
+              style={{ position: 'relative' }}
+              onMouseEnter={() => setExcludeTooltipVisible(true)}
+              onMouseLeave={() => setExcludeTooltipVisible(false)}
+            >
+              <Button
+                variant={exclusionMode ? 'secondary' : 'primary'}
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={() => setExclusionMode((m) => !m)}
+              >
+                <EyeOff size={14} style={{ marginRight: 6 }} />
+                Temporarily Exclude Txns
+                {excludedIds.size > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      padding: '1px 6px',
+                      borderRadius: 10,
+                      background: 'rgba(255,135,68,0.3)',
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {excludedIds.size}
+                  </span>
+                )}
+              </Button>
+              {excludeTooltipVisible && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginBottom: 6,
+                    background: colorPalette.popBlack[300],
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 8,
+                    padding: '8px 12px',
+                    zIndex: 10,
+                    whiteSpace: 'normal',
+                    maxWidth: 280,
+                  }}
+                >
+                  <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.7)">
+                    This allows you to temporarily exclude some transactions from the summation value above
+                  </Typography>
+                </div>
+              )}
+            </div>
+            {excludedIds.size > 0 && (
+              <Button
+                variant="secondary"
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={handleResetExclusions}
+              >
+                Reset Exclusions
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              kind="elevated"
+              size="small"
+              colorMode="dark"
+              onClick={handleExport}
+            >
+              <Download size={14} style={{ marginRight: 6 }} />
+              Export
+            </Button>
+          </div>
         </Header>
 
         <div
@@ -427,7 +539,13 @@ function TransactionsContent() {
                   })}
                 </Typography>
                 {txs.map((tx) => (
-                  <TransactionRow key={tx.id} transaction={tx} />
+                  <TransactionRow
+                    key={tx.id}
+                    transaction={tx}
+                    exclusionMode={exclusionMode}
+                    isExcluded={excludedIds.has(tx.id)}
+                    onToggleExclude={handleToggleExclude}
+                  />
                 ))}
               </DateGroup>
             ))}

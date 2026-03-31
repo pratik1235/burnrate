@@ -1,5 +1,7 @@
 export type Bank = 'hdfc' | 'icici' | 'axis' | 'sbi' | 'amex' | 'idfc_first' | 'indusind' | 'kotak' | 'sc' | 'yes' | 'au' | 'rbl' | 'federal' | 'indian_bank';
 
+export type Source = 'CC' | 'BANK';
+
 export type Category = string;
 
 export interface Card {
@@ -19,6 +21,7 @@ export interface Transaction {
   cardId: string;
   bank: Bank;
   cardLast4: string;
+  source: Source;
   tags?: string[];
 }
 
@@ -30,7 +33,8 @@ export interface Statement {
   periodEnd: string;
   transactionCount: number;
   totalSpend: number;
-  status: 'success' | 'parse_error';
+  source: Source;
+  status: 'success' | 'parse_error' | 'password_needed';
   importedAt: string;
 }
 

@@ -35,6 +35,7 @@ def list_transactions(
     search: Optional[str] = Query(None),
     tags: Optional[str] = Query(None, description="Comma-separated tag names to filter by"),
     direction: Optional[str] = Query(None, description="incoming or outgoing"),
+    source: Optional[str] = Query(None, description="Filter by source: CC or BANK"),
     amount_min: Optional[float] = Query(None),
     amount_max: Optional[float] = Query(None),
     limit: int = Query(100, ge=1, le=500),
@@ -42,6 +43,8 @@ def list_transactions(
 ) -> Dict[str, Any]:
     """Query transactions with filters. Returns {transactions: [...], total: N, totalAmount: F}."""
     q = db.query(Transaction)
+    if source:
+        q = q.filter(Transaction.source == source.upper())
     if cards:
         card_ids = [c.strip() for c in cards.split(",") if c.strip()]
         if card_ids:
@@ -123,6 +126,7 @@ def list_transactions(
                 "bank": r.bank,
                 "cardLast4": r.card_last4,
                 "cardId": r.card_id,
+                "source": getattr(r, "source", None) or "CC",
                 "tags": [t.tag for t in r.tags],
             }
             for r in rows

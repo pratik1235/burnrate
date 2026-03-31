@@ -5,7 +5,7 @@ import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { Button } from '@cred/neopop-web/lib/components';
 import { CloseButton } from '@/components/CloseButton';
-import { useFilters, type Direction } from '@/contexts/FilterContext';
+import { useFilters, type Direction, type SourceFilter } from '@/contexts/FilterContext';
 import { useCards } from '@/hooks/useApi';
 import { getAllCategories, getTagDefinitions } from '@/lib/api';
 
@@ -24,6 +24,7 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
   const [localCategories, setLocalCategories] = useState<string[]>([]);
   const [localTags, setLocalTags] = useState<string[]>([]);
   const [localDirection, setLocalDirection] = useState<Direction>('all');
+  const [localSource, setLocalSource] = useState<SourceFilter>('all');
   const [localFrom, setLocalFrom] = useState('');
   const [localTo, setLocalTo] = useState('');
   const [localMin, setLocalMin] = useState('');
@@ -55,6 +56,7 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
       setLocalCategories(filters.selectedCategories);
       setLocalTags(filters.selectedTags ?? []);
       setLocalDirection(filters.direction);
+      setLocalSource(filters.source ?? 'all');
       setLocalFrom(filters.dateRange.from ?? '');
       setLocalTo(filters.dateRange.to ?? '');
       setLocalMin(filters.amountRange.min?.toString() ?? '');
@@ -94,6 +96,7 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
       selectedCategories: localCategories,
       selectedTags: localTags,
       direction: localDirection,
+      source: localSource,
       dateRange: {
         from: localFrom || undefined,
         to: localTo || undefined,
@@ -225,6 +228,31 @@ export function FilterModal({ open, onClose }: FilterModalProps) {
                 onClick={() => setLocalDirection(d)}
               >
                 {d === 'all' ? 'All' : d === 'incoming' ? 'Incoming' : 'Outgoing'}
+              </Button>
+            ))}
+          </div>
+
+          {/* Source */}
+          <Typography
+            fontType={FontType.BODY}
+            fontSize={12}
+            fontWeight={FontWeights.MEDIUM}
+            color="rgba(255,255,255,0.5)"
+            style={{ marginBottom: 10 }}
+          >
+            Source
+          </Typography>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {(['all', 'CC', 'BANK'] as const).map((s) => (
+              <Button
+                key={s}
+                variant={localSource === s ? 'secondary' : 'primary'}
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={() => setLocalSource(s)}
+              >
+                {s === 'all' ? 'All' : s === 'CC' ? 'Credit Card' : 'Bank Account'}
               </Button>
             ))}
           </div>

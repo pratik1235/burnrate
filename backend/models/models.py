@@ -55,7 +55,7 @@ class Card(Base):
 
 
 class Statement(Base):
-    """Imported credit card statement."""
+    """Imported credit card or bank account statement."""
 
     __tablename__ = "statements"
 
@@ -70,6 +70,7 @@ class Statement(Base):
     total_spend = Column(Float, default=0.0)
     total_amount_due = Column(Float, nullable=True)
     credit_limit = Column(Float, nullable=True)
+    source = Column(String(4), nullable=False, default="CC", server_default="CC")
     status = Column(String(20), nullable=False, default="success")
     imported_at = Column(DateTime, default=datetime.utcnow)
 
@@ -92,6 +93,7 @@ class Transaction(Base):
     card_id = Column(String(36), ForeignKey("cards.id"), nullable=True)
     bank = Column(String(50), nullable=True)
     card_last4 = Column(String(4), nullable=True)
+    source = Column(String(4), nullable=False, default="CC", server_default="CC")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     statement = relationship("Statement", back_populates="transactions")
