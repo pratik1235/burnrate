@@ -3,6 +3,7 @@ uvicorn==0.34.0
 sqlalchemy==2.0.40
 pikepdf==9.7.0
 pdfplumber==0.11.6
+charset-normalizer==3.4.6
 watchdog==6.0.0
 python-multipart==0.0.20
 aiofiles==24.1.0
