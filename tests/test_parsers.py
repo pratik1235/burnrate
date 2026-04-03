@@ -35,7 +35,9 @@ def _unlock(pdf_path: str, bank: str) -> str:
         card_last4s=["8087", "1464", "9735", "0000"],
         dob_year=PROFILE["dob_year"],
     )
-    result = unlock_pdf(pdf_path, passwords)
+    result = unlock_pdf(
+        pdf_path, passwords, allowed_roots=(FIXTURES.resolve(),),
+    )
     return result or pdf_path
 
 

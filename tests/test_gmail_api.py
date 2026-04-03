@@ -1,5 +1,20 @@
 """Gmail API smoke tests (no live Google calls)."""
 
+from backend.routers import gmail as gmail_router
+
+
+def test_validated_browser_redirect_localhost_only():
+    default = "http://localhost:5173/customize?gmail=connected"
+    assert gmail_router._validated_browser_redirect(
+        "http://127.0.0.1:9999/callback", default,
+    ).startswith("http://127.0.0.1:9999")
+    assert gmail_router._validated_browser_redirect(
+        "https://evil.example/phish", default,
+    ) == default
+    assert gmail_router._validated_browser_redirect(
+        "javascript:alert(1)", default,
+    ) == default
+
 
 def test_gmail_status_without_client_id(api_client, monkeypatch):
     monkeypatch.delenv("GOOGLE_OAUTH_CLIENT_ID", raising=False)

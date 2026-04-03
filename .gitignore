@@ -13,6 +13,8 @@ dist/
 build/
 backend/venv/
 .venv/
+.venv-audit/
+.venv-audit2/
 .venv-build/
 
 # Environment

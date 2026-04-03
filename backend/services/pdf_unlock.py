@@ -1,34 +1,54 @@
 """PDF unlock service using pikepdf."""
 
 import logging
-import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
+
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 
-def _validate_pdf_path(pdf_path: str) -> bool:
-    """
-    Validate path to prevent traversal. Reject '..', symlinks outside allowed bases.
-    Allowed: paths under DATA_DIR, user home, or /Volumes.
-    """
-    from backend.models.database import DATA_DIR
+def _path_is_under_any_root(path: Path, roots: Tuple[Path, ...]) -> bool:
+    rp = path.resolve()
+    for root in roots:
+        try:
+            rp.relative_to(root.resolve())
+            return True
+        except ValueError:
+            continue
+    return False
 
+
+def allowed_roots_for_statements(db_session: Session) -> Tuple[Path, ...]:
+    """Directories where statement PDF/CSV files may be read (uploads + watch folder)."""
+    from backend.models.database import UPLOADS_DIR
+    from backend.models.models import Settings
+
+    ordered: list[Path] = [UPLOADS_DIR.resolve()]
+    settings = db_session.query(Settings).first()
+    if settings and settings.watch_folder:
+        try:
+            wf = Path(settings.watch_folder).expanduser().resolve()
+            if wf not in ordered:
+                ordered.append(wf)
+        except OSError:
+            pass
+    return tuple(ordered)
+
+
+def _validate_pdf_path(pdf_path: str, allowed_roots: Tuple[Path, ...]) -> bool:
+    """
+    Validate path to prevent traversal. Reject '..'; resolved file must lie under
+    one of ``allowed_roots`` (typically uploads + configured watch folder).
+    """
     if not pdf_path or ".." in pdf_path:
         return False
     try:
         resolved = Path(pdf_path).resolve()
         if not resolved.exists() or not resolved.is_file():
             return False
-        real = resolved.resolve()
-        home = Path.home().resolve()
-        volumes = Path("/Volumes").resolve()
-        return (
-            str(real).startswith(str(DATA_DIR.resolve()))
-            or str(real).startswith(str(home))
-            or str(real).startswith(str(volumes))
-        )
+        return _path_is_under_any_root(resolved, allowed_roots)
     except (OSError, RuntimeError):
         return False
 
@@ -165,7 +185,12 @@ def generate_passwords(
     return passwords
 
 
-def unlock_pdf(pdf_path: str, passwords: List[str]) -> Optional[str]:
+def unlock_pdf(
+    pdf_path: str,
+    passwords: List[str],
+    *,
+    allowed_roots: Tuple[Path, ...],
+) -> Optional[str]:
     """
     Try each password with pikepdf. On success, save decrypted copy
     to a temporary file and return its path. The caller is responsible
@@ -176,7 +201,7 @@ def unlock_pdf(pdf_path: str, passwords: List[str]) -> Optional[str]:
 
     import pikepdf
 
-    if not _validate_pdf_path(pdf_path):
+    if not _validate_pdf_path(pdf_path, allowed_roots):
         return None
 
     for pwd in passwords:
@@ -197,11 +222,11 @@ def unlock_pdf(pdf_path: str, passwords: List[str]) -> Optional[str]:
     return None
 
 
-def is_encrypted(pdf_path: str) -> bool:
+def is_encrypted(pdf_path: str, *, allowed_roots: Tuple[Path, ...]) -> bool:
     """Check if PDF is password-protected."""
     import pikepdf
 
-    if not _validate_pdf_path(pdf_path):
+    if not _validate_pdf_path(pdf_path, allowed_roots):
         return False
     try:
         with pikepdf.open(pdf_path) as pdf:

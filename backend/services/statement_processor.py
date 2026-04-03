@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from backend.models.database import SessionLocal
 from backend.models.models import Card, Statement, Settings, Transaction
 from backend.services.categorizer import categorize
-from backend.services.pdf_unlock import _validate_pdf_path, generate_passwords, is_encrypted, unlock_pdf
+from backend.services.pdf_unlock import (
+    _validate_pdf_path,
+    allowed_roots_for_statements,
+    generate_passwords,
+    is_encrypted,
+    unlock_pdf,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +159,8 @@ def process_statement(
     try:
         if not os.path.isfile(pdf_path):
             return {"status": "error", "message": "File not found", "count": 0}
-        if not _validate_pdf_path(pdf_path):
+        roots = allowed_roots_for_statements(db_session)
+        if not _validate_pdf_path(pdf_path, roots):
             return {"status": "error", "message": "Invalid file path", "count": 0}
 
         file_hash = _compute_hash(pdf_path)
@@ -186,10 +193,10 @@ def process_statement(
         profile = _get_user_profile(db_session)
         card_last4s = _get_card_last4s(db_session, bank=bank) if bank else _get_card_last4s(db_session)
         working_path = pdf_path
-        encrypted = is_encrypted(pdf_path)
+        encrypted = is_encrypted(pdf_path, allowed_roots=roots)
 
         if encrypted and manual_password:
-            unlocked = unlock_pdf(pdf_path, [manual_password])
+            unlocked = unlock_pdf(pdf_path, [manual_password], allowed_roots=roots)
             if unlocked:
                 working_path = unlocked
                 if not bank:
@@ -216,7 +223,7 @@ def process_statement(
                     card_last4s=card_last4s,
                     dob_year=profile.dob_year or "",
                 )
-                unlocked = unlock_pdf(pdf_path, passwords)
+                unlocked = unlock_pdf(pdf_path, passwords, allowed_roots=roots)
                 if unlocked:
                     working_path = unlocked
                 else:
@@ -240,7 +247,7 @@ def process_statement(
                         card_last4s=try_card_last4s,
                         dob_year=profile.dob_year or "",
                     )
-                    unlocked = unlock_pdf(pdf_path, passwords)
+                    unlocked = unlock_pdf(pdf_path, passwords, allowed_roots=roots)
                     if unlocked:
                         bank = try_bank
                         working_path = unlocked

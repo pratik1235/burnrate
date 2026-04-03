@@ -15,8 +15,9 @@ This feature is **explicitly user-authorized** and scoped to Gmail’s readonly 
 | `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID (required to enable the feature). |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Optional; empty for public / desktop-style clients where allowed. |
 | `GMAIL_OAUTH_REDIRECT_URI` | Default `http://127.0.0.1:8000/api/gmail/oauth/callback` — must match Google Cloud console. |
-| `GMAIL_OAUTH_SUCCESS_REDIRECT` | Browser redirect after success (default dev: `http://localhost:5173/customize?gmail=connected`). |
-| `GMAIL_OAUTH_ERROR_REDIRECT` | Browser redirect on failure. |
+| `GMAIL_OAUTH_SUCCESS_REDIRECT` | Browser redirect after success (default dev: `http://localhost:5173/customize?gmail=connected`). Only `http`/`https` to `localhost`, `127.0.0.1`, or `::1` unless overridden below. |
+| `GMAIL_OAUTH_ERROR_REDIRECT` | Browser redirect on failure (same validation). |
+| `BURNRATE_OAUTH_REDIRECT_ALLOWED_HOSTS` | Optional comma-separated extra hostnames allowed for success/error redirects (e.g. production UI hostname). |
 | `BURNRATE_OAUTH_FERNET_KEY` | Optional base64 Fernet key; otherwise a key file is created under the data directory. |
 
 ## Flow

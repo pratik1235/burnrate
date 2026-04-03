@@ -23,17 +23,53 @@ from backend.services.oauth_tokens import encrypt_secret
 router = APIRouter(prefix="/gmail", tags=["gmail"])
 logger = logging.getLogger(__name__)
 
+_DEFAULT_FRONTEND_OK = "http://localhost:5173/customize?gmail=connected"
+_DEFAULT_FRONTEND_ERR = "http://localhost:5173/customize?gmail=error"
+
+
+def _allowed_oauth_redirect_hosts() -> set[str]:
+    raw = os.environ.get("BURNRATE_OAUTH_REDIRECT_ALLOWED_HOSTS", "")
+    return {h.strip().lower() for h in raw.split(",") if h.strip()}
+
+
+def _validated_browser_redirect(raw: str | None, default: str) -> str:
+    """Allow http(s) to localhost / 127.0.0.1 / ::1, or hosts in BURNRATE_OAUTH_REDIRECT_ALLOWED_HOSTS."""
+    if not raw or not str(raw).strip():
+        return default
+    url = str(raw).strip()
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        logger.warning("Rejected OAuth browser redirect: invalid scheme")
+        return default
+    host = (parsed.hostname or "").lower()
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return url
+    if host in _allowed_oauth_redirect_hosts():
+        return url
+    logger.warning("Rejected OAuth browser redirect for disallowed host: %s", host)
+    return default
+
+
+def _redirect_with_reason(base: str, key: str, value: str) -> str:
+    parsed = urllib.parse.urlparse(base)
+    pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    pairs = [(k, v) for k, v in pairs if k != key]
+    pairs.append((key, value))
+    new_query = urllib.parse.urlencode(pairs)
+    return urllib.parse.urlunparse(parsed._replace(query=new_query))
+
+
 REDIRECT_URI = os.environ.get(
     "GMAIL_OAUTH_REDIRECT_URI",
     "http://127.0.0.1:8000/api/gmail/oauth/callback",
 )
-FRONTEND_OK = os.environ.get(
-    "GMAIL_OAUTH_SUCCESS_REDIRECT",
-    "http://localhost:5173/customize?gmail=connected",
+FRONTEND_OK = _validated_browser_redirect(
+    os.environ.get("GMAIL_OAUTH_SUCCESS_REDIRECT"),
+    _DEFAULT_FRONTEND_OK,
 )
-FRONTEND_ERR = os.environ.get(
-    "GMAIL_OAUTH_ERROR_REDIRECT",
-    "http://localhost:5173/customize?gmail=error",
+FRONTEND_ERR = _validated_browser_redirect(
+    os.environ.get("GMAIL_OAUTH_ERROR_REDIRECT"),
+    _DEFAULT_FRONTEND_ERR,
 )
 
 GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
@@ -131,7 +167,9 @@ def gmail_oauth_callback(
 
     refresh = tok.get("refresh_token")
     if not refresh:
-        return RedirectResponse(f"{FRONTEND_ERR}&reason=no_refresh")
+        return RedirectResponse(
+            _redirect_with_reason(FRONTEND_ERR, "reason", "no_refresh"),
+        )
 
     access = tok.get("access_token")
     expires_in = int(tok.get("expires_in", 3600))
