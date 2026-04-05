@@ -46,7 +46,7 @@ def _validated_browser_redirect(raw: str | None, default: str) -> str:
         return url
     if host in _allowed_oauth_redirect_hosts():
         return url
-    logger.warning("Rejected OAuth browser redirect for disallowed host: %s", host)
+    logger.warning("Rejected OAuth browser redirect for disallowed host")
     return default
 
 
