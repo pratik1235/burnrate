@@ -7,6 +7,7 @@ from datetime import date
 import pytest
 
 from backend.models.models import Card, Statement, Transaction
+from tests.synthetic_profile import LAST4_HDFC
 
 
 def _hash64(s: str) -> str:
@@ -16,14 +17,14 @@ def _hash64(s: str) -> str:
 @pytest.fixture()
 def mixed_currency_rows(db_session_factory, setup_cards):
     db = db_session_factory()
-    card = db.query(Card).filter(Card.bank == "hdfc", Card.last4 == "8087").first()
+    card = db.query(Card).filter(Card.bank == "hdfc", Card.last4 == LAST4_HDFC).first()
     sid_inr = str(uuid.uuid4())
     sid_usd = str(uuid.uuid4())
     db.add(
         Statement(
             id=sid_inr,
             bank="hdfc",
-            card_last4="8087",
+            card_last4=LAST4_HDFC,
             period_start=date(2030, 1, 1),
             period_end=date(2030, 1, 31),
             file_hash=_hash64("currency-test-inr-stmt"),
@@ -38,7 +39,7 @@ def mixed_currency_rows(db_session_factory, setup_cards):
         Statement(
             id=sid_usd,
             bank="hdfc",
-            card_last4="8087",
+            card_last4=LAST4_HDFC,
             period_start=date(2030, 2, 1),
             period_end=date(2030, 2, 28),
             file_hash=_hash64("currency-test-usd-stmt"),
@@ -59,7 +60,7 @@ def mixed_currency_rows(db_session_factory, setup_cards):
             type="debit",
             category="food",
             bank="hdfc",
-            card_last4="8087",
+            card_last4=LAST4_HDFC,
             card_id=card.id if card else None,
             source="CC",
             currency="INR",
@@ -74,7 +75,7 @@ def mixed_currency_rows(db_session_factory, setup_cards):
             type="debit",
             category="food",
             bank="hdfc",
-            card_last4="8087",
+            card_last4=LAST4_HDFC,
             card_id=card.id if card else None,
             source="CC",
             currency="USD",

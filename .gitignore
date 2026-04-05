@@ -86,3 +86,7 @@ src-tauri/gen/
 
 # PyInstaller spec files
 *.spec
+.cursor/
+.claude/
+temp/
+docs/security-deployment.md

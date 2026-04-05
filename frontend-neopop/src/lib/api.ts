@@ -5,7 +5,11 @@ import type {
   Category,
   CategoryBreakdown,
   MerchantSpend,
+  Milestone,
+  MilestoneDefinition,
   MonthlyTrend,
+  Offer,
+  OfferSyncStatus,
   Source,
   Statement,
   Transaction,
@@ -272,7 +276,7 @@ export async function uploadStatementsBulk(
 interface StatementRaw {
   id: string;
   bank: string;
-  card_last4: string;
+  card_last4: string | null;
   period_start: string | null;
   period_end: string | null;
   transaction_count: number;
@@ -281,6 +285,9 @@ interface StatementRaw {
   source: string | null;
   status: string | null;
   imported_at: string | null;
+  file_path?: string | null;
+  file_name?: string | null;
+  status_message?: string | null;
 }
 
 export interface GetStatementsParams {
@@ -305,7 +312,7 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
   return data.map((s) => ({
     id: s.id,
     bank: s.bank as Bank,
-    cardLast4: s.card_last4,
+    cardLast4: s.card_last4 ?? '',
     periodStart: s.period_start ?? '',
     periodEnd: s.period_end ?? '',
     transactionCount: s.transaction_count,
@@ -314,6 +321,9 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     source: (s.source as Source) ?? 'CC',
     status: (s.status as 'success' | 'parse_error' | 'password_needed') ?? 'success',
     importedAt: s.imported_at ?? '',
+    filePath: s.file_path ?? null,
+    fileName: s.file_name ?? null,
+    statusMessage: s.status_message ?? null,
   }));
 }
 
@@ -546,5 +556,166 @@ export async function triggerGmailSync(): Promise<{
   seconds_remaining?: number;
 }> {
   const { data } = await api.post('/gmail/sync', {}, { timeout: 120000 });
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Offers
+// ---------------------------------------------------------------------------
+
+export interface GetOffersParams {
+  cards?: string;
+  bank?: string;
+  banks?: string;
+  search?: string;
+  category?: string;
+  categories?: string;
+  offer_type?: string;
+  source?: string;
+  include_expired?: boolean;
+  include_hidden?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getOffers(
+  params: GetOffersParams = {},
+): Promise<{ offers: Offer[]; total: number; lastSyncAt: string | null }> {
+  const { data } = await api.get('/offers', { params });
+  return data;
+}
+
+export async function getOffer(id: string): Promise<Offer> {
+  const { data } = await api.get(`/offers/${id}`);
+  return data;
+}
+
+export async function createOffer(body: {
+  title: string;
+  description?: string;
+  merchant?: string;
+  discount_text?: string;
+  offer_type?: string;
+  bank?: string;
+  category?: string;
+  valid_from?: string;
+  valid_until?: string;
+  min_transaction?: number;
+  max_discount?: number;
+}): Promise<Offer> {
+  const { data } = await api.post('/offers', body);
+  return data;
+}
+
+export async function updateOffer(
+  id: string,
+  body: Partial<{
+    title: string;
+    description: string;
+    merchant: string;
+    discount_text: string;
+    offer_type: string;
+    bank: string;
+    category: string;
+    valid_from: string;
+    valid_until: string;
+  }>,
+): Promise<Offer> {
+  const { data } = await api.put(`/offers/${id}`, body);
+  return data;
+}
+
+export async function deleteOffer(id: string): Promise<void> {
+  await api.delete(`/offers/${id}`);
+}
+
+export async function hideOffer(id: string): Promise<Offer> {
+  const { data } = await api.post(`/offers/${id}/hide`);
+  return data;
+}
+
+export async function unhideOffer(id: string): Promise<Offer> {
+  const { data } = await api.post(`/offers/${id}/unhide`);
+  return data;
+}
+
+export async function triggerOfferSync(): Promise<{ status: string }> {
+  const { data } = await api.post('/offers/sync');
+  return data;
+}
+
+export async function getOfferSyncStatus(): Promise<OfferSyncStatus> {
+  const { data } = await api.get('/offers/sync-status');
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Milestones
+// ---------------------------------------------------------------------------
+
+export async function getMilestones(params: {
+  card_id?: string;
+  include_archived?: boolean;
+} = {}): Promise<{ milestones: Milestone[]; total: number }> {
+  const { data } = await api.get('/milestones', { params });
+  return data;
+}
+
+export async function getMilestone(id: string): Promise<Milestone> {
+  const { data } = await api.get(`/milestones/${id}`);
+  return data;
+}
+
+export async function createMilestone(body: {
+  card_id: string;
+  title: string;
+  target_amount: number;
+  period_kind?: string;
+  period_config?: string;
+  milestone_type?: string;
+  reward_description?: string;
+}): Promise<Milestone> {
+  const { data } = await api.post('/milestones', body);
+  return data;
+}
+
+export async function updateMilestone(
+  id: string,
+  body: Partial<{
+    title: string;
+    target_amount: number;
+    period_kind: string;
+    milestone_type: string;
+    reward_description: string;
+  }>,
+): Promise<Milestone> {
+  const { data } = await api.put(`/milestones/${id}`, body);
+  return data;
+}
+
+export async function deleteMilestone(id: string): Promise<void> {
+  await api.delete(`/milestones/${id}`);
+}
+
+export async function archiveMilestone(id: string): Promise<Milestone> {
+  const { data } = await api.post(`/milestones/${id}/archive`);
+  return data;
+}
+
+export async function unarchiveMilestone(id: string): Promise<Milestone> {
+  const { data } = await api.post(`/milestones/${id}/unarchive`);
+  return data;
+}
+
+export async function triggerMilestoneSync(): Promise<{ status: string }> {
+  const { data } = await api.post('/milestones/sync');
+  return data;
+}
+
+export async function getMilestoneDefinitions(): Promise<{
+  definitions: MilestoneDefinition[];
+  total: number;
+}> {
+  const { data } = await api.get('/milestones/definitions');
   return data;
 }

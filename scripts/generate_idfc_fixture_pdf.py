@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate tests/fixtures/idfc_9370_synthetic.pdf (synthetic IDFC-style layout).
+"""Regenerate tests/fixtures/idfc_1847_synthetic.pdf (synthetic IDFC-style layout).
 
 Requires: pip install fpdf2
 Run from repo root: python scripts/generate_idfc_fixture_pdf.py
@@ -12,7 +12,7 @@ from fpdf import FPDF
 
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
-    out = root / "tests" / "fixtures" / "idfc_9370_synthetic.pdf"
+    out = root / "tests" / "fixtures" / "idfc_1847_synthetic.pdf"
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -21,7 +21,7 @@ def main() -> None:
     lines = [
         "IDFC FIRST Bank",
         "Credit Card Statement",
-        "(XX9370)",
+        "(XX1847)",
         "Statement period 01/Jan/2026 - 31/Jan/2026",
         "",
         "Total Amount Due",

@@ -13,9 +13,11 @@ interface NavbarProps {
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'cards', label: 'Cards' },
-  { id: 'bank-statements', label: 'Bank Statements' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'analytics', label: 'Analytics' },
+  { id: 'statements', label: 'Statements' },
+  { id: 'offers', label: 'Offers' },
+  { id: 'milestones', label: 'Milestones' },
   { id: 'customize', label: 'Customize' },
 ];
 

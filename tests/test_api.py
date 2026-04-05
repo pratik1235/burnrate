@@ -9,12 +9,25 @@ from pathlib import Path
 
 import pytest
 
+from tests.synthetic_profile import (
+    AXIS_STATEMENT,
+    DOB_DAY,
+    DOB_MONTH,
+    DOB_YEAR,
+    HDFC_STATEMENT,
+    ICICI_STATEMENT,
+    LAST4_AXIS,
+    LAST4_HDFC,
+    LAST4_ICICI,
+    NAME,
+)
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 STATEMENT_FILES = [
-    ("hdfc_8087_2026-02.pdf", "hdfc", "8087", 35),
-    ("axis_9735.pdf", "axis", "9735", 12),
-    ("icici_0000.pdf", "icici", "0000", 4),
+    (HDFC_STATEMENT, "hdfc", LAST4_HDFC, 35),
+    (AXIS_STATEMENT, "axis", LAST4_AXIS, 12),
+    (ICICI_STATEMENT, "icici", LAST4_ICICI, 4),
 ]
 
 TOTAL_TRANSACTIONS = 48  # 34 (HDFC) + 10 (Axis, 2 dupes removed) + 4 (ICICI)
@@ -36,14 +49,14 @@ class TestSetup:
 
     def test_setup_wizard(self, api_client):
         resp = api_client.post("/api/settings/setup", json={
-            "name": "Pratik Prakash",
-            "dob_day": "09",
-            "dob_month": "02",
-            "dob_year": "1999",
+            "name": NAME,
+            "dob_day": DOB_DAY,
+            "dob_month": DOB_MONTH,
+            "dob_year": DOB_YEAR,
             "cards": [
-                {"bank": "hdfc", "last4": "8087"},
-                {"bank": "axis", "last4": "9735"},
-                {"bank": "icici", "last4": "0000"},
+                {"bank": "hdfc", "last4": LAST4_HDFC},
+                {"bank": "axis", "last4": LAST4_AXIS},
+                {"bank": "icici", "last4": LAST4_ICICI},
             ],
         })
         assert resp.status_code in (200, 400)
@@ -53,16 +66,16 @@ class TestSetup:
         assert resp.status_code == 200
         data = resp.json()
         assert data["setup_complete"] is True
-        assert data["settings"]["name"] == "Pratik Prakash"
+        assert data["settings"]["name"] == NAME
 
     def test_cards_registered(self, api_client):
         resp = api_client.get("/api/settings")
         assert resp.status_code == 200
         cards = resp.json()["cards"]
         banks = {(c["bank"], c["last4"]) for c in cards}
-        assert ("hdfc", "8087") in banks
-        assert ("axis", "9735") in banks
-        assert ("icici", "0000") in banks
+        assert ("hdfc", LAST4_HDFC) in banks
+        assert ("axis", LAST4_AXIS) in banks
+        assert ("icici", LAST4_ICICI) in banks
 
 
 # =====================================================================
@@ -85,11 +98,11 @@ class TestStatementUpload:
         assert data["bank"] == bank
 
     def test_duplicate_upload_rejected(self, api_client):
-        filepath = FIXTURES / "hdfc_8087_2026-02.pdf"
+        filepath = FIXTURES / HDFC_STATEMENT
         with open(filepath, "rb") as f:
             resp = api_client.post(
                 "/api/statements/upload",
-                files={"file": ("hdfc_8087_2026-02.pdf", f, "application/pdf")},
+                files={"file": (HDFC_STATEMENT, f, "application/pdf")},
             )
         assert resp.status_code == 200
         data = resp.json()
@@ -131,6 +144,9 @@ class TestStatementListing:
             assert s["transaction_count"] > 0
             assert s["period_start"] is not None
             assert s["period_end"] is not None
+            assert "file_path" in s
+            assert "file_name" in s
+            assert "status_message" in s
 
 
 # =====================================================================
@@ -145,7 +161,7 @@ class TestTransactions:
         assert data["total"] == TOTAL_TRANSACTIONS
 
     def test_filter_by_card(self, api_client):
-        card_id = _get_card_id(api_client, "hdfc", "8087")
+        card_id = _get_card_id(api_client, "hdfc", LAST4_HDFC)
         resp = api_client.get("/api/transactions", params={"card": card_id})
         assert resp.status_code == 200
         data = resp.json()
@@ -326,11 +342,11 @@ class TestStatementManagement:
 
     def test_re_upload_after_delete(self, api_client):
         """After deleting a statement, re-uploading should succeed."""
-        filepath = FIXTURES / "icici_0000.pdf"
+        filepath = FIXTURES / ICICI_STATEMENT
         with open(filepath, "rb") as f:
             resp = api_client.post(
                 "/api/statements/upload",
-                files={"file": ("icici_0000.pdf", f, "application/pdf")},
+                files={"file": (ICICI_STATEMENT, f, "application/pdf")},
             )
         assert resp.status_code == 200
         data = resp.json()

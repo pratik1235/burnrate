@@ -14,14 +14,29 @@ from backend.parsers.axis import AxisParser
 from backend.parsers.icici import ICICIParser
 from backend.parsers.idfc_first import IDFCFirstBankParser
 from backend.services.pdf_unlock import generate_passwords, unlock_pdf
+from tests.synthetic_profile import (
+    AXIS_STATEMENT,
+    DOB_DAY,
+    DOB_MONTH,
+    DOB_YEAR,
+    HDFC_STATEMENT,
+    ICICI_STATEMENT,
+    IDFC_SYNTHETIC_PDF,
+    LAST4_AXIS,
+    LAST4_HDFC,
+    LAST4_ICICI,
+    LAST4_IDFC_SYNTH,
+    NAME,
+    card_last4s_for_pdf_unlock,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 PROFILE = {
-    "name": "Pratik Prakash",
-    "dob_day": "09",
-    "dob_month": "02",
-    "dob_year": "1999",
+    "name": NAME,
+    "dob_day": DOB_DAY,
+    "dob_month": DOB_MONTH,
+    "dob_year": DOB_YEAR,
 }
 
 
@@ -32,7 +47,7 @@ def _unlock(pdf_path: str, bank: str) -> str:
         name=PROFILE["name"],
         dob_day=PROFILE["dob_day"],
         dob_month=PROFILE["dob_month"],
-        card_last4s=["8087", "1464", "9735", "0000"],
+        card_last4s=card_last4s_for_pdf_unlock(),
         dob_year=PROFILE["dob_year"],
     )
     result = unlock_pdf(
@@ -42,13 +57,13 @@ def _unlock(pdf_path: str, bank: str) -> str:
 
 
 # =====================================================================
-# HDFC — Card 8087, Feb 2026
+# HDFC — sample statement, Feb 2026
 # =====================================================================
 class TestHDFCParser:
 
     @pytest.fixture(autouse=True)
     def parse(self, tmp_path):
-        src = str(FIXTURES / "hdfc_8087_2026-02.pdf")
+        src = str(FIXTURES / HDFC_STATEMENT)
         unlocked = _unlock(src, "hdfc")
         self.result = HDFCParser().parse(unlocked)
         yield
@@ -56,7 +71,7 @@ class TestHDFCParser:
             Path(unlocked).unlink(missing_ok=True)
 
     def test_card_detected(self):
-        assert self.result.card_last4 == "8087"
+        assert self.result.card_last4 == LAST4_HDFC
 
     def test_period(self):
         assert self.result.period_start is not None
@@ -90,13 +105,13 @@ class TestHDFCParser:
 
 
 # =====================================================================
-# Axis — Card 9735
+# Axis
 # =====================================================================
 class TestAxisParser:
 
     @pytest.fixture(autouse=True)
     def parse(self, tmp_path):
-        src = str(FIXTURES / "axis_9735.pdf")
+        src = str(FIXTURES / AXIS_STATEMENT)
         unlocked = _unlock(src, "axis")
         self.result = AxisParser().parse(unlocked)
         yield
@@ -104,7 +119,7 @@ class TestAxisParser:
             Path(unlocked).unlink(missing_ok=True)
 
     def test_card_detected(self):
-        assert self.result.card_last4 == "9735"
+        assert self.result.card_last4 == LAST4_AXIS
 
     def test_period(self):
         assert self.result.period_start is not None
@@ -123,13 +138,13 @@ class TestAxisParser:
 
 
 # =====================================================================
-# ICICI — Card 0000
+# ICICI
 # =====================================================================
 class TestICICIParser:
 
     @pytest.fixture(autouse=True)
     def parse(self, tmp_path):
-        src = str(FIXTURES / "icici_0000.pdf")
+        src = str(FIXTURES / ICICI_STATEMENT)
         unlocked = _unlock(src, "icici")
         self.result = ICICIParser().parse(unlocked)
         yield
@@ -137,7 +152,7 @@ class TestICICIParser:
             Path(unlocked).unlink(missing_ok=True)
 
     def test_card_detected(self):
-        assert self.result.card_last4 == "0000"
+        assert self.result.card_last4 == LAST4_ICICI
 
     def test_period(self):
         assert self.result.period_start is not None
@@ -162,11 +177,11 @@ class TestIDFCFirstParser:
 
     @pytest.fixture(autouse=True)
     def parse(self):
-        src = str(FIXTURES / "idfc_9370_synthetic.pdf")
+        src = str(FIXTURES / IDFC_SYNTHETIC_PDF)
         self.result = IDFCFirstBankParser().parse(src)
 
     def test_card_detected(self):
-        assert self.result.card_last4 == "9370"
+        assert self.result.card_last4 == LAST4_IDFC_SYNTH
 
     def test_period(self):
         assert self.result.period_start == date(2026, 1, 1)

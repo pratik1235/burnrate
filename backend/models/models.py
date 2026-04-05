@@ -53,6 +53,7 @@ class Card(Base):
     bank = Column(String(50), nullable=False)  # 'hdfc', 'icici', 'axis'
     last4 = Column(String(4), nullable=False)
     name = Column(String(255), nullable=True)
+    template_id = Column(String(100), nullable=True)  # References CardTemplate.id from frontend
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -74,6 +75,7 @@ class Statement(Base):
     credit_limit = Column(Float, nullable=True)
     source = Column(String(4), nullable=False, default="CC", server_default="CC")
     status = Column(String(20), nullable=False, default="success")
+    status_message = Column(Text, nullable=True)
     imported_at = Column(DateTime, default=datetime.utcnow)
     currency = Column(String(3), nullable=False, default="INR", server_default="INR")
 
@@ -178,5 +180,151 @@ class ProcessingLog(Base):
     transaction_count = Column(Integer, default=0)
     acknowledged = Column(Integer, default=0)  # 0=unread, 1=dismissed
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Offers & Benefits (Issue #6)
+# ---------------------------------------------------------------------------
+
+class SyncMetadata(Base):
+    """Tracks per-provider sync status for offers and milestones."""
+
+    __tablename__ = "sync_metadata"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    provider = Column(String(50), unique=True, nullable=False)
+    last_sync_at = Column(DateTime, nullable=True)
+    last_status = Column(String(20), nullable=True)  # success, partial, failed
+    offers_fetched = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+
+
+class CardOffer(Base):
+    """Normalized offer record — fetched from aggregators or user-created."""
+
+    __tablename__ = "card_offers"
+    __table_args__ = (
+        UniqueConstraint("source", "source_id", name="uq_offer_source"),
+    )
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+
+    # Source tracking
+    source = Column(String(50), nullable=False)  # "hdfc_bank", "sbicard", "cardexpert", "user"
+    source_id = Column(String(255), nullable=True)  # External ID or URL hash for dedup
+    source_url = Column(String(1024), nullable=True)
+
+    # Offer content
+    title = Column(String(512), nullable=False)
+    description = Column(Text, nullable=True)
+    merchant = Column(String(255), nullable=True)
+    discount_text = Column(String(255), nullable=True)  # "10% cashback up to ₹200"
+    offer_type = Column(String(50), nullable=True)  # cashback, discount, reward_points, emi, lounge
+
+    # Applicability
+    bank = Column(String(50), nullable=True)  # NULL = all banks
+    card_template_id = Column(String(100), nullable=True)
+    network = Column(String(20), nullable=True)  # visa, mastercard, rupay
+    min_transaction = Column(Float, nullable=True)
+    max_discount = Column(Float, nullable=True)
+
+    # Validity
+    valid_from = Column(Date, nullable=True)
+    valid_until = Column(Date, nullable=True)
+    is_expired = Column(Integer, default=0)
+
+    # Category for filtering
+    category = Column(String(50), nullable=True)
+
+    # Metadata
+    is_user_created = Column(Integer, default=0)
+    is_hidden = Column(Integer, default=0)
+    fetched_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CardOfferCard(Base):
+    """Junction table: which user cards an offer applies to."""
+
+    __tablename__ = "card_offer_cards"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    offer_id = Column(String(36), ForeignKey("card_offers.id", ondelete="CASCADE"), nullable=False)
+    card_id = Column(String(36), ForeignKey("cards.id", ondelete="CASCADE"), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Milestones (Issue #7)
+# ---------------------------------------------------------------------------
+
+class MilestoneDefinition(Base):
+    """Template milestone definitions fetched from internet sources."""
+
+    __tablename__ = "milestone_definitions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+
+    # Source tracking
+    source = Column(String(50), nullable=False)  # "hdfc_bank", "paisabazaar", "user"
+    source_url = Column(String(1024), nullable=True)
+
+    # Card targeting
+    card_template_id = Column(String(100), nullable=True)
+    bank = Column(String(50), nullable=True)
+
+    # Milestone details
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    milestone_type = Column(String(50), nullable=False)  # fee_waiver, bonus_points, lounge_access, accelerated_rewards, voucher, cashback
+
+    # Target
+    target_amount = Column(Float, nullable=False)
+
+    # Period
+    period_kind = Column(String(30), nullable=False)  # calendar_month, calendar_quarter, calendar_year, rolling_days, fixed_range
+    period_config = Column(Text, nullable=True)  # JSON
+
+    # Reward on achievement
+    reward_description = Column(String(512), nullable=True)
+    reward_value = Column(Float, nullable=True)
+
+    # Filters
+    category_filter = Column(Text, nullable=True)  # JSON list
+    exclude_categories = Column(Text, nullable=True)  # JSON list
+
+    # Metadata
+    is_active = Column(Integer, default=1)
+    fetched_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserMilestone(Base):
+    """Per-user milestone tracker — links a definition to a user's card."""
+
+    __tablename__ = "user_milestones"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    card_id = Column(String(36), ForeignKey("cards.id", ondelete="CASCADE"), nullable=False)
+    definition_id = Column(String(36), ForeignKey("milestone_definitions.id", ondelete="SET NULL"), nullable=True)
+
+    # User can override definition values
+    title = Column(String(255), nullable=False)
+    target_amount = Column(Float, nullable=False)
+    period_kind = Column(String(30), nullable=False)
+    period_config = Column(Text, nullable=True)  # JSON
+    milestone_type = Column(String(50), nullable=False)
+    reward_description = Column(String(512), nullable=True)
+    category_filter = Column(Text, nullable=True)  # JSON list
+    exclude_categories = Column(Text, nullable=True)  # JSON list
+
+    # State
+    is_auto_created = Column(Integer, default=0)
+    is_archived = Column(Integer, default=0)
+    is_custom = Column(Integer, default=0)  # 1 = fully user-created
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

@@ -25,7 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.models.database import SessionLocal, init_db
 from backend.models.models import CategoryDefinition, Settings
-from backend.routers import analytics, cards, categories, gmail, settings, statements, tags, transactions
+from backend.routers import analytics, cards, categories, gmail, milestones, offers, settings, statements, tags, transactions
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,50 @@ async def lifespan(app: FastAPI):
 
     threading.Thread(target=_gmail_startup_sync, name="gmail-startup-sync", daemon=True).start()
 
+    # Offer sync background loop
+    def _offer_sync_loop() -> None:
+        import time
+
+        from backend.config import OFFER_SYNC_ENABLED, OFFER_SYNC_INTERVAL
+
+        time.sleep(5)  # let app fully start
+        while True:
+            if OFFER_SYNC_ENABLED:
+                session = SessionLocal()
+                try:
+                    from backend.services.offer_fetcher import sync_offers
+                    sync_offers(session)
+                    logger.info("Offer sync completed")
+                except Exception:
+                    logger.exception("Offer sync failed")
+                finally:
+                    session.close()
+            time.sleep(OFFER_SYNC_INTERVAL)
+
+    threading.Thread(target=_offer_sync_loop, name="offer-sync", daemon=True).start()
+
+    # Milestone sync background loop
+    def _milestone_sync_loop() -> None:
+        import time
+
+        from backend.config import MILESTONE_SYNC_ENABLED, MILESTONE_SYNC_INTERVAL
+
+        time.sleep(8)  # let app fully start, after offer sync begins
+        while True:
+            if MILESTONE_SYNC_ENABLED:
+                session = SessionLocal()
+                try:
+                    from backend.services.milestone_fetcher import sync_milestone_definitions
+                    sync_milestone_definitions(session)
+                    logger.info("Milestone sync completed")
+                except Exception:
+                    logger.exception("Milestone sync failed")
+                finally:
+                    session.close()
+            time.sleep(MILESTONE_SYNC_INTERVAL)
+
+    threading.Thread(target=_milestone_sync_loop, name="milestone-sync", daemon=True).start()
+
     yield
 
     from backend.routers.settings import get_watcher_observer
@@ -169,6 +213,8 @@ app.include_router(analytics.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
 app.include_router(tags.router, prefix="/api")
 app.include_router(gmail.router, prefix="/api")
+app.include_router(offers.router, prefix="/api")
+app.include_router(milestones.router, prefix="/api")
 
 _project_root_for_static = Path(__file__).resolve().parent.parent
 _static_candidates = [

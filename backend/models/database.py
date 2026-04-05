@@ -75,6 +75,8 @@ def _run_migrations(engine_ref) -> None:
         ("transactions", "currency", "VARCHAR(3) NOT NULL DEFAULT 'INR'"),
         ("statements", "currency", "VARCHAR(3) NOT NULL DEFAULT 'INR'"),
         ("settings", "display_currency", "VARCHAR(3)"),
+        ("cards", "template_id", "VARCHAR(100)"),
+        ("statements", "status_message", "TEXT"),
     ]
 
     with engine_ref.connect() as conn:

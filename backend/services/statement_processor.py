@@ -366,6 +366,10 @@ def process_statement(
         )
 
         if is_parse_error:
+            parse_msg = (
+                f"Could not extract transactions from this {bank.upper()} statement. "
+                f"The PDF format may not be supported yet."
+            )
             statement = Statement(
                 bank=bank,
                 card_last4=card_last4,
@@ -379,6 +383,7 @@ def process_statement(
                 credit_limit=getattr(parsed, "credit_limit", None),
                 source=source,
                 status="parse_error",
+                status_message=parse_msg,
                 currency=_parsed_currency(parsed),
             )
             db_session.add(statement)
@@ -390,10 +395,7 @@ def process_statement(
             )
             return {
                 "status": "parse_error",
-                "message": (
-                    f"Could not extract transactions from this {bank.upper()} statement. "
-                    f"The PDF format may not be supported yet."
-                ),
+                "message": parse_msg,
                 "count": 0,
                 "period": None,
                 "bank": bank,
@@ -512,6 +514,10 @@ def _process_csv_statement(
     )
 
     if is_parse_error:
+        parse_msg = (
+            f"Could not extract transactions from this {bank.upper()} CSV. "
+            f"The format may not be supported yet."
+        )
         statement = Statement(
             bank=bank,
             card_last4=card_last4,
@@ -523,6 +529,7 @@ def _process_csv_statement(
             total_spend=0.0,
             source=source,
             status="parse_error",
+            status_message=parse_msg,
             currency=_parsed_currency(parsed),
         )
         db_session.add(statement)
@@ -534,10 +541,7 @@ def _process_csv_statement(
         )
         return {
             "status": "parse_error",
-            "message": (
-                f"Could not extract transactions from this {bank.upper()} CSV. "
-                f"The format may not be supported yet."
-            ),
+            "message": parse_msg,
             "count": 0,
             "period": None,
             "bank": bank,

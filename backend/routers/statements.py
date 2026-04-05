@@ -230,24 +230,30 @@ def list_statements(
             or_(Statement.period_start.is_(None), Statement.period_start <= to_date)
         )
     statements = q.all()
-    return [
-        {
-            "id": s.id,
-            "bank": s.bank,
-            "card_last4": s.card_last4,
-            "period_start": s.period_start.isoformat() if s.period_start else None,
-            "period_end": s.period_end.isoformat() if s.period_end else None,
-            "transaction_count": s.transaction_count,
-            "total_spend": s.total_spend,
-            "total_amount_due": s.total_amount_due,
-            "credit_limit": s.credit_limit,
-            "currency": (getattr(s, "currency", None) or "INR").upper()[:3],
-            "source": getattr(s, "source", None) or "CC",
-            "status": getattr(s, "status", None) or "success",
-            "imported_at": s.imported_at.isoformat() if s.imported_at else None,
-        }
-        for s in statements
-    ]
+    out: List[Dict[str, Any]] = []
+    for s in statements:
+        fp = s.file_path
+        out.append(
+            {
+                "id": s.id,
+                "bank": s.bank,
+                "card_last4": s.card_last4,
+                "period_start": s.period_start.isoformat() if s.period_start else None,
+                "period_end": s.period_end.isoformat() if s.period_end else None,
+                "transaction_count": s.transaction_count,
+                "total_spend": s.total_spend,
+                "total_amount_due": s.total_amount_due,
+                "credit_limit": s.credit_limit,
+                "currency": (getattr(s, "currency", None) or "INR").upper()[:3],
+                "source": getattr(s, "source", None) or "CC",
+                "status": getattr(s, "status", None) or "success",
+                "imported_at": s.imported_at.isoformat() if s.imported_at else None,
+                "file_path": fp,
+                "file_name": os.path.basename(fp) if fp else None,
+                "status_message": getattr(s, "status_message", None),
+            }
+        )
+    return out
 
 
 @router.get("/processing-logs")

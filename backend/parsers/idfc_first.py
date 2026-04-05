@@ -1,7 +1,7 @@
 """IDFC FIRST Bank credit card statement parser.
 
 Layout (typical portal PDF):
-- Title includes "Credit Card Statement"; card masked as (XX9370) or XXXX 9370.
+- Title includes "Credit Card Statement"; card masked as (XX1234) or XXXX 1234 (last four).
 - Statement period often DD/Mon/YYYY - DD/Mon/YYYY.
 - Summary: Total Amount Due, Minimum Amount Due, Credit Limit, Payment Due Date.
 - Transactions: table with Transaction Date (DD/MM/YYYY), details, amount ending in DR/CR;

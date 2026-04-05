@@ -39,6 +39,11 @@ export interface Statement {
   source: Source;
   status: 'success' | 'parse_error' | 'password_needed';
   importedAt: string;
+  /** Stored path on the server (full path). */
+  filePath?: string | null;
+  fileName?: string | null;
+  /** Persisted parse failure text when status is parse_error. */
+  statusMessage?: string | null;
 }
 
 export interface CategoryBreakdown {
@@ -89,6 +94,85 @@ export const CATEGORY_COLORS: Record<Category, string> = {
   cashback: '#06C270',
   other: '#9CA3AF',
 };
+
+// ---------------------------------------------------------------------------
+// Offers & Milestones
+// ---------------------------------------------------------------------------
+
+export interface Offer {
+  id: string;
+  title: string;
+  description?: string;
+  merchant?: string;
+  discountText?: string;
+  offerType?: string;
+  bank?: string;
+  cardTemplateId?: string;
+  network?: string;
+  minTransaction?: number;
+  maxDiscount?: number;
+  validFrom?: string;
+  validUntil?: string;
+  isExpired: boolean;
+  category?: string;
+  source: string;
+  sourceUrl?: string;
+  isUserCreated: boolean;
+  isHidden: boolean;
+  applicableCards: string[];
+  fetchedAt?: string;
+  createdAt?: string;
+}
+
+export interface OfferSyncStatus {
+  providers: {
+    provider: string;
+    lastSyncAt: string | null;
+    lastStatus: string | null;
+    offersFetched: number;
+    errorMessage: string | null;
+  }[];
+}
+
+export interface Milestone {
+  id: string;
+  cardId: string;
+  definitionId?: string;
+  title: string;
+  milestoneType: string;
+  targetAmount: number;
+  periodKind: string;
+  periodConfig?: string;
+  rewardDescription?: string;
+  categoryFilter?: string;
+  excludeCategories?: string;
+  isAutoCreated: boolean;
+  isArchived: boolean;
+  isCustom: boolean;
+  bank?: string;
+  cardLast4?: string;
+  // Progress fields
+  currentAmount: number;
+  percent: number;
+  remaining: number;
+  periodStart?: string;
+  periodEnd?: string;
+  daysLeft: number;
+}
+
+export interface MilestoneDefinition {
+  id: string;
+  source: string;
+  cardTemplateId?: string;
+  bank?: string;
+  title: string;
+  description?: string;
+  milestoneType: string;
+  targetAmount: number;
+  periodKind: string;
+  rewardDescription?: string;
+  rewardValue?: number;
+}
 
 export const CATEGORY_CONFIG: Record<Category, { label: string; icon: string; color: string }> = {
   food: { label: 'Food & Dining', icon: 'UtensilsCrossed', color: CATEGORY_COLORS.food },
