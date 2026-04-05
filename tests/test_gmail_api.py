@@ -1,6 +1,7 @@
 """Gmail API smoke tests (no live Google calls)."""
 
 from backend.routers import gmail as gmail_router
+from urllib.parse import urlparse
 
 
 def test_validated_browser_redirect_localhost_only():
@@ -47,5 +48,7 @@ def test_gmail_auth_start_returns_url(api_client, monkeypatch):
     assert r.status_code == 200
     j = r.json()
     assert "auth_url" in j
-    assert "accounts.google.com" in j["auth_url"]
+    parsed = urlparse(j["auth_url"])
+    assert parsed.scheme == "https"
+    assert parsed.hostname == "accounts.google.com"
     assert "code_challenge=" in j["auth_url"]
