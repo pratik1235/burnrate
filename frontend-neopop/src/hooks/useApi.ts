@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { Category } from '@/lib/types';
+import type { Offer, Milestone } from '@/lib/types';
 import {
   getSettings,
   setupProfile,
@@ -11,10 +12,16 @@ import {
   getMerchants,
   getProcessingLogs,
   acknowledgeProcessingLog,
+  getOffers as apiGetOffers,
+  getMilestones as apiGetMilestones,
   type Settings,
   type SetupProfilePayload,
   type GetTransactionsParams,
   type GetSummaryResponse,
+  type CategoryBlockByCurrency,
+  type TrendsBlockByCurrency,
+  type MerchantsBlockByCurrency,
+  type GetOffersParams,
 } from '@/lib/api';
 
 export function useSettings(): {
@@ -72,12 +79,14 @@ export async function submitSetup(data: SetupProfilePayload): Promise<Settings> 
 export interface TransactionFilters {
   card?: string;
   cards?: string;
+  bankAccounts?: string;
   from?: string;
   to?: string;
   category?: Category;
   search?: string;
   tags?: string;
   direction?: string;
+  source?: string;
   amountMin?: number;
   amountMax?: number;
   limit?: number;
@@ -89,12 +98,21 @@ const EMPTY_SUMMARY: GetSummaryResponse = {
   deltaPercent: 0,
   period: 'This month',
   sparklineData: [{ value: 0 }],
+  mixedCurrency: false,
 };
+
+function isUsableSummary(res: GetSummaryResponse | null | undefined): boolean {
+  if (!res) return false;
+  if (res.mixedCurrency) return true;
+  return typeof res.totalSpend === 'number';
+}
 
 export function useTransactions(filters: TransactionFilters = {}) {
   const [transactions, setTransactions] = useState<import('@/lib/types').Transaction[]>([]);
   const [total, setTotal] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0);
+  const [totalAmount, setTotalAmount] = useState<number | null>(0);
+  const [totalsByCurrency, setTotalsByCurrency] = useState<{ currency: string; amount: number }[]>([]);
+  const [mixedCurrency, setMixedCurrency] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -112,20 +130,27 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (filters.to) params.to = filters.to;
       if (filters.category) params.category = filters.category;
       if (filters.search) params.search = filters.search;
-      if (filters.tags) (params as Record<string, unknown>).tags = filters.tags;
+      if (filters.tags) params.tags = filters.tags;
       if (filters.direction) params.direction = filters.direction;
+      if (filters.source) params.source = filters.source;
+      if (filters.bankAccounts) params.bank_accounts = filters.bankAccounts;
       if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
       if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
 
       const result = await apiGetTransactions(params);
       setTransactions(Array.isArray(result?.transactions) ? result.transactions : []);
       setTotal(typeof result?.total === 'number' ? result.total : 0);
-      setTotalAmount(typeof result?.totalAmount === 'number' ? result.totalAmount : 0);
+      const ta = result?.totalAmount;
+      setTotalAmount(typeof ta === 'number' ? ta : ta === null ? null : 0);
+      setTotalsByCurrency(Array.isArray(result?.totalsByCurrency) ? result.totalsByCurrency : []);
+      setMixedCurrency(!!result?.mixedCurrency);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
       setTransactions([]);
       setTotal(0);
       setTotalAmount(0);
+      setTotalsByCurrency([]);
+      setMixedCurrency(false);
     } finally {
       setLoading(false);
     }
@@ -138,6 +163,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.search,
     filters.tags,
     filters.direction,
+    filters.source,
+    filters.bankAccounts,
     filters.amountMin,
     filters.amountMax,
     filters.limit,
@@ -160,15 +187,20 @@ export function useTransactions(filters: TransactionFilters = {}) {
         if (filters.to) params.to = filters.to;
         if (filters.category) params.category = filters.category;
         if (filters.search) params.search = filters.search;
-        if (filters.tags) (params as Record<string, unknown>).tags = filters.tags;
+        if (filters.tags) params.tags = filters.tags;
         if (filters.direction) params.direction = filters.direction;
+        if (filters.source) params.source = filters.source;
+        if (filters.bankAccounts) params.bank_accounts = filters.bankAccounts;
         if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
         if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
         const result = await apiGetTransactions(params);
         if (!cancelled) {
           setTransactions(Array.isArray(result?.transactions) ? result.transactions : []);
           setTotal(typeof result?.total === 'number' ? result.total : 0);
-          setTotalAmount(typeof result?.totalAmount === 'number' ? result.totalAmount : 0);
+          const ta = result?.totalAmount;
+          setTotalAmount(typeof ta === 'number' ? ta : ta === null ? null : 0);
+          setTotalsByCurrency(Array.isArray(result?.totalsByCurrency) ? result.totalsByCurrency : []);
+          setMixedCurrency(!!result?.mixedCurrency);
         }
       } catch (e) {
         if (!cancelled) {
@@ -176,6 +208,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
           setTransactions([]);
           setTotal(0);
           setTotalAmount(0);
+          setTotalsByCurrency([]);
+          setMixedCurrency(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -191,13 +225,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.search,
     filters.tags,
     filters.direction,
+    filters.source,
+    filters.bankAccounts,
     filters.amountMin,
     filters.amountMax,
     filters.limit,
     filters.offset,
   ]);
 
-  return { transactions, total, totalAmount, loading, error, refetch };
+  return { transactions, total, totalAmount, totalsByCurrency, mixedCurrency, loading, error, refetch };
 }
 
 export interface AnalyticsFilters {
@@ -209,13 +245,18 @@ export interface AnalyticsFilters {
   direction?: string;
   amountMin?: number;
   amountMax?: number;
+  source?: string;
+  bankAccounts?: string;
 }
 
 export function useAnalytics(filters: AnalyticsFilters = {}) {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [categories, setCategories] = useState<import('@/lib/types').CategoryBreakdown[]>([]);
+  const [categoriesByCurrency, setCategoriesByCurrency] = useState<CategoryBlockByCurrency[]>([]);
   const [trends, setTrends] = useState<import('@/lib/types').MonthlyTrend[]>([]);
+  const [trendsByCurrency, setTrendsByCurrency] = useState<TrendsBlockByCurrency[]>([]);
   const [merchants, setMerchants] = useState<import('@/lib/types').MerchantSpend[]>([]);
+  const [merchantsByCurrency, setMerchantsByCurrency] = useState<MerchantsBlockByCurrency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -232,6 +273,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
         ...(filters.direction ? { direction: filters.direction } : {}),
         ...(filters.amountMin !== undefined ? { amount_min: filters.amountMin } : {}),
         ...(filters.amountMax !== undefined ? { amount_max: filters.amountMax } : {}),
+        ...(filters.source ? { source: filters.source } : {}),
+        ...(filters.bankAccounts ? { bank_accounts: filters.bankAccounts } : {}),
       };
       const hasParams = Object.keys(params).length > 0;
       const apiParams = hasParams ? params : undefined;
@@ -242,20 +285,37 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
           getTrends(apiParams),
           getMerchants(apiParams),
         ]);
-      setSummary(
-        summaryRes && typeof summaryRes.totalSpend === 'number'
-          ? summaryRes
-          : EMPTY_SUMMARY
-      );
-      setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
-      setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
-      setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+      setSummary(isUsableSummary(summaryRes) ? summaryRes! : EMPTY_SUMMARY);
+      if (categoriesRes?.mixedCurrency && categoriesRes.byCurrency?.length) {
+        setCategories([]);
+        setCategoriesByCurrency(categoriesRes.byCurrency);
+      } else {
+        setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
+        setCategoriesByCurrency([]);
+      }
+      if (trendsRes?.mixedCurrency && trendsRes.trendsByCurrency?.length) {
+        setTrends([]);
+        setTrendsByCurrency(trendsRes.trendsByCurrency);
+      } else {
+        setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
+        setTrendsByCurrency([]);
+      }
+      if (merchantsRes?.mixedCurrency && merchantsRes.merchantsByCurrency?.length) {
+        setMerchants([]);
+        setMerchantsByCurrency(merchantsRes.merchantsByCurrency);
+      } else {
+        setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+        setMerchantsByCurrency([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
       setSummary(EMPTY_SUMMARY);
       setCategories([]);
+      setCategoriesByCurrency([]);
       setTrends([]);
+      setTrendsByCurrency([]);
       setMerchants([]);
+      setMerchantsByCurrency([]);
     } finally {
       setLoading(false);
     }
@@ -268,6 +328,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
     filters.direction,
     filters.amountMin,
     filters.amountMax,
+    filters.source,
+    filters.bankAccounts,
   ]);
 
   useEffect(() => {
@@ -285,6 +347,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
           ...(filters.direction ? { direction: filters.direction } : {}),
           ...(filters.amountMin !== undefined ? { amount_min: filters.amountMin } : {}),
           ...(filters.amountMax !== undefined ? { amount_max: filters.amountMax } : {}),
+          ...(filters.source ? { source: filters.source } : {}),
+          ...(filters.bankAccounts ? { bank_accounts: filters.bankAccounts } : {}),
         };
         const hasParams = Object.keys(params).length > 0;
         const apiParams = hasParams ? params : undefined;
@@ -296,20 +360,39 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
             getMerchants(apiParams),
           ]);
         if (!cancelled) {
-          setSummary(
-            summaryRes && typeof summaryRes.totalSpend === 'number' ? summaryRes : EMPTY_SUMMARY
-          );
-          setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
-          setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
-          setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+          setSummary(isUsableSummary(summaryRes) ? summaryRes! : EMPTY_SUMMARY);
+          if (categoriesRes?.mixedCurrency && categoriesRes.byCurrency?.length) {
+            setCategories([]);
+            setCategoriesByCurrency(categoriesRes.byCurrency);
+          } else {
+            setCategories(Array.isArray(categoriesRes?.breakdown) ? categoriesRes.breakdown : []);
+            setCategoriesByCurrency([]);
+          }
+          if (trendsRes?.mixedCurrency && trendsRes.trendsByCurrency?.length) {
+            setTrends([]);
+            setTrendsByCurrency(trendsRes.trendsByCurrency);
+          } else {
+            setTrends(Array.isArray(trendsRes?.trends) ? trendsRes.trends : []);
+            setTrendsByCurrency([]);
+          }
+          if (merchantsRes?.mixedCurrency && merchantsRes.merchantsByCurrency?.length) {
+            setMerchants([]);
+            setMerchantsByCurrency(merchantsRes.merchantsByCurrency);
+          } else {
+            setMerchants(Array.isArray(merchantsRes?.merchants) ? merchantsRes.merchants : []);
+            setMerchantsByCurrency([]);
+          }
         }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e : new Error(String(e)));
           setSummary(EMPTY_SUMMARY);
           setCategories([]);
+          setCategoriesByCurrency([]);
           setTrends([]);
+          setTrendsByCurrency([]);
           setMerchants([]);
+          setMerchantsByCurrency([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -325,13 +408,18 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
     filters.direction,
     filters.amountMin,
     filters.amountMax,
+    filters.source,
+    filters.bankAccounts,
   ]);
 
   return {
     summary,
     categories,
+    categoriesByCurrency,
     trends,
+    trendsByCurrency,
     merchants,
+    merchantsByCurrency,
     loading,
     error,
     refetch,
@@ -416,4 +504,81 @@ export function useProcessingLogPoller(
       clearInterval(timer);
     };
   }, [onLog, intervalMs]);
+}
+
+// ---------------------------------------------------------------------------
+// Offers
+// ---------------------------------------------------------------------------
+
+export function useOffers(params: GetOffersParams = {}): {
+  offers: Offer[];
+  total: number;
+  lastSyncAt: string | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+} {
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [total, setTotal] = useState(0);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await apiGetOffers(params);
+      setOffers(result.offers);
+      setTotal(result.total);
+      setLastSyncAt(result.lastSyncAt);
+    } catch (e) {
+      setError(e instanceof Error ? e : new Error(String(e)));
+    } finally {
+      setLoading(false);
+    }
+  }, [JSON.stringify(params)]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { offers, total, lastSyncAt, loading, error, refetch };
+}
+
+// ---------------------------------------------------------------------------
+// Milestones
+// ---------------------------------------------------------------------------
+
+export function useMilestones(cardId?: string): {
+  milestones: Milestone[];
+  total: number;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+} {
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await apiGetMilestones(cardId ? { card_id: cardId } : {});
+      setMilestones(result.milestones);
+      setTotal(result.total);
+    } catch (e) {
+      setError(e instanceof Error ? e : new Error(String(e)));
+    } finally {
+      setLoading(false);
+    }
+  }, [cardId]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { milestones, total, loading, error, refetch };
 }

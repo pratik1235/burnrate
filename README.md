@@ -1,8 +1,8 @@
 # Burnrate
 
-**Privacy-first, local-only credit card spend analytics.**
+**Privacy-first credit card and bank-account spend analytics.**
 
-Burnrate is a personal finance analytics app that runs entirely on your laptop. Your financial data never leaves your machine — no cloud, no servers, no tracking.
+Burnrate is a personal finance app that keeps imported **statements and transactions in a local database** on your machine — no Burnrate-hosted cloud for your data, no telemetry. Optional **Gmail autosync** and **offers** syncing use the network only when you use those features (see **Privacy First** below).
 
 **[→ Website & demo](https://pratik1235.github.io/burnrate)**
 
@@ -11,22 +11,28 @@ Burnrate is a personal finance analytics app that runs entirely on your laptop. 
 ## Features
 
 - **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, IndusInd, Kotak, Standard Chartered, YES, AU, RBL
-- **Auto-import** — Drop PDF statements or set up a watch folder for automatic processing
+- **Auto-import** — Drop credit card statement PDFs or set up a watch folder for automatic processing
+- **Bank account statements (CSV)** — Import savings/current account CSVs from major Indian banks (HDFC, ICICI, SBI, Axis, plus a generic auto-detect parser). Statements and transactions carry a **CC** vs **BANK** source so you can filter and review them separately. Credit card bill payments on bank statements are excluded from spend totals so they are not double-counted with card-side payments.
+- **Statements hub** — Browse imported statements (card and bank), filter by bank and period, and manage uploads from one place
+- **Offers & benefits** — Offers are fetched from public bank and aggregator pages, normalized, cached locally, and shown in a searchable catalog. Highlight offers that match your cards, hide noise, add your own manual offers, and refresh on demand. Always verify details with your issuer before relying on an offer.
+- **Gmail statement autosync (optional)** — Opt in to read-only Gmail OAuth (PKCE). Matching statement attachments (PDF, CSV, XLS/XLSX) are saved to your watch folder or default uploads and processed like manual drops. Configure OAuth in the backend; connect from **Customize** and monitor sync from the navbar.
 - **Smart categorization** — Transactions auto-categorized with customizable categories and keywords
 - **Rich analytics** — Spend trends, category breakdowns, merchant insights, credit utilization
-- **Multi-card filtering across transactions and metrics** — Filter by cards, categories, date range, amount, direction, and tags
+- **Multi-card and multi-source filtering** — Filter transactions and metrics by cards, **bank accounts** (bank + last 4), **source** (credit card / bank / all), categories, date range, amount, direction, and tags
 - **Multiple Views** — Analyze transactions per statement, consolidate across multiple cards, or apply flexible filters for any custom combination
 - **Transaction tagging** — Define and apply custom tags to transactions
 - **CSV export** — Export filtered transactions for external analysis
-- **Statement management** — Reparse or remove imported statements
-- **Google Apps Script** — Auto-download statements from Gmail (optional)
+- **Statement management** — Reparse or remove imported statements; inline password entry for encrypted PDFs when needed
+- **Google Apps Script** — Alternative workflow: auto-download statements from Gmail into a folder the app watches ([`apps-script/`](apps-script/))
 
 ## Privacy First
 
-- All data stored locally in SQLite
-- No network requests to external services
-- No telemetry, analytics, or tracking
-- Your statements and transactions stay on your machine
+- All analytics and statement data live in a local **SQLite** database on your machine
+- **No telemetry, analytics, or tracking** in the core product
+- **Optional network features** (only if you enable or use them):
+  - **Gmail autosync** uses Google’s **read-only** Gmail scope; tokens are stored encrypted. See [docs/plans/gmail-autosync.md](docs/plans/gmail-autosync.md).
+  - **Offers** fetches public offer pages on a schedule for convenience; offers are cached locally. See [docs/plans/offers-benefits.md](docs/plans/offers-benefits.md).
+- With those options turned off, routine spend analytics do not require outbound calls to third parties
 
 > **Note:** Currently, only **HDFC**, **ICICI**, **Axis**, and **Indian Bank** credit cards are officially supported and tested. Other bank cards *may* work, but stability is not guaranteed at this time. Support for many more cards is coming soon! If you'd like to request support for a new card, please [create a GitHub issue](https://github.com/pratik1235/burnrate/issues/new?title=Card%20support%20request:%20%3CYour%20Bank%3E&labels=enhancement).
 
@@ -99,8 +105,8 @@ Open http://localhost:5173 in your browser.
 ### First Run
 
 1. Complete the setup wizard (name, DOB, cards)
-2. Set a watch folder or drag-and-drop statement PDFs
-3. Explore your spend analytics
+2. Set a watch folder or import files (credit card statement PDFs, bank account CSVs)
+3. Explore your spend analytics — use **Customize** for bank CSV imports or optional Gmail autosync; use **Offers** in the nav for card benefits
 
 ## Screenshots
 
@@ -176,7 +182,10 @@ Burnrate follows **spec-driven development** — all new features require a spec
 | [Project Constitution](docs/CONSTITUTION.md) | Project guidelines, code constraints, security standards |
 | [Requirements](docs/requirements.md) | Functional and non-functional requirements |
 | [Architecture](docs/architecture.md) | System architecture, data models, API docs, diagrams |
-| [Feature Plans](docs/plans/) | Detailed plans for each backend feature |
+| [Feature Plans](docs/plans/) | Index of feature specs |
+| [Gmail autosync](docs/plans/gmail-autosync.md) | Optional OAuth Gmail attachment import |
+| [Offers & benefits](docs/plans/offers-benefits.md) | Offer providers, sync, API, and UI |
+| [Bank statements](docs/plans/bank-statements.md) | Bank CSV import, `CC`/`BANK` source, analytics rules |
 
 ## License
 

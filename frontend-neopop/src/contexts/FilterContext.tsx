@@ -8,14 +8,18 @@ import {
 } from 'react';
 
 export type Direction = 'all' | 'incoming' | 'outgoing';
+export type SourceFilter = 'all' | 'CC' | 'BANK';
 
 export interface FilterState {
   selectedCards: string[];
+  /** BANK account keys `bank:last4` from GET /transactions/bank-accounts */
+  selectedBankAccounts: string[];
   selectedCategories: string[];
   selectedTags: string[];
   dateRange: { from?: string; to?: string };
   amountRange: { min?: number; max?: number };
   direction: Direction;
+  source: SourceFilter;
 }
 
 export interface FilterContextValue {
@@ -27,11 +31,13 @@ export interface FilterContextValue {
 
 const defaultState: FilterState = {
   selectedCards: [],
+  selectedBankAccounts: [],
   selectedCategories: [],
   selectedTags: [],
   dateRange: {},
   amountRange: {},
   direction: 'all',
+  source: 'all',
 };
 
 const FilterContext = createContext<FilterContextValue | null>(null);
@@ -53,13 +59,15 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const hasActiveFilters = useMemo(() => {
     return (
       filters.selectedCards.length > 0 ||
+      filters.selectedBankAccounts.length > 0 ||
       filters.selectedCategories.length > 0 ||
       filters.selectedTags.length > 0 ||
       !!filters.dateRange.from ||
       !!filters.dateRange.to ||
       filters.amountRange.min !== undefined ||
       filters.amountRange.max !== undefined ||
-      filters.direction !== 'all'
+      filters.direction !== 'all' ||
+      filters.source !== 'all'
     );
   }, [filters]);
 

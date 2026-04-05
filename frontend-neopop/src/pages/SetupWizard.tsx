@@ -33,6 +33,7 @@ export function SetupWizard() {
       dobMonth: settings.dobMonth,
       dobYear: settings.dobYear,
       watchFolder: settings.watchFolder,
+      displayCurrency: settings.displayCurrency ?? '',
       cards: settings.cards?.map((c) => ({ bank: c.bank, last4: c.last4 })),
     };
   }, [settings]);
@@ -44,6 +45,7 @@ export function SetupWizard() {
     dobYear: string;
     cards: { bank: string; last4: string }[];
     watchFolder: string;
+    displayCurrency: string;
   }) => {
     setSubmitting(true);
     try {
@@ -54,6 +56,7 @@ export function SetupWizard() {
           dobMonth: data.dobMonth,
           dobYear: data.dobYear,
           watchFolder: data.watchFolder,
+          displayCurrency: data.displayCurrency || undefined,
           cards: data.cards,
         });
         toast.success('Profile updated!');
@@ -68,6 +71,7 @@ export function SetupWizard() {
             last4: c.last4,
           })),
           watchFolder: data.watchFolder,
+          displayCurrency: data.displayCurrency || undefined,
         });
         toast.success('Profile saved! Redirecting to dashboard...');
       }

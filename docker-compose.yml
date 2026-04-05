@@ -1,9 +1,13 @@
+# Security: map container port 8000 to the host loopback only so the API is not
+# reachable from other machines on the LAN. The app has no authentication; see
+# docs/security-deployment.md. To expose on all interfaces (not recommended), use
+# "8000:8000" instead.
 services:
   burnrate:
     build: .
     image: burnrate:latest
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - burnrate_data:/data
       # Mount your statements folder (read-only is sufficient)

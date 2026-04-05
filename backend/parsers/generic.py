@@ -13,6 +13,7 @@ from typing import List, Optional, Tuple
 import pdfplumber
 
 from backend.parsers.base import BaseParser, ParsedStatement, ParsedTransaction
+from backend.parsers.currency_infer import infer_currency_from_document_text
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +39,12 @@ class GenericParser(BaseParser):
         total_amount_due = self._extract_total_amount_due(full_text)
         credit_limit = self._extract_credit_limit(full_text)
         transactions = self._extract_transactions(all_lines)
+        currency = infer_currency_from_document_text(full_text)
 
         logger.info(
-            "Generic parse (%s): card=%s period=%s..%s txns=%d due=%s limit=%s",
+            "Generic parse (%s): card=%s period=%s..%s txns=%d due=%s limit=%s currency=%s",
             self._bank, card_last4, period_start, period_end,
-            len(transactions), total_amount_due, credit_limit,
+            len(transactions), total_amount_due, credit_limit, currency,
         )
 
         return ParsedStatement(
@@ -53,6 +55,7 @@ class GenericParser(BaseParser):
             card_last4=card_last4,
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
+            currency=currency,
         )
 
     def _extract_period(self, text: str) -> Tuple[Optional[date], Optional[date]]:

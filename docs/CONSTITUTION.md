@@ -7,18 +7,18 @@
 
 ## 1. Project Philosophy
 
-Burnrate is a **privacy-first, local-only** credit card spend analytics application. The following principles are non-negotiable:
+Burnrate is a **privacy-first, local-first** credit card and bank statement analytics application. The following principles are non-negotiable:
 
 ### 1.1 Privacy-First
 
-- **Financial data never leaves the machine.** All processing, storage, and analytics occur locally.
+- **Financial data never leaves the machine** for core spend analytics. Processing, storage, and analytics for transactions and statements occur locally unless a **documented, feature-scoped** integration explicitly requires otherwise (and only for that feature’s purpose).
 - **No telemetry.** The application does not collect usage statistics, crash reports, or any form of analytics.
-- **No external network calls.** The application does not make outbound requests to third-party services, APIs, or cloud infrastructure.
+- **Feature-scoped network access is allowed** where the product intentionally integrates with online services. Examples include **milestones**, **offers and benefits fetching**, **Gmail (or similar email) integration**, and comparable features that users opt into or clearly expect to use the network. Such features must be called out in specs/plans, minimize data sent, and must not weaken the local-first guarantee for unrelated core financial flows.
 
 ### 1.2 Local-Only
 
-- All data resides on the user's device or within their controlled infrastructure.
-- No cloud sync, no remote backups, no SaaS dependencies.
+- Core financial data resides on the user's device or within their controlled infrastructure.
+- No cloud sync, remote backups, or SaaS dependencies **for core spend/statement analytics**; **documented network features** (§1.1, §8.1) may use external services only as specified for those features.
 - Users retain full ownership and control of their financial data.
 
 ### 1.3 Trust Through Transparency
@@ -234,7 +234,8 @@ Plans must include:
 
 ### 8.1 Network
 
-- **No external network requests** from the application. This is a core privacy guarantee.
+- **Default: local-first.** Core transaction and statement handling must not depend on the internet; privacy guarantees for that data remain as in §1.
+- **Exceptions:** Outbound requests are permitted only for **explicit, documented features** that require online services—e.g. **milestones**, **offers/benefits fetching**, **Gmail (or email) integration**, and similar integrations. Implementations must stay within the scope of each feature’s spec, avoid telemetry, and must not exfiltrate bulk financial datasets except where the feature’s contract requires it and the user understands that flow.
 
 ### 8.2 Database
 
@@ -254,6 +255,13 @@ Plans must include:
 
 - **Category slugs must be stable.** They are used as keys in the database and API.
 - Do not rename slugs without migration logic; they may be referenced externally.
+
+### 8.6 Currency and analytics
+
+- **No outbound FX or exchange-rate APIs** in the default build. Combined totals across currencies require **user-maintained local rates** (future); until then the product must not silently merge unlike ISO 4217 codes.
+- **Per-row truth:** `transactions.currency` (and optional `statements.currency`) store the statement-native code (default INR for legacy rows).
+- **Analytics contract:** When filters span **more than one** currency, list endpoints return **per-currency splits** (`totalSpendByCurrency`, `totalsByCurrency`, `byCurrency`, etc.) and omit a single combined scalar where it would be misleading. Single-currency views keep backward-compatible numeric totals.
+- **Settings `display_currency`:** Optional UI preference only (e.g. ordering or copy); it does **not** convert stored amounts.
 
 ---
 
@@ -295,4 +303,4 @@ Plans must include:
 
 ---
 
-*Last updated: March 2025*
+*Last updated: March 2026*

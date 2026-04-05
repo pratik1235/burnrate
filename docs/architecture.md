@@ -3,7 +3,7 @@
 **Version:** 0.2.0  
 **Last Updated:** March 2026
 
-Burnrate is a **privacy-first, local-only** credit card spend analytics application. All data stays on the user's machine—no cloud sync, no telemetry, no external API calls for analytics.
+Burnrate is a **privacy-first, local-first** credit card and bank statement analytics application. Core spend data and parsing stay on the user's machine—no cloud sync and no telemetry. **Core analytics** do not call third-party APIs. Optional **Gmail read-only** autosync is documented in [docs/plans/gmail-autosync.md](plans/gmail-autosync.md) and uses `/api/gmail/*` only after the user connects OAuth. Bank account statements are ingested as CSV with a `source` dimension (`CC` | `BANK`); see [docs/plans/bank-statements.md](plans/bank-statements.md).
 
 ---
 
@@ -65,7 +65,7 @@ Burnrate is a **privacy-first, local-only** credit card spend analytics applicat
   │                                                                                │
   │  ┌─────────────────────────────────────────────────────────────────────────┐  │
   │  │ ROUTERS: /api/settings | /api/cards | /api/statements | /api/transactions │  │
-  │  │          /api/analytics | /api/categories | /api/tags                    │  │
+  │  │          /api/analytics | /api/categories | /api/tags | /api/gmail/*     │  │
   │  └─────────────────────────────────────────────────────────────────────────┘  │
   │                                                                                │
   │  ┌─────────────────────────────────────────────────────────────────────────┐  │

@@ -2,6 +2,7 @@ import { Button, Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { Settings } from 'lucide-react';
+import { SyncStatus } from '@/components/SyncStatus';
 
 interface NavbarProps {
   activeTab?: string;
@@ -14,6 +15,9 @@ const TABS = [
   { id: 'cards', label: 'Cards' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'analytics', label: 'Analytics' },
+  { id: 'statements', label: 'Statements' },
+  { id: 'offers', label: 'Offers' },
+  { id: 'milestones', label: 'Milestones' },
   { id: 'customize', label: 'Customize' },
 ];
 
@@ -57,27 +61,36 @@ export function Navbar({ activeTab = 'dashboard', onTabChange, className }: Navb
         ))}
       </div>
 
-      <Button
-        kind="elevated"
-        size="small"
-        colorMode="dark"
-        variant="primary"
-        onClick={() => onTabChange?.('setup')}
+      <div
         style={{
           position: 'absolute',
           right: 24,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          width: 36,
-          height: 36,
-          color: 'rgba(255,255,255,0.6)',
-          backgroundColor: 'rgba(255,255,255,0.05)',
-          padding: 0,
+          gap: 12,
         }}
       >
-        <Settings size={18} />
-      </Button>
+        <SyncStatus />
+        <Button
+          kind="elevated"
+          size="small"
+          colorMode="dark"
+          variant="primary"
+          onClick={() => onTabChange?.('setup')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 36,
+            height: 36,
+            color: 'rgba(255,255,255,0.6)',
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            padding: 0,
+          }}
+        >
+          <Settings size={18} />
+        </Button>
+      </div>
     </nav>
   );
 }

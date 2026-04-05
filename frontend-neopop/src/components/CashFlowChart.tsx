@@ -18,12 +18,12 @@ interface CashFlowData {
   spend: number;
 }
 
-interface CashFlowChartProps {
-  data: CashFlowData[];
-  className?: string;
-}
-
-function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+  currency = 'INR',
+}: TooltipProps<number, string> & { currency?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div
@@ -37,13 +37,19 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
     >
       <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)" style={{ marginBottom: 4 }}>{label}</Typography>
       <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-        {formatCurrency(payload[0].value as number)}
+        {formatCurrency(payload[0].value as number, currency)}
       </Typography>
     </div>
   );
 }
 
-export function CashFlowChart({ data, className }: CashFlowChartProps) {
+interface CashFlowChartProps {
+  data: CashFlowData[];
+  currency?: string;
+  className?: string;
+}
+
+export function CashFlowChart({ data, currency = 'INR', className }: CashFlowChartProps) {
   return (
     <div
       style={{ padding: 20, minWidth: 320, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
@@ -51,7 +57,7 @@ export function CashFlowChart({ data, className }: CashFlowChartProps) {
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-          Cash Flow
+          Cash Flow ({currency})
         </Typography>
         <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
           {data.length} months
@@ -77,10 +83,10 @@ export function CashFlowChart({ data, className }: CashFlowChartProps) {
             axisLine={false}
             tickLine={false}
             tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
-            tickFormatter={(v) => formatCurrencyCompact(v)}
+            tickFormatter={(v) => formatCurrencyCompact(v, currency)}
             width={45}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 6 }} />
+          <Tooltip content={<CustomTooltip currency={currency} />} cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 6 }} />
           <Bar
             dataKey="spend"
             fill="url(#neopopBarGradient)"

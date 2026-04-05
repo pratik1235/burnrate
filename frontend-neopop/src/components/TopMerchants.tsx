@@ -6,10 +6,11 @@ import type { MerchantSpend } from '@/lib/types';
 
 interface TopMerchantsProps {
   data: MerchantSpend[];
+  currency?: string;
   className?: string;
 }
 
-export function TopMerchants({ data, className }: TopMerchantsProps) {
+export function TopMerchants({ data, currency = 'INR', className }: TopMerchantsProps) {
   const maxAmount = Math.max(...data.map((d) => d.amount), 1);
 
   return (
@@ -18,7 +19,7 @@ export function TopMerchants({ data, className }: TopMerchantsProps) {
       className={className}
     >
       <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white} style={{ marginBottom: 16 }}>
-        Top Merchants
+        Top Merchants ({currency})
       </Typography>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -35,7 +36,7 @@ export function TopMerchants({ data, className }: TopMerchantsProps) {
                     {merchant.merchant}
                   </Typography>
                   <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color={mainColors.white} style={{ marginLeft: 8 }}>
-                    {formatCurrency(merchant.amount)}
+                    {formatCurrency(merchant.amount, currency)}
                   </Typography>
                 </div>
                 <div

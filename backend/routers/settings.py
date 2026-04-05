@@ -37,6 +37,18 @@ def _validate_watch_folder(folder: Optional[str]) -> Optional[str]:
     return str(resolved)
 
 
+def _normalize_display_currency(value: Optional[str]) -> Optional[str]:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    code = str(value).strip().upper()[:3]
+    if code not in ("INR", "USD"):
+        raise HTTPException(
+            status_code=400,
+            detail="display_currency must be INR or USD",
+        )
+    return code
+
+
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 # Global observer for folder watcher - set by main.py
@@ -66,6 +78,7 @@ class SetupInput(BaseModel):
     dob_month: Optional[str] = None
     dob_year: Optional[str] = None
     watch_folder: Optional[str] = None
+    display_currency: Optional[str] = None
     cards: List[CardInput] = []
 
 
@@ -75,6 +88,7 @@ class SettingsUpdateInput(BaseModel):
     dob_month: Optional[str] = None
     dob_year: Optional[str] = None
     watch_folder: Optional[str] = None
+    display_currency: Optional[str] = None
     cards: Optional[List[CardInput]] = None
 
 
@@ -95,6 +109,7 @@ def get_settings(db: Session = Depends(get_db)) -> Dict[str, Any]:
             "dob_month": settings.dob_month,
             "dob_year": settings.dob_year,
             "watch_folder": settings.watch_folder,
+            "display_currency": getattr(settings, "display_currency", None),
             "created_at": settings.created_at.isoformat() if settings.created_at else None,
             "updated_at": settings.updated_at.isoformat() if settings.updated_at else None,
         },
@@ -121,6 +136,7 @@ def setup(
         raise HTTPException(status_code=400, detail="Setup already completed. Use PUT /api/settings to update.")
 
     validated_folder = _validate_watch_folder(body.watch_folder)
+    disp_cur = _normalize_display_currency(body.display_currency)
 
     settings = Settings(
         name=body.name,
@@ -128,6 +144,7 @@ def setup(
         dob_month=body.dob_month,
         dob_year=body.dob_year,
         watch_folder=validated_folder,
+        display_currency=disp_cur,
     )
     db.add(settings)
     db.flush()
@@ -177,6 +194,9 @@ def update_settings(
         settings.dob_year = body.dob_year
     if body.watch_folder is not None:
         settings.watch_folder = _validate_watch_folder(body.watch_folder)
+    update_data = body.model_dump(exclude_unset=True)
+    if "display_currency" in update_data:
+        settings.display_currency = _normalize_display_currency(body.display_currency)
 
     cards_added = 0
     if body.cards is not None:

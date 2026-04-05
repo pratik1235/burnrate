@@ -1,0 +1,4 @@
+# Development and tests (install with: pip install -r requirements-dev.txt)
+-r requirements.txt
+httpx>=0.27.0
+pytest>=8.0.0

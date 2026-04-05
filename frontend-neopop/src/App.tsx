@@ -4,9 +4,12 @@ import { ToastContainer, toast } from '@/components/Toast';
 import { SetupWizard } from '@/pages/SetupWizard';
 import { Dashboard } from '@/pages/Dashboard';
 import { Cards } from '@/pages/Cards';
+import { Statements } from '@/pages/Statements';
 import { Transactions } from '@/pages/Transactions';
 import { Analytics } from '@/pages/Analytics';
 import { Customize } from '@/pages/Customize';
+import { Offers } from '@/pages/Offers';
+import { Milestones } from '@/pages/Milestones';
 import { FilterProvider } from '@/contexts/FilterContext';
 import { useSettings, useProcessingLogPoller } from '@/hooks/useApi';
 
@@ -77,9 +80,13 @@ export default function App() {
         <Route path="/setup" element={<SetupWizard />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/cards" element={<Cards />} />
+        <Route path="/statements" element={<Statements />} />
+        <Route path="/bank-statements" element={<Navigate to="/statements" replace />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/customize" element={<Customize />} />
+        <Route path="/offers" element={<Offers />} />
+        <Route path="/milestones" element={<Milestones />} />
       </Routes>
       </FilterProvider>
     </BrowserRouter>

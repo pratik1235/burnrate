@@ -9,6 +9,7 @@ interface CardSpend {
   bank: Bank;
   last4: string;
   amount: number;
+  currency?: string;
 }
 
 interface CardComparisonProps {
@@ -39,7 +40,7 @@ export function CardComparison({ data, period, className }: CardComparisonProps)
           const config = BANK_CONFIG[card.bank];
           const widthPct = (card.amount / maxAmount) * 100;
           return (
-            <div key={`${card.bank}-${card.last4}`}>
+            <div key={`${card.bank}-${card.last4}-${card.currency ?? 'INR'}`}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div
@@ -68,7 +69,7 @@ export function CardComparison({ data, period, className }: CardComparisonProps)
                   </div>
                 </div>
                 <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color={mainColors.white}>
-                  {formatCurrency(card.amount)}
+                  {formatCurrency(card.amount, card.currency ?? 'INR')}
                 </Typography>
               </div>
               <div

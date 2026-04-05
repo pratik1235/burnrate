@@ -209,17 +209,20 @@ This document defines the functional requirements (FR) and non-functional requir
 
 ---
 
-### FR-013: Google Apps Script (Optional)
+### FR-013: Statement delivery automation (Optional)
 
-**Description:** An optional Google Apps Script deployment shall enable auto-download of statement PDFs from Gmail.
+**Description:** Users may automate statement ingestion via **user-deployed** Google Apps Script ([`apps-script/`](../apps-script/)) and/or via **opt-in in-app Gmail OAuth** (read-only scope; see [docs/plans/gmail-autosync.md](plans/gmail-autosync.md)). Both paths are optional; core analytics remain local-first.
 
 **Acceptance Criteria:**
 
 - [ ] FR-013.1: Script is deployable separately from main application.
 - [ ] FR-013.2: Script identifies statement emails by bank-specific patterns.
 - [ ] FR-013.3: Downloaded PDFs are saved to a user-configurable location (e.g., watch folder).
-- [ ] FR-013.4: Integration is optional; core app has no dependency on Gmail or Google services.
+- [ ] FR-013.4: Integration is optional; default install has no dependency on Gmail until the user connects an account or deploys Apps Script.
 - [ ] FR-013.5: Documentation exists for deployment and configuration.
+- [ ] FR-013.6: In-app Gmail uses OAuth 2.0 with PKCE; tokens are stored encrypted in SQLite (`oauth_credentials`).
+- [ ] FR-013.7: Attachments are written to the configured watch folder or default uploads and processed via the existing statement queue.
+- [ ] FR-013.8: API surface includes status, connect, disconnect, and manual sync (`/api/gmail/*`).
 
 ---
 
@@ -244,7 +247,7 @@ The following entities support the functional requirements. Schema details are a
 
 | Entity | Key Fields |
 |--------|------------|
-| **Settings** | id, name, dob_day, dob_month, dob_year, watch_folder |
+| **Settings** | id, name, dob_day, dob_month, dob_year, watch_folder, last_gmail_sync |
 | **Card** | id, bank, last4 |
 | **Statement** | id, bank, card_last4, period_start, period_end, file_hash, file_path, transaction_count, total_spend, total_amount_due, credit_limit, status, imported_at |
 | **Transaction** | id, statement_id, date, merchant, amount, type, category, description, bank, card_last4, card_id |
@@ -290,6 +293,11 @@ The following entities support the functional requirements. Schema details are a
 | Tags | GET | `/api/tags` |
 | Tags | POST | `/api/tags` |
 | Tags | DELETE | `/api/tags/{id}` |
+| Gmail | GET | `/api/gmail/status` |
+| Gmail | POST | `/api/gmail/auth/start` |
+| Gmail | GET | `/api/gmail/oauth/callback` |
+| Gmail | POST | `/api/gmail/disconnect` |
+| Gmail | POST | `/api/gmail/sync` |
 
 ---
 
@@ -303,7 +311,7 @@ The following entities support the functional requirements. Schema details are a
 
 - [ ] NFR-001.1: No financial data, PII, or transaction details are transmitted to external services.
 - [ ] NFR-001.2: No telemetry, analytics, crash reporting, or usage tracking.
-- [ ] NFR-001.3: No outbound network requests from the application (except optional Gmail via user-deployed Apps Script).
+- [ ] NFR-001.3: No outbound network requests for core analytics; optional, user-authorized flows (in-app Gmail OAuth read-only, user-deployed Apps Script) are documented and scoped ([CONSTITUTION.md](CONSTITUTION.md) §1.1, §8.1).
 - [ ] NFR-001.4: All processing, storage, and analytics occur on the user's device or within their controlled infrastructure.
 - [ ] NFR-001.5: Data ownership and control remain entirely with the user.
 
@@ -417,9 +425,9 @@ The following entities support the functional requirements. Schema details are a
 | FR-010 | `backend/routers/cards.py` |
 | FR-011 | `backend/routers/statements.py` |
 | FR-012 | `backend/routers/settings.py` |
-| FR-013 | `apps-script/` |
+| FR-013 | `apps-script/`, `docs/plans/gmail-autosync.md`, `/api/gmail/*` |
 | FR-014 | `src-tauri/` |
-| NFR-001 | CONSTITUTION.md, no network calls in app |
+| NFR-001 | CONSTITUTION.md, scoped network for documented opt-in features |
 | NFR-002 | `backend/services/statement_processor.py`, `backend/models/database.py` |
 | NFR-003 | `backend/main.py`, routers, config |
 | NFR-004 | `Dockerfile`, `scripts/`, `docs/` |

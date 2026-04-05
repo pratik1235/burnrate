@@ -28,9 +28,12 @@ interface StatUploadProps {
   onBulkUpload?: (files: File[]) => Promise<BulkUploadResult>;
   className?: string;
   compact?: boolean;
+  acceptTypes?: Record<string, string[]>;
+  idleText?: string;
+  subtitleText?: string;
 }
 
-export function StatUpload({ onUpload, onBulkUpload, className, compact = false }: StatUploadProps) {
+export function StatUpload({ onUpload, onBulkUpload, className, compact = false, acceptTypes, idleText, subtitleText }: StatUploadProps) {
   const [status, setStatus] = useState<UploadStatus>('idle');
   const [fileName, setFileName] = useState<string>('');
   const [resultMessage, setResultMessage] = useState<string>('');
@@ -143,7 +146,7 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false 
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/pdf': ['.pdf'] },
+    accept: acceptTypes ?? { 'application/pdf': ['.pdf'] },
     multiple: true,
     disabled: status === 'uploading' || status === 'password_needed',
   });
@@ -210,9 +213,9 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false 
   const statusConfig = {
     idle: {
       icon: onBulkUpload ? Files : Upload,
-      text: compact
+      text: idleText ?? (compact
         ? 'Drop Statement PDFs'
-        : 'Drop your statement PDFs here, or click to browse',
+        : 'Drop your statement PDFs here, or click to browse'),
       color: 'rgba(255,255,255,0.6)',
     },
     uploading: {
@@ -274,7 +277,7 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false 
       </Typography>
       {status === 'idle' && onBulkUpload && (
         <Typography fontType={FontType.BODY} fontSize={compact ? 11 : 12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.4)" style={{ marginTop: 4 }}>
-          {compact ? 'drop multiple files for bulk import' : 'PDF files only — drop multiple files for bulk import'}
+          {subtitleText ?? (compact ? 'drop multiple files for bulk import' : 'PDF files only — drop multiple files for bulk import')}
         </Typography>
       )}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

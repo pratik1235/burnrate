@@ -1,5 +1,7 @@
 export type Bank = 'hdfc' | 'icici' | 'axis' | 'sbi' | 'amex' | 'idfc_first' | 'indusind' | 'kotak' | 'sc' | 'yes' | 'au' | 'rbl' | 'federal' | 'indian_bank';
 
+export type Source = 'CC' | 'BANK';
+
 export type Category = string;
 
 export interface Card {
@@ -19,6 +21,9 @@ export interface Transaction {
   cardId: string;
   bank: Bank;
   cardLast4: string;
+  source: Source;
+  /** ISO 4217 (e.g. INR, USD) */
+  currency?: string;
   tags?: string[];
 }
 
@@ -30,8 +35,15 @@ export interface Statement {
   periodEnd: string;
   transactionCount: number;
   totalSpend: number;
-  status: 'success' | 'parse_error';
+  currency?: string;
+  source: Source;
+  status: 'success' | 'parse_error' | 'password_needed';
   importedAt: string;
+  /** Stored path on the server (full path). */
+  filePath?: string | null;
+  fileName?: string | null;
+  /** Persisted parse failure text when status is parse_error. */
+  statusMessage?: string | null;
 }
 
 export interface CategoryBreakdown {
@@ -79,8 +91,88 @@ export const CATEGORY_COLORS: Record<Category, string> = {
   health: '#10B981',
   groceries: '#14B8A6',
   cc_payment: '#6B7280',
+  cashback: '#06C270',
   other: '#9CA3AF',
 };
+
+// ---------------------------------------------------------------------------
+// Offers & Milestones
+// ---------------------------------------------------------------------------
+
+export interface Offer {
+  id: string;
+  title: string;
+  description?: string;
+  merchant?: string;
+  discountText?: string;
+  offerType?: string;
+  bank?: string;
+  cardTemplateId?: string;
+  network?: string;
+  minTransaction?: number;
+  maxDiscount?: number;
+  validFrom?: string;
+  validUntil?: string;
+  isExpired: boolean;
+  category?: string;
+  source: string;
+  sourceUrl?: string;
+  isUserCreated: boolean;
+  isHidden: boolean;
+  applicableCards: string[];
+  fetchedAt?: string;
+  createdAt?: string;
+}
+
+export interface OfferSyncStatus {
+  providers: {
+    provider: string;
+    lastSyncAt: string | null;
+    lastStatus: string | null;
+    offersFetched: number;
+    errorMessage: string | null;
+  }[];
+}
+
+export interface Milestone {
+  id: string;
+  cardId: string;
+  definitionId?: string;
+  title: string;
+  milestoneType: string;
+  targetAmount: number;
+  periodKind: string;
+  periodConfig?: string;
+  rewardDescription?: string;
+  categoryFilter?: string;
+  excludeCategories?: string;
+  isAutoCreated: boolean;
+  isArchived: boolean;
+  isCustom: boolean;
+  bank?: string;
+  cardLast4?: string;
+  // Progress fields
+  currentAmount: number;
+  percent: number;
+  remaining: number;
+  periodStart?: string;
+  periodEnd?: string;
+  daysLeft: number;
+}
+
+export interface MilestoneDefinition {
+  id: string;
+  source: string;
+  cardTemplateId?: string;
+  bank?: string;
+  title: string;
+  description?: string;
+  milestoneType: string;
+  targetAmount: number;
+  periodKind: string;
+  rewardDescription?: string;
+  rewardValue?: number;
+}
 
 export const CATEGORY_CONFIG: Record<Category, { label: string; icon: string; color: string }> = {
   food: { label: 'Food & Dining', icon: 'UtensilsCrossed', color: CATEGORY_COLORS.food },
@@ -92,5 +184,6 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; icon: string; co
   health: { label: 'Health', icon: 'Heart', color: CATEGORY_COLORS.health },
   groceries: { label: 'Groceries', icon: 'ShoppingCart', color: CATEGORY_COLORS.groceries },
   cc_payment: { label: 'CC Bill Payment', icon: 'CreditCard', color: CATEGORY_COLORS.cc_payment },
+  cashback: { label: 'Cashback', icon: 'Coins', color: CATEGORY_COLORS.cashback },
   other: { label: 'Other', icon: 'MoreHorizontal', color: CATEGORY_COLORS.other },
 };

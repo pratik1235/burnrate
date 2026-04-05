@@ -14,6 +14,9 @@ cd ..
 
 echo ==> Building Windows app with PyInstaller...
 set PYTHONPATH=.
+echo ==> Force pure-Python charset_normalizer for PyInstaller / mypyc compatibility...
+pip uninstall -y charset-normalizer 2>nul
+pip install charset-normalizer --no-binary :all:
 python -m PyInstaller ^
     --name Burnrate ^
     --windowed ^

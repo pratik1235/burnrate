@@ -32,6 +32,16 @@ from backend.models.database import Base, DATA_DIR, UPLOADS_DIR  # noqa: E402
 from backend.main import app, seed_categories  # noqa: E402
 from backend.models.models import Settings, Card  # noqa: E402
 
+from tests.synthetic_profile import (  # noqa: E402
+    DOB_DAY,
+    DOB_MONTH,
+    DOB_YEAR,
+    LAST4_AXIS,
+    LAST4_HDFC,
+    LAST4_ICICI,
+    NAME,
+)
+
 
 def _make_session_factory(db_path: Path):
     url = f"sqlite:///{db_path}"
@@ -88,10 +98,10 @@ def setup_profile(db_session_factory):
     existing = db.query(Settings).first()
     if not existing:
         db.add(Settings(
-            name="Pratik Prakash",
-            dob_day="09",
-            dob_month="02",
-            dob_year="1999",
+            name=NAME,
+            dob_day=DOB_DAY,
+            dob_month=DOB_MONTH,
+            dob_year=DOB_YEAR,
         ))
         db.commit()
     db.close()
@@ -102,9 +112,9 @@ def setup_cards(db_session_factory, setup_profile):
     """Register the three cards used in test fixtures."""
     db = db_session_factory()
     cards_to_add = [
-        ("hdfc", "8087"),
-        ("axis", "9735"),
-        ("icici", "0000"),
+        ("hdfc", LAST4_HDFC),
+        ("axis", LAST4_AXIS),
+        ("icici", LAST4_ICICI),
     ]
     for bank, last4 in cards_to_add:
         existing = db.query(Card).filter(Card.bank == bank, Card.last4 == last4).first()

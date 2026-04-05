@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { Button } from '@cred/neopop-web/lib/components';
-import { Upload, Plus } from 'lucide-react';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
+import { Upload, Plus, RefreshCw } from 'lucide-react';
 
 const meta = {
   title: 'NeoPOP/Button',
@@ -85,9 +86,14 @@ export const Disabled: Story = {
   },
 };
 
+const spinKeyframes = (
+  <style>{`@keyframes storybook-button-spin { to { transform: rotate(360deg); } }`}</style>
+);
+
 export const AllVariants: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {spinKeyframes}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <Button variant="primary" kind="elevated" size="big" colorMode="dark" onClick={() => {}}>
           Primary Elevated
@@ -113,16 +119,119 @@ export const AllVariants: Story = {
           Big
         </Button>
       </div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <Button variant="primary" kind="elevated" size="medium" colorMode="dark" onClick={() => {}}>
-          <Upload size={16} style={{ marginRight: 8 }} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <ButtonWithIcon
+          icon={Upload}
+          variant="primary"
+          kind="elevated"
+          size="medium"
+          colorMode="dark"
+          iconSize={16}
+          onClick={() => {}}
+        >
           Upload PDF
-        </Button>
-        <Button variant="secondary" kind="elevated" size="medium" colorMode="dark" onClick={() => {}}>
-          <Plus size={16} style={{ marginRight: 8 }} />
+        </ButtonWithIcon>
+        <ButtonWithIcon
+          icon={Plus}
+          variant="secondary"
+          kind="elevated"
+          size="medium"
+          colorMode="dark"
+          iconSize={16}
+          onClick={() => {}}
+        >
           Add Card
-        </Button>
+        </ButtonWithIcon>
+        <ButtonWithIcon
+          icon={RefreshCw}
+          variant="primary"
+          kind="elevated"
+          size="small"
+          colorMode="dark"
+          iconProps={{
+            style: { animation: 'storybook-button-spin 1s linear infinite' },
+          }}
+          onClick={() => {}}
+        >
+          Syncing
+        </ButtonWithIcon>
       </div>
     </div>
   ),
+};
+
+const buttonStoryDefaults = {
+  variant: 'primary' as const,
+  kind: 'elevated' as const,
+  size: 'big' as const,
+  colorMode: 'dark' as const,
+  onClick: () => {},
+};
+
+/** Icon + label via `ButtonWithIcon` (NeoPOP `Button` + `Row` + `Typography`). */
+export const ButtonWithIconPrimary: Story = {
+  name: 'ButtonWithIcon — Primary',
+  render: () => (
+    <ButtonWithIcon icon={Upload} {...buttonStoryDefaults}>
+      Upload PDF
+    </ButtonWithIcon>
+  ),
+  args: {
+    children: 'Upload PDF',
+    ...buttonStoryDefaults,
+  },
+};
+
+export const ButtonWithIconSecondarySmall: Story = {
+  name: 'ButtonWithIcon — Secondary small',
+  render: () => (
+    <ButtonWithIcon
+      icon={Plus}
+      variant="secondary"
+      kind="elevated"
+      size="small"
+      colorMode="dark"
+      onClick={() => {}}
+    >
+      Add offer
+    </ButtonWithIcon>
+  ),
+  args: {
+    children: 'Add offer',
+    variant: 'secondary',
+    kind: 'elevated',
+    size: 'small',
+    colorMode: 'dark',
+    onClick: () => {},
+  },
+};
+
+export const ButtonWithIconAnimatedIcon: Story = {
+  name: 'ButtonWithIcon — Icon props',
+  render: () => (
+    <>
+      {spinKeyframes}
+      <ButtonWithIcon
+        icon={RefreshCw}
+        variant="primary"
+        kind="elevated"
+        size="medium"
+        colorMode="dark"
+        iconProps={{
+          style: { animation: 'storybook-button-spin 1s linear infinite' },
+        }}
+        onClick={() => {}}
+      >
+        Sync in progress
+      </ButtonWithIcon>
+    </>
+  ),
+  args: {
+    children: 'Sync in progress',
+    variant: 'primary',
+    kind: 'elevated',
+    size: 'medium',
+    colorMode: 'dark',
+    onClick: () => {},
+  },
 };

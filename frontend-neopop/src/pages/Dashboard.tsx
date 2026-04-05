@@ -8,7 +8,7 @@ import { CashFlowChart } from '@/components/CashFlowChart';
 import { TransactionRow } from '@/components/TransactionRow';
 import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
-import { useAnalytics, useTransactions, useCards } from '@/hooks/useApi';
+import { useAnalytics, useTransactions, useCards, useMilestones } from '@/hooks/useApi';
 import { uploadStatement, uploadStatementsBulk, getStatementPeriods } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/Toast';
@@ -97,9 +97,60 @@ const ClickableSpend = styled.div`
   }
 `;
 
+const MilestonesList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const MilestoneCard = styled.div`
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+`;
+
+const MilestoneHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+`;
+
+const ProgressBarContainer = styled.div`
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+`;
+
+const ProgressBarFill = styled.div<{ $percent: number }>`
+  height: 100%;
+  width: ${(p) => p.$percent}%;
+  background: linear-gradient(90deg, #10B981 0%, #06C270 100%);
+  border-radius: 3px;
+`;
+
+const MilestoneFooter = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+`;
+
 function countActiveFilters(filters: ReturnType<typeof useFilters>['filters']): number {
   let count = 0;
   count += filters.selectedCards.length;
+  count += filters.selectedBankAccounts.length;
   count += filters.selectedCategories.length;
   count += filters.selectedTags.length;
   if (filters.dateRange.from) count++;
@@ -107,6 +158,7 @@ function countActiveFilters(filters: ReturnType<typeof useFilters>['filters']): 
   if (filters.amountRange.min !== undefined) count++;
   if (filters.amountRange.max !== undefined) count++;
   if (filters.direction !== 'all') count++;
+  if (filters.source !== 'all') count++;
   return count;
 }
 
@@ -217,7 +269,7 @@ function StatementPeriodsModal({
                   <div style={{ textAlign: 'right' }}>
                      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}> Statement Due</Typography>
                     <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.BOLD} color={colorPalette.rss[500]}>
-                      {formatCurrency(p.totalAmountDue ?? 0)}
+                      {formatCurrency(p.totalAmountDue ?? 0, p.currency ?? 'INR')}
                     </Typography>
                   </div>
                 </div>
@@ -242,24 +294,30 @@ function DashboardContent() {
 
   const filterParams = {
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
+    bankAccounts:
+      filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     category: filters.selectedCategories.length === 1 ? filters.selectedCategories[0] : undefined,
     tags: filters.selectedTags?.length > 0 ? filters.selectedTags.join(',') : undefined,
     direction: filters.direction !== 'all' ? filters.direction : undefined,
+    source: filters.source !== 'all' ? filters.source : undefined,
     amountMin: filters.amountRange.min,
     amountMax: filters.amountRange.max,
   };
 
-  const { summary, trends, loading } = useAnalytics({
+  const { summary, trends, trendsByCurrency, loading } = useAnalytics({
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
+    bankAccounts:
+      filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
     categories: filters.selectedCategories.length > 0 ? filters.selectedCategories.join(',') : undefined,
     tags: filters.selectedTags?.length > 0 ? filters.selectedTags.join(',') : undefined,
     direction: filters.direction !== 'all' ? filters.direction : undefined,
     amountMin: filters.amountRange.min,
     amountMax: filters.amountRange.max,
+    source: filters.source !== 'all' ? filters.source : undefined,
   });
   const { transactions, loading: txLoading } = useTransactions({
     ...filterParams,
@@ -267,29 +325,50 @@ function DashboardContent() {
     offset: 0,
   });
   const { cards, loading: cardsLoading } = useCards();
+  const { milestones, loading: milestonesLoading } = useMilestones();
 
   const safeCards = Array.isArray(cards) ? cards : [];
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
 
-  const safeSummary = summary && typeof summary.totalSpend === 'number' ? summary : {
-    totalSpend: 0,
-    deltaPercent: 0,
-    deltaLabel: 'vs last month',
-    period: 'This month',
-    sparklineData: [{ value: 0 }],
-    cardBreakdown: [],
-  };
+  const safeSummary =
+    summary && (summary.mixedCurrency || typeof summary.totalSpend === 'number')
+      ? summary
+      : {
+          totalSpend: 0,
+          mixedCurrency: false,
+          deltaPercent: 0,
+          deltaLabel: 'vs last month',
+          period: 'This month',
+          sparklineData: [{ value: 0 }],
+          cardBreakdown: [],
+        };
   const safeTrends = Array.isArray(trends) ? trends : [];
+  const safeTrendsByCurrency = Array.isArray(trendsByCurrency) ? trendsByCurrency : [];
 
   const cardBreakdown = safeSummary.cardBreakdown ?? [];
   const cardSpendByCard = safeCards.map((card) => {
-    const match = cardBreakdown.find(
+    const matches = cardBreakdown.filter(
       (cb) => cb.bank === card.bank && cb.last4 === card.last4
     );
+    if (matches.length === 0) {
+      return { ...card, spend: 0, count: 0, spendLines: undefined as { amount: number; currency: string }[] | undefined };
+    }
+    if (matches.length === 1) {
+      return {
+        ...card,
+        spend: matches[0].amount,
+        count: matches[0].count,
+        spendLines: undefined as { amount: number; currency: string }[] | undefined,
+      };
+    }
     return {
       ...card,
-      spend: match?.amount ?? 0,
-      count: match?.count ?? 0,
+      spend: matches[0].amount,
+      count: matches.reduce((s, m) => s + m.count, 0),
+      spendLines: matches.map((m) => ({
+        amount: m.amount,
+        currency: m.currency ?? 'INR',
+      })),
     };
   });
 
@@ -427,9 +506,15 @@ function DashboardContent() {
             <ClickableSpend style={{ flex: '1.2 1 0', minWidth: 280 }} onClick={handleSpendClick}>
               <SpendSummary
                 totalSpend={safeSummary.totalSpend}
-                deltaPercent={safeSummary.deltaPercent}
+                mixedCurrency={safeSummary.mixedCurrency}
+                totalSpendByCurrency={safeSummary.totalSpendByCurrency}
+                deltaPercent={safeSummary.deltaPercent ?? null}
                 deltaLabel={safeSummary.deltaLabel ?? 'vs last month'}
-                sparklineData={safeSummary.sparklineData ?? [{ value: 0 }]}
+                sparklineData={
+                  safeSummary.sparklineByCurrency?.[0]?.sparklineData ??
+                  safeSummary.sparklineData ??
+                  [{ value: 0 }]
+                }
                 period={periodLabel}
               />
             </ClickableSpend>
@@ -461,6 +546,7 @@ function DashboardContent() {
                   bank={card.bank}
                   last4={card.last4}
                   totalSpend={info?.spend ?? 0}
+                  spendLines={info?.spendLines}
                   transactionCount={info?.count ?? 0}
                 />
               );
@@ -472,11 +558,59 @@ function DashboardContent() {
         <Section>
           <SectionHeader>
             <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+              Milestones & Goals
+            </Typography>
+            <StyledLink to="/milestones">View all</StyledLink>
+          </SectionHeader>
+          {milestonesLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} height="100px" />
+              ))}
+            </div>
+          ) : milestones.length === 0 ? (
+            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+              No milestones yet. Create one to track your spending goals.
+            </Typography>
+          ) : (
+            <MilestonesList>
+              {milestones.slice(0, 3).map((milestone) => (
+                <MilestoneCard key={milestone.id} onClick={() => navigate('/milestones')}>
+                  <MilestoneHeader>
+                    <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                      {milestone.title}
+                    </Typography>
+                    <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                      {milestone.percent.toFixed(1)}%
+                    </Typography>
+                  </MilestoneHeader>
+                  <ProgressBarContainer>
+                    <ProgressBarFill $percent={milestone.percent} />
+                  </ProgressBarContainer>
+                  <MilestoneFooter>
+                    <span>₹{milestone.currentAmount.toLocaleString()} / ₹{milestone.targetAmount.toLocaleString()}</span>
+                    <span>{milestone.daysLeft} days left</span>
+                  </MilestoneFooter>
+                </MilestoneCard>
+              ))}
+            </MilestonesList>
+          )}
+        </Section>
+
+        <Section>
+          <SectionHeader>
+            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Cash Flow
             </Typography>
           </SectionHeader>
           {loading ? (
             <Skeleton height="280px" />
+          ) : safeTrendsByCurrency.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {safeTrendsByCurrency.map((block) => (
+                <CashFlowChart key={block.currency} data={block.trends} currency={block.currency} />
+              ))}
+            </div>
           ) : safeTrends.length === 0 ? (
             <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
               No spending data yet. Import statements to see your cash flow.

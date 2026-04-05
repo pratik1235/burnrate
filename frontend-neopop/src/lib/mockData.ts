@@ -101,6 +101,7 @@ export function generateMockTransactions(count: number): Transaction[] {
       cardId: card.id,
       bank: card.bank,
       cardLast4: card.last4,
+      source: 'CC',
     });
   }
 

@@ -179,7 +179,7 @@ The `frontend-neopop/package.json` uses `"version": "0.0.0"` (private package) a
 
 - **Missing module errors** — Add `--hidden-import` for any dynamically imported modules. The workflow already includes uvicorn, parsers, and routers.
 - **pdfplumber** — Use `--collect-all pdfplumber` to bundle all pdfplumber data files.
-- **charset_normalizer** — On some builds, use `--no-binary :all:` to avoid mypyc bundling issues.
+- **charset_normalizer** — **macOS and Windows release jobs** both run `pip uninstall charset-normalizer` and `pip install charset-normalizer --no-binary :all:` immediately before PyInstaller, then `--collect-all charset_normalizer`, to avoid mypyc/binary layouts that fail inside frozen apps. Windows PyInstaller jobs in `release.yml` and the optional `build.yml` Windows job fail CI if `__mypyc` appears under `charset_normalizer` in `dist/Burnrate/`.
 
 ### Homebrew formula update fails
 
@@ -199,4 +199,4 @@ The `frontend-neopop/package.json` uses `"version": "0.0.0"` (private package) a
 
 ---
 
-*Last updated: March 2025*
+*Last updated: March 2026*

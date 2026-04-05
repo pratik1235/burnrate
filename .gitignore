@@ -12,6 +12,9 @@ __pycache__/
 dist/
 build/
 backend/venv/
+.venv/
+.venv-audit/
+.venv-audit2/
 .venv-build/
 
 # Environment
@@ -83,3 +86,7 @@ src-tauri/gen/
 
 # PyInstaller spec files
 *.spec
+.cursor/
+.claude/
+temp/
+docs/security-deployment.md
