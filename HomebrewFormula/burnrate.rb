@@ -3,7 +3,7 @@ class Burnrate < Formula
 
   desc "Local-only credit card spend analytics"
   homepage "https://github.com/pratik1235/burnrate"
-  url "https://github.com/pratik1235/burnrate/archive/v0.2.5.tar.gz"
+  url "https://github.com/pratik1235/burnrate/archive/v0.3.0.tar.gz"
   sha256 "PLACEHOLDER"
   license "Apache-2.0"
 
