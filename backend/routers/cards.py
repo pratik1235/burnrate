@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
-from backend.models.models import Card, Statement, Transaction, TransactionTag
+from backend.models.models import Card
+
+from backend.services.card_delete import delete_card_cascade
 
 router = APIRouter(prefix="/cards", tags=["cards"])
 
@@ -29,22 +31,8 @@ def list_cards(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
 @router.delete("/{card_id}")
 def delete_card(card_id: str, db: Session = Depends(get_db)) -> Dict[str, str]:
     """Delete a card and all associated transactions and statements."""
-    card = db.query(Card).filter(Card.id == card_id).first()
-    if not card:
+    if not delete_card_cascade(db, card_id):
         raise HTTPException(status_code=404, detail="Card not found")
-
-    txn_ids = [
-        t.id for t in db.query(Transaction.id).filter(Transaction.card_id == card_id).all()
-    ]
-    if txn_ids:
-        db.query(TransactionTag).filter(TransactionTag.transaction_id.in_(txn_ids)).delete(
-            synchronize_session=False
-        )
-    db.query(Transaction).filter(Transaction.card_id == card_id).delete(synchronize_session=False)
-    db.query(Statement).filter(
-        Statement.card_last4 == card.last4, Statement.bank == card.bank
-    ).delete(synchronize_session=False)
-    db.delete(card)
     db.commit()
 
     return {"status": "success", "message": "Card and associated data deleted"}

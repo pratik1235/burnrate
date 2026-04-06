@@ -7,6 +7,7 @@ import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typograph
 import { useOffers } from '@/hooks/useApi';
 import { createOffer, deleteOffer, hideOffer, triggerOfferSync } from '@/lib/api';
 import type { GetOffersParams } from '@/lib/api';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { toast } from '@/components/Toast';
 import { CloseButton } from '@/components/CloseButton';
 import { Gift, Percent, RefreshCw, Plus, EyeOff, Trash2, ExternalLink } from 'lucide-react';
@@ -279,20 +280,31 @@ export function Offers() {
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button kind="elevated" size="small" colorMode="dark" variant="primary" onClick={handleSync}>
-              <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} style={{ marginRight: 6 }} />
+            <ButtonWithIcon
+              icon={RefreshCw}
+              kind="elevated"
+              size="small"
+              colorMode="dark"
+              variant="primary"
+              onClick={handleSync}
+              iconProps={{ className: syncing ? 'animate-spin' : undefined }}
+              gap={6}
+              justifyContent="center"
+            >
               {syncing ? 'Syncing...' : 'Sync'}
-            </Button>
-            <Button
+            </ButtonWithIcon>
+            <ButtonWithIcon
+              icon={Plus}
               kind="elevated"
               size="small"
               colorMode="dark"
               variant="secondary"
               onClick={() => setShowCreateModal(true)}
+              gap={6}
+              justifyContent="center"
             >
-              <Plus size={14} style={{ marginRight: 6 }} />
               Add Offer
-            </Button>
+            </ButtonWithIcon>
           </div>
         </Header>
 

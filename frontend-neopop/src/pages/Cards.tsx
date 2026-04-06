@@ -5,13 +5,15 @@ import { CreditCardVisual } from '@/components/CreditCardVisual';
 import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
 import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { TrashIconButton } from '@/components/TrashIconButton';
 import { mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { useCards, useAnalytics } from '@/hooks/useApi';
 import { deleteCard } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/Toast';
-import { Trash2, SlidersHorizontal, Plus } from 'lucide-react';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
+import { SlidersHorizontal, Plus } from 'lucide-react';
 import { CloseButton } from '@/components/CloseButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import styled from 'styled-components';
@@ -193,30 +195,34 @@ export function Cards() {
 
         <FilterRow>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Button
+            <ButtonWithIcon
+              icon={SlidersHorizontal}
               variant={hasActiveFilters ? 'secondary' : 'primary'}
               kind="elevated"
               size="small"
               colorMode="dark"
               onClick={() => setFilterOpen(true)}
+              gap={6}
+              justifyContent="center"
             >
-              <SlidersHorizontal size={14} style={{ marginRight: 6 }} />
               Filters {hasActiveFilters ? `(${activeCount})` : ''}
-            </Button>
+            </ButtonWithIcon>
             {hasActiveFilters && (
               <CloseButton onClick={clearFilters} variant="inline" />
             )}
           </div>
-          <Button
+          <ButtonWithIcon
+            icon={Plus}
             variant="primary"
             kind="elevated"
             size="small"
             colorMode="dark"
             onClick={() => navigate('/setup')}
+            gap={6}
+            justifyContent="center"
           >
-            <Plus size={14} style={{ marginRight: 6 }} />
             Add Card
-          </Button>
+          </ButtonWithIcon>
         </FilterRow>
 
         {loading ? (
@@ -296,28 +302,14 @@ export function Cards() {
                       {card.txnCount} transaction{card.txnCount !== 1 ? 's' : ''}
                     </Typography>
                   </SpendInfo>
-                  <Button
-                    variant="secondary"
-                    kind="flat"
-                    size="small"
-                    colorMode="dark"
-                    onClick={(e: React.MouseEvent) => {
+                  <TrashIconButton
+                    aria-label={`Remove card ${card.bank} …${card.last4}`}
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                       e.stopPropagation();
                       handleRemoveCard(card.id, `${card.bank.toUpperCase()} ...${card.last4}`);
                     }}
-                    style={{
-                      minWidth: 32,
-                      height: 32,
-                      marginLeft: 'auto',
-                      marginRight: 8,
-                      background: 'rgba(238, 77, 55, 0.15)',
-                      border: '1px solid rgba(238, 77, 55, 0.4)',
-                      color: mainColors.red,
-                      padding: 0,
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                    style={{ marginLeft: 'auto', marginRight: 8 }}
+                  />
                 </CardFooter>
               </CardItem>
             ))}

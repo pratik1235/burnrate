@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="260" viewBox="0 0 360 260" role="img" aria-labelledby="title desc">
+  <title id="title">StatUpload bulk upload with folder picker</title>
+  <desc id="desc">Single dashed dropzone: file picker on most of the area, Choose folder button inside for directory picker.</desc>
+  <defs>
+    <filter id="btnShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="360" height="260" fill="#000000"/>
+  <!-- One dashed dropzone; button visually inside; file picker = click elsewhere (implementation: stopPropagation on button) -->
+  <rect x="0" y="0" width="360" height="248" rx="12" ry="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-dasharray="6 6"/>
+  <g transform="translate(180 40)" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-10 6 L-4 0 L2 6"/>
+    <path d="M-4 0 L-4 14 L10 14 L10 6 L4 0 L-4 0"/>
+    <path d="M-6 4 L-12 4 L-12 16 L6 16 L6 8"/>
+  </g>
+  <text x="180" y="82" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="rgba(245,245,245,0.98)">Drop your statement PDFs here, or click to browse</text>
+  <text x="180" y="104" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="400" fill="rgba(255,255,255,0.4)">PDF or CSV &#8212; drop files or click (not the button)</text>
+  <text x="180" y="120" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="12" font-weight="400" fill="rgba(255,255,255,0.4)">to pick files. Entire folder: use Choose folder.</text>
+  <g transform="translate(180 188)" filter="url(#btnShadow)">
+    <rect x="-88" y="-20" width="176" height="40" rx="8" ry="8" fill="#242424" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+    <g transform="translate(-52 0)" fill="none" stroke="rgba(242,242,242,0.95)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7h5l2 2h6a2 2 0 0 1 2 2v7H3V7z"/>
+      <path d="M3 7V5a2 2 0 0 1 2-2h3l2 2"/>
+    </g>
+    <text x="-34" y="5" text-anchor="start" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="rgba(242,242,242,0.95)">Choose folder</text>
+  </g>
+</svg>

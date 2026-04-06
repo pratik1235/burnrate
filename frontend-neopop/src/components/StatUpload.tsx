@@ -1,9 +1,13 @@
-import { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, CheckCircle2, AlertCircle, Loader2, Lock, Files } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Loader2, Lock, Files, FolderOpen } from 'lucide-react';
 import { Button, Typography, InputField } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
+import { BulkUploadSummaryModal } from '@/components/BulkUploadSummaryCard';
+import type { BulkUploadResult } from '@/lib/api';
+import { filesFromDataTransfer } from '@/lib/filesFromDataTransfer';
+import { describeAllowedFileKinds, filterFilesByAcceptTypes } from '@/lib/statUploadFilter';
 
 type UploadStatus = 'idle' | 'uploading' | 'success' | 'error' | 'password_needed';
 
@@ -14,14 +18,7 @@ export interface UploadResult {
   bank?: string;
 }
 
-export interface BulkUploadResult {
-  status: string;
-  total: number;
-  success: number;
-  failed: number;
-  duplicate: number;
-  skipped: number;
-}
+const DEFAULT_ACCEPT_TYPES: Record<string, string[]> = { 'application/pdf': ['.pdf'] };
 
 interface StatUploadProps {
   onUpload?: (file: File, password?: string) => Promise<UploadResult>;
@@ -33,12 +30,25 @@ interface StatUploadProps {
   subtitleText?: string;
 }
 
+async function filesFromDropzoneEvent(event: unknown): Promise<File[]> {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) return [];
+  const drag = event as React.DragEvent<HTMLElement> | globalThis.DragEvent;
+  const dt = 'dataTransfer' in drag ? drag.dataTransfer : null;
+  if (!dt) return [];
+  return filesFromDataTransfer({ dataTransfer: dt });
+}
+
 export function StatUpload({ onUpload, onBulkUpload, className, compact = false, acceptTypes, idleText, subtitleText }: StatUploadProps) {
   const [status, setStatus] = useState<UploadStatus>('idle');
   const [fileName, setFileName] = useState<string>('');
   const [resultMessage, setResultMessage] = useState<string>('');
   const [password, setPassword] = useState('');
+  const [bulkSummary, setBulkSummary] = useState<BulkUploadResult | null>(null);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const pendingFile = useRef<File | null>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  const resolvedAccept = acceptTypes ?? DEFAULT_ACCEPT_TYPES;
 
   const doUpload = useCallback(
     async (file: File, pwd?: string) => {
@@ -89,21 +99,36 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false,
       if (!onBulkUpload) return;
       setStatus('uploading');
       setResultMessage('');
+      setBulkSummary(null);
+      setSummaryModalOpen(false);
       setFileName(`${files.length} files`);
 
       try {
         const result = await onBulkUpload(files);
+        setBulkSummary(result);
+        setSummaryModalOpen(true);
         const parts: string[] = [];
         if (result.success > 0) parts.push(`${result.success} imported`);
         if (result.duplicate > 0) parts.push(`${result.duplicate} duplicates`);
         if (result.failed > 0) parts.push(`${result.failed} failed`);
-        if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+        if (result.card_not_found > 0) parts.push(`${result.card_not_found} card missing`);
+        if (result.parse_error > 0) parts.push(`${result.parse_error} parse errors`);
+        if (result.password_needed > 0) parts.push(`${result.password_needed} need password`);
+        if (result.skipped > 0) parts.push(`${result.skipped} not queued`);
 
         if (result.success > 0) {
           setStatus('success');
           setResultMessage(parts.join(', '));
           setTimeout(() => setStatus('idle'), 5000);
-        } else if (result.duplicate > 0 && result.failed === 0) {
+        } else if (
+          result.success === 0 &&
+          result.total > 0 &&
+          result.duplicate === result.total &&
+          result.failed === 0 &&
+          result.card_not_found === 0 &&
+          result.parse_error === 0 &&
+          result.password_needed === 0
+        ) {
           setStatus('error');
           setResultMessage('All statements already imported');
           setTimeout(() => setStatus('idle'), 4000);
@@ -115,13 +140,34 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false,
       } catch {
         setStatus('error');
         setResultMessage('Bulk upload failed — check backend connection');
+        setBulkSummary(null);
+        setSummaryModalOpen(false);
         setTimeout(() => setStatus('idle'), 5000);
       }
     },
     [onBulkUpload]
   );
 
-  const onDrop = useCallback(
+  const handleFolderSideFiles = useCallback(
+    (rawFiles: File[]) => {
+      if (!onBulkUpload) return;
+      setPassword('');
+      pendingFile.current = null;
+      const filtered = filterFilesByAcceptTypes(rawFiles, resolvedAccept);
+      if (filtered.length === 0) {
+        const kinds = describeAllowedFileKinds(resolvedAccept);
+        setStatus('error');
+        setResultMessage(`No ${kinds} files found in that folder`);
+        setFileName('');
+        setTimeout(() => setStatus('idle'), 4000);
+        return;
+      }
+      doBulkUpload(filtered);
+    },
+    [doBulkUpload, onBulkUpload, resolvedAccept]
+  );
+
+  const onFileDrop = useCallback(
     (accepted: File[]) => {
       if (accepted.length === 0) return;
       setPassword('');
@@ -138,18 +184,64 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false,
     [doUpload, doBulkUpload, onBulkUpload]
   );
 
+  const onFolderDrop = useCallback(
+    (accepted: File[]) => {
+      if (accepted.length === 0) {
+        const kinds = describeAllowedFileKinds(resolvedAccept);
+        setStatus('error');
+        setResultMessage(`No ${kinds} files found in that folder`);
+        setFileName('');
+        setTimeout(() => setStatus('idle'), 4000);
+        return;
+      }
+      handleFolderSideFiles(accepted);
+    },
+    [handleFolderSideFiles, resolvedAccept]
+  );
+
+  const dropDisabled = status === 'uploading' || status === 'password_needed';
+
+  const { getRootProps: getFileRootProps, getInputProps: getFileInputProps, isDragActive: fileDragActive } = useDropzone({
+    onDrop: onFileDrop,
+    accept: resolvedAccept,
+    multiple: true,
+    disabled: dropDisabled,
+  });
+
+  const { getRootProps: getFolderRootProps, getInputProps: getFolderDropInputProps, isDragActive: folderDragActive } = useDropzone({
+    onDrop: onFolderDrop,
+    multiple: true,
+    noClick: true,
+    disabled: dropDisabled || !onBulkUpload,
+    getFilesFromEvent: filesFromDropzoneEvent,
+  });
+
   const handlePasswordRetry = useCallback(() => {
     if (pendingFile.current && password.trim()) {
       doUpload(pendingFile.current, password.trim());
     }
   }, [doUpload, password]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: acceptTypes ?? { 'application/pdf': ['.pdf'] },
-    multiple: true,
-    disabled: status === 'uploading' || status === 'password_needed',
-  });
+  const handleChooseFolderClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    folderInputRef.current?.click();
+  }, []);
+
+  const handleFolderInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const list = e.target.files;
+      e.target.value = '';
+      if (!list?.length || !onBulkUpload) return;
+      handleFolderSideFiles(Array.from(list));
+    },
+    [handleFolderSideFiles, onBulkUpload]
+  );
+
+  const dismissSummary = useCallback(() => {
+    setSummaryModalOpen(false);
+    setBulkSummary(null);
+  }, []);
 
   if (status === 'password_needed') {
     return (
@@ -242,28 +334,29 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false,
 
   const current = statusConfig[status];
   const StatusIcon = current.icon;
+  const showDualDropzones = Boolean(onBulkUpload);
+  const dropzoneMinHeight = showDualDropzones ? (compact ? 140 : 200) : compact ? 120 : 180;
+  const zonePadding = compact ? 12 : 24;
 
-  return (
-    <div
-      {...getRootProps()}
-      style={{
-        border: `2px dashed ${isDragActive ? colorPalette.rss[500] : 'rgba(255,255,255,0.2)'}`,
-        borderRadius: 12,
-        padding: compact ? 16 : 32,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        cursor: status === 'uploading' ? 'wait' : 'pointer',
-        backgroundColor: isDragActive ? 'rgba(255,135,68,0.1)' : 'rgba(255,255,255,0.02)',
-        transition: 'all 0.2s',
-        minHeight: compact ? 120 : 180,
-        opacity: status === 'uploading' ? 0.8 : 1,
-      }}
-      className={className}
-    >
-      <input {...getInputProps()} />
+  const folderRootFromDropzone = getFolderRootProps();
+  const folderRootHtml = folderRootFromDropzone as React.HTMLAttributes<HTMLElement>;
+  const folderRootProps = {
+    ...folderRootFromDropzone,
+    onClick: (e: React.MouseEvent<HTMLElement>) => {
+      handleChooseFolderClick(e);
+      folderRootHtml.onClick?.(e);
+    },
+    onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+      folderRootHtml.onKeyDown?.(e);
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        folderInputRef.current?.click();
+      }
+    },
+  };
+
+  const renderStatusBody = () => (
+    <>
       <StatusIcon
         size={compact ? 20 : 32}
         color={current.color}
@@ -275,12 +368,124 @@ export function StatUpload({ onUpload, onBulkUpload, className, compact = false,
       <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.MEDIUM} color={current.color} style={{ margin: 0 }}>
         {current.text}
       </Typography>
-      {status === 'idle' && onBulkUpload && (
+      {status === 'idle' && subtitleText && (
         <Typography fontType={FontType.BODY} fontSize={compact ? 11 : 12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.4)" style={{ marginTop: 4 }}>
-          {subtitleText ?? (compact ? 'drop multiple files for bulk import' : 'PDF files only — drop multiple files for bulk import')}
+          {subtitleText}
         </Typography>
       )}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </>
+  );
+
+  return (
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      {showDualDropzones && status === 'idle' ? (
+        <div
+          style={{
+            border: `2px dashed ${fileDragActive || folderDragActive ? colorPalette.rss[500] : 'rgba(255,255,255,0.2)'}`,
+            borderRadius: 12,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'stretch',
+            width: '100%',
+            minHeight: dropzoneMinHeight,
+            backgroundColor: fileDragActive || folderDragActive ? 'rgba(255,135,68,0.1)' : 'rgba(255,255,255,0.02)',
+            transition: 'all 0.2s',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            {...getFileRootProps()}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: zonePadding,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              cursor: dropDisabled ? 'wait' : 'pointer',
+              borderRight: '1px solid rgba(255,255,255,0.12)',
+              backgroundColor: fileDragActive ? 'rgba(255,135,68,0.08)' : 'transparent',
+            }}
+            aria-label="Upload statement files"
+          >
+            <input {...getFileInputProps()} />
+            <Files size={compact ? 22 : 28} color="rgba(255,255,255,0.5)" style={{ marginBottom: 8 }} />
+            <Typography fontType={FontType.BODY} fontSize={compact ? 12 : 13} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.75)" style={{ margin: 0 }}>
+              {compact ? 'Files' : 'Drop files or click to browse'}
+            </Typography>
+            <Typography fontType={FontType.BODY} fontSize={compact ? 10 : 11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.38)" style={{ marginTop: 4 }}>
+              One or more {describeAllowedFileKinds(resolvedAccept)} files
+            </Typography>
+          </div>
+          <div
+            {...folderRootProps}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: zonePadding,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              cursor: dropDisabled ? 'not-allowed' : 'pointer',
+              backgroundColor: folderDragActive ? 'rgba(255,135,68,0.08)' : 'transparent',
+            }}
+            role="button"
+            tabIndex={dropDisabled ? -1 : 0}
+            aria-label="Upload statements from a folder"
+          >
+            <input {...getFolderDropInputProps()} tabIndex={-1} style={{ display: 'none' }} />
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              onChange={handleFolderInputChange}
+              tabIndex={-1}
+              aria-hidden
+              {...({
+                webkitdirectory: '',
+                directory: '',
+              } as Record<string, string>)}
+            />
+            <FolderOpen size={compact ? 22 : 28} color="rgba(255,255,255,0.5)" style={{ marginBottom: 8 }} />
+            <Typography fontType={FontType.BODY} fontSize={compact ? 12 : 13} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.75)" style={{ margin: 0 }}>
+              {compact ? 'Folder' : 'Drop a folder or click to choose'}
+            </Typography>
+            <Typography fontType={FontType.BODY} fontSize={compact ? 10 : 11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.38)" style={{ marginTop: 4 }}>
+              Scans subfolders for {describeAllowedFileKinds(resolvedAccept)}
+            </Typography>
+          </div>
+        </div>
+      ) : (
+        <div
+          {...getFileRootProps()}
+          style={{
+            border: `2px dashed ${fileDragActive ? colorPalette.rss[500] : 'rgba(255,255,255,0.2)'}`,
+            borderRadius: 12,
+            padding: compact ? 16 : 32,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            cursor: status === 'uploading' ? 'wait' : 'pointer',
+            backgroundColor: fileDragActive ? 'rgba(255,135,68,0.1)' : 'rgba(255,255,255,0.02)',
+            transition: 'all 0.2s',
+            minHeight: dropzoneMinHeight,
+            opacity: status === 'uploading' ? 0.8 : 1,
+          }}
+        >
+          <input {...getFileInputProps()} />
+          {renderStatusBody()}
+        </div>
+      )}
+
+      <BulkUploadSummaryModal open={summaryModalOpen} result={bulkSummary} onDismiss={dismissSummary} />
     </div>
   );
 }

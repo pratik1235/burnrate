@@ -11,6 +11,11 @@ const meta = {
   title: 'NeoPOP/CardComparison',
   component: CardComparison,
   parameters: { layout: 'centered' },
+  argTypes: {
+    data: { control: 'object' },
+    period: { control: 'text' },
+    className: { control: 'text' },
+  },
 } satisfies Meta<typeof CardComparison>;
 
 export default meta;

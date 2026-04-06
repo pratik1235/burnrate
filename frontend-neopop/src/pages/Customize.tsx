@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { Navbar } from '@/components/Navbar';
 import { StatUpload } from '@/components/StatUpload';
 import { Button, Typography, ElevatedCard, Tag, InputField, Row, Column } from '@cred/neopop-web/lib/components';
@@ -26,9 +27,11 @@ import {
 import type { Statement } from '@/lib/types';
 import type { CategoryResponse, TagDefinitionResponse, GmailStatusResponse } from '@/lib/api';
 import { toast } from '@/components/Toast';
-import { RefreshCw, Palette, X, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus, CreditCard, Landmark, Lock, Mail } from 'lucide-react';
+import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
+import { RefreshCw, Palette, Trash2, Tag as TagIcon, Plus, AlertTriangle, MessageSquarePlus, CreditCard, Landmark, Lock, Mail } from 'lucide-react';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { CloseButton } from '@/components/CloseButton';
+import { TrashIconButton } from '@/components/TrashIconButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import styled from 'styled-components';
 
@@ -270,24 +273,7 @@ export function DefineTagsModal({ open, onClose }: { open: boolean; onClose: () 
                   <Tag colorMode="dark" type="warning">
                     {t.name}
                   </Tag>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    kind="flat"
-                    size="small"
-                    colorMode="dark"
-                    onClick={() => handleDelete(t.id)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: colorPalette.black[50],
-                      padding: 2,
-                      minWidth: 'auto',
-                    }}
-                    aria-label={`Delete ${t.name}`}
-                  >
-                    <X size={14} />
-                  </Button>
+                  <TrashIconButton aria-label={`Remove tag ${t.name}`} onClick={() => handleDelete(t.id)} />
                 </TagWithDelete>
               ))}
             </TagsWrap>
@@ -445,7 +431,8 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
         </div>
 
         <div style={{ padding: 20 }}>
-          <Button
+          <ButtonWithIcon
+            icon={RefreshCw}
             variant="secondary"
             kind="elevated"
             size="small"
@@ -453,10 +440,12 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
             onClick={handleReparseAll}
             disabled={reparseAllRunning || loading || statements.length === 0}
             style={{ marginBottom: 20 }}
+            gap={6}
+            justifyContent="center"
+            iconProps={{ className: reparseAllRunning ? 'animate-spin' : undefined }}
           >
-            <RefreshCw size={14} style={{ marginRight: 6 }} />
             {reparseAllRunning ? 'Reparsing...' : 'Reparse All'}
-          </Button>
+          </ButtonWithIcon>
 
           {loading ? (
             <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -540,19 +529,35 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
                         <Column alignItems="center" gap={2}>
                           <Row alignItems='center' justifyContent="space-evenly" gap={20}>
                             {!needsPassword && (
-                              <Button variant="primary" kind="elevated" size="small" colorMode="dark" onClick={() => handleReparse(s.id)} disabled={!!actioning} style={{ minWidth: 'auto', marginRight: 10 }}>
-                                <Row gap={4} alignItems="center" justifyContent="center">
-                                  <RefreshCw size={14} style={{ marginRight: 5 }} />
-                                  {isError ? 'Retry' : 'Refresh'}
-                                </Row>
-                              </Button>
+                              <ButtonWithIcon
+                                icon={RefreshCw}
+                                variant="primary"
+                                kind="elevated"
+                                size="small"
+                                colorMode="dark"
+                                onClick={() => handleReparse(s.id)}
+                                disabled={!!actioning}
+                                gap={4}
+                                justifyContent="center"
+                                style={{ minWidth: 'auto', marginRight: 10 }}
+                              >
+                                {isError ? 'Retry' : 'Refresh'}
+                              </ButtonWithIcon>
                             )}
-                            <Button variant="secondary" kind="elevated" size="small" colorMode="dark" onClick={() => handleRemove(s.id)} disabled={!!actioning} style={{ minWidth: 'auto', color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}>
-                              <Row gap={4} alignItems="center" justifyContent="center">
-                                <Trash2 size={14} style={{ marginRight: 4 }} />
-                                Remove
-                              </Row>
-                            </Button>
+                            <ButtonWithIcon
+                              icon={Trash2}
+                              variant="secondary"
+                              kind="elevated"
+                              size="small"
+                              colorMode="dark"
+                              onClick={() => handleRemove(s.id)}
+                              disabled={!!actioning}
+                              gap={4}
+                              justifyContent="center"
+                              style={{ minWidth: 'auto', color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
+                            >
+                              Remove
+                            </ButtonWithIcon>
                           </Row>
                         </Column>
                       </div>
@@ -629,6 +634,18 @@ const CATEGORY_COLORS = [
   { name: 'Graphite', value: '#636E72' },
 ];
 
+function normalizeHexInput(raw: string): string | null {
+  const s = raw.trim();
+  if (/^#[0-9A-Fa-f]{6}$/i.test(s)) return s.toUpperCase();
+  if (/^[0-9A-Fa-f]{6}$/i.test(s)) return `#${s.toUpperCase()}`;
+  return null;
+}
+
+function colorInputValue(hex: string): string {
+  const n = normalizeHexInput(hex.startsWith('#') ? hex : `#${hex}`);
+  return n ?? '#FF8744';
+}
+
 function ColorPickerPopover({
   selectedColor,
   onSelect,
@@ -638,58 +655,135 @@ function ColorPickerPopover({
   onSelect: (color: string) => void;
   onClose: () => void;
 }) {
+  const [hexDraft, setHexDraft] = useState(selectedColor);
+
+  useEffect(() => {
+    setHexDraft(selectedColor);
+  }, [selectedColor]);
+
+  const applyHex = () => {
+    const parsed = normalizeHexInput(hexDraft);
+    if (parsed) {
+      onSelect(parsed);
+      onClose();
+    }
+  };
+
   return (
     <>
       <div
         style={{ position: 'fixed', inset: 0, zIndex: 200 }}
         onClick={onClose}
+        aria-hidden
       />
       <div
         style={{
           position: 'absolute',
           top: '100%',
-          left: '-100%',
-          right: 50,
-          marginTop: 4,
-          marginRight: 50,
+          left: 0,
+          marginTop: 8,
           zIndex: 201,
-          background: colorPalette.black[100],
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 12,
-          padding: 12,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(6, 1fr)',
-          gap: 8,
-          width: 'max-content',
+          width: 300,
+          maxHeight: 'min(420px, 70vh)',
+          overflowY: 'auto',
+          background: colorPalette.black[90],
+          border: '1px solid rgba(255,255,255,0.14)',
+          borderRadius: 16,
+          padding: 16,
+          boxShadow: '0 16px 48px rgba(0,0,0,0.65)',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {CATEGORY_COLORS.map((c) => (
-          <Button
-            key={c.value}
-            type="button"
-            variant="secondary"
-            kind="flat"
-            size="small"
-            colorMode="dark"
-            onClick={() => {
-              onSelect(c.value);
-              onClose();
-            }}
-            title={c.name}
+        <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.SEMI_BOLD} color="rgba(255,255,255,0.75)" style={{ marginBottom: 12 }}>
+          Custom
+        </Typography>
+        <Row alignItems="center" style={{ gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div
             style={{
-              width: 24,
-              height: 24,
-              minWidth: 24,
-              borderRadius: '50%',
-              backgroundColor: c.value,
-              border: selectedColor === c.value
-                ? `2px solid ${mainColors.white}`
-                : '2px solid transparent',
-              padding: 0,
+              position: 'relative',
+              width: 40,
+              height: 40,
+              flexShrink: 0,
+              borderRadius: 10,
+              backgroundColor: colorInputValue(selectedColor),
+              border: '2px solid rgba(255,255,255,0.25)',
+              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
             }}
-          />
-        ))}
+          >
+            <input
+              type="color"
+              value={colorInputValue(selectedColor)}
+              onChange={(e) => onSelect(e.target.value)}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                opacity: 0,
+                cursor: 'pointer',
+              }}
+              aria-label="Choose color with native picker"
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 120 }}>
+            <InputField
+              colorMode="dark"
+              placeholder="#RRGGBB"
+              value={hexDraft}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHexDraft(e.target.value)}
+              style={{
+                fontFamily: 'ui-monospace, Menlo, monospace',
+                fontSize: 13,
+                backgroundColor: colorPalette.black[100],
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 8,
+              }}
+            />
+          </div>
+          <Button type="button" variant="primary" kind="elevated" size="small" colorMode="dark" onClick={applyHex}>
+            Apply
+          </Button>
+        </Row>
+        <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.SEMI_BOLD} color="rgba(255,255,255,0.75)" style={{ marginBottom: 10 }}>
+          Palette
+        </Typography>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(8, 1fr)',
+            gap: 8,
+          }}
+        >
+          {CATEGORY_COLORS.map((c) => (
+            <Button
+              key={c.value}
+              type="button"
+              variant="secondary"
+              kind="flat"
+              size="small"
+              colorMode="dark"
+              onClick={() => {
+                onSelect(c.value);
+                onClose();
+              }}
+              title={c.name}
+              aria-label={c.name}
+              style={{
+                width: 28,
+                height: 28,
+                minWidth: 28,
+                borderRadius: 8,
+                backgroundColor: c.value,
+                border:
+                  selectedColor.toLowerCase() === c.value.toLowerCase()
+                    ? `2px solid ${mainColors.white}`
+                    : '2px solid rgba(255,255,255,0.12)',
+                padding: 0,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+              }}
+            />
+          ))}
+        </div>
       </div>
     </>
   );
@@ -974,26 +1068,11 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
                     </td>
                     <td>
                       {!cat.is_prebuilt && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          kind="flat"
-                          size="small"
-                          colorMode="dark"
+                        <TrashIconButton
+                          aria-label={`Remove category ${cat.name}`}
                           onClick={() => handleDelete(cat)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: mainColors.red,
-                            padding: 4,
-                            minWidth: 'auto',
-                            marginRight: 10,
-                            marginLeft: -20,
-                          }}
-                          aria-label={`Delete ${cat.name}`}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
+                          style={{ marginRight: 10, marginLeft: -20 }}
+                        />
                       )}
                     </td>
                   </tr>
@@ -1175,6 +1254,9 @@ function GmailAutosyncModal({ open, onClose }: { open: boolean; onClose: () => v
   );
 }
 
+/** Hide entry point only; `ReparseRemoveModal` code path stays in the bundle. */
+const SHOW_REPARSE_REMOVE_FEATURE_CARD = false;
+
 export function Customize() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1219,14 +1301,12 @@ export function Customize() {
     try {
       const result = await uploadStatementsBulk(files, undefined, undefined, 'CC');
       toast.dismiss(loadingId);
-      if (result.success > 0) toast.success(`${result.success} of ${result.total} statements imported`);
-      else if (result.duplicate > 0) toast.info('All statements already imported');
-      else if (result.failed > 0) toast.error(`${result.failed} of ${result.total} statements failed`);
+      notifyBulkUploadToasts(result, toast);
       return result;
     } catch (err) {
       toast.dismiss(loadingId);
       toast.error(err instanceof Error ? err.message : 'Bulk upload failed');
-      return { status: 'error', total: files.length, success: 0, failed: files.length, duplicate: 0, skipped: 0 };
+      return syntheticBulkUploadFailure(files.length);
     }
   };
 
@@ -1255,14 +1335,12 @@ export function Customize() {
     try {
       const result = await uploadStatementsBulk(files, undefined, undefined, 'BANK');
       toast.dismiss(loadingId);
-      if (result.success > 0) toast.success(`${result.success} of ${result.total} bank statements imported`);
-      else if (result.duplicate > 0) toast.info('All statements already imported');
-      else if (result.failed > 0) toast.error(`${result.failed} of ${result.total} statements failed`);
+      notifyBulkUploadToasts(result, toast);
       return result;
     } catch (err) {
       toast.dismiss(loadingId);
       toast.error(err instanceof Error ? err.message : 'Bulk upload failed');
-      return { status: 'error', total: files.length, success: 0, failed: files.length, duplicate: 0, skipped: 0 };
+      return syntheticBulkUploadFailure(files.length);
     }
   };
 
@@ -1319,15 +1397,17 @@ export function Customize() {
             </Typography>
           </FeatureCard>
 
-          <FeatureCard onClick={() => setReparseModalOpen(true)}>
-            <RefreshCw size={24} color={colorPalette.rss[500]} />
-            <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-              Reparse/Remove Statements
-            </Typography>
-            <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
-              Re-import or delete imported statements.
-            </Typography>
-          </FeatureCard>
+          {SHOW_REPARSE_REMOVE_FEATURE_CARD && (
+            <FeatureCard onClick={() => setReparseModalOpen(true)}>
+              <RefreshCw size={24} color={colorPalette.rss[500]} />
+              <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                Reparse/Remove Statements
+              </Typography>
+              <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                Re-import or delete imported statements.
+              </Typography>
+            </FeatureCard>
+          )}
 
           <FeatureCard onClick={() => setCategoriesModalOpen(true)}>
             <Palette size={24} color={colorPalette.rss[500]} />

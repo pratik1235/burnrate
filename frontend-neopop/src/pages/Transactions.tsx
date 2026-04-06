@@ -7,11 +7,11 @@ import { useFilters } from '@/contexts/FilterContext';
 import { useTransactions, useCards } from '@/hooks/useApi';
 import { formatCurrency } from '@/lib/utils';
 import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
-import { Button, SearchBar } from '@cred/neopop-web/lib/components';
-import { Typography } from '@cred/neopop-web/lib/components';
+import { Button, SearchBar, Row, Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { SlidersHorizontal, Download, EyeOff } from 'lucide-react';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { CloseButton } from '@/components/CloseButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import styled from 'styled-components';
@@ -306,16 +306,18 @@ function TransactionsContent() {
       <Content>
         <ActionBar>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Button
+            <ButtonWithIcon
+              icon={SlidersHorizontal}
               variant={hasActiveFilters ? 'secondary' : 'primary'}
               kind="elevated"
               size="small"
               colorMode="dark"
               onClick={() => setFilterOpen(true)}
+              justifyContent="center"
+              gap={6}
             >
-              <SlidersHorizontal size={14} style={{ marginRight: 6 }} />
               Filters {hasActiveFilters ? `(${activeCount})` : ''}
-            </Button>
+            </ButtonWithIcon>
             {hasActiveFilters && (
               <CloseButton onClick={clearFilters} variant="inline" />
             )}
@@ -503,42 +505,54 @@ function TransactionsContent() {
                 colorMode="dark"
                 onClick={() => setExclusionMode((m) => !m)}
               >
-                <EyeOff size={14} style={{ marginRight: 6 }} />
-                Temporarily Exclude Txns
-                {excludedIds.size > 0 && (
-                  <span
-                    style={{
-                      marginLeft: 6,
-                      padding: '1px 6px',
-                      borderRadius: 10,
-                      background: 'rgba(255,135,68,0.3)',
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
+                <Row alignItems="center" style={{ columnGap: 6 }}>
+                  <EyeOff size={14} aria-hidden />
+                  <Typography
+                    as="span"
+                    fontType={FontType.BODY}
+                    fontSize={14}
+                    fontWeight={FontWeights.MEDIUM}
+                    color="inherit"
+                    style={{ lineHeight: 1.2 }}
                   >
-                    {excludedIds.size}
-                  </span>
-                )}
+                    Temporarily Exclude Txns
+                  </Typography>
+                  {excludedIds.size > 0 && (
+                    <span
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: 10,
+                        background: 'rgba(255,135,68,0.3)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {excludedIds.size}
+                    </span>
+                  )}
+                </Row>
               </Button>
               {excludeTooltipVisible && (
                 <div
                   style={{
                     position: 'absolute',
-                    bottom: '100%',
+                    top: '100%',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    marginBottom: 6,
+                    marginTop: 8,
                     background: colorPalette.popBlack[300],
                     border: '1px solid rgba(255,255,255,0.15)',
                     borderRadius: 8,
                     padding: '8px 12px',
-                    zIndex: 10,
+                    zIndex: 200,
                     whiteSpace: 'normal',
                     maxWidth: 280,
+                    width: 'max-content',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
                   }}
                 >
                   <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.7)">
-                    This allows you to temporarily exclude some transactions from the summation value above
+                    This allows you to temporarily exclude some transactions from the summation value on the left side
                   </Typography>
                 </div>
               )}
@@ -554,16 +568,18 @@ function TransactionsContent() {
                 Reset Exclusions
               </Button>
             )}
-            <Button
+            <ButtonWithIcon
+              icon={Download}
               variant="primary"
               kind="elevated"
               size="small"
               colorMode="dark"
               onClick={handleExport}
+              justifyContent="center"
+              gap={6}
             >
-              <Download size={14} style={{ marginRight: 6 }} />
               Export
-            </Button>
+            </ButtonWithIcon>
           </div>
         </Header>
 

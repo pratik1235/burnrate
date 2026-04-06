@@ -15,6 +15,16 @@ const meta = {
   title: 'NeoPOP/SpendSummary',
   component: SpendSummary,
   parameters: { layout: 'centered' },
+  argTypes: {
+    totalSpend: { control: 'number' },
+    mixedCurrency: { control: 'boolean' },
+    totalSpendByCurrency: { control: 'object' },
+    deltaPercent: { control: 'number' },
+    deltaLabel: { control: 'text' },
+    sparklineData: { control: 'object' },
+    period: { control: 'text' },
+    className: { control: 'text' },
+  },
 } satisfies Meta<typeof SpendSummary>;
 
 export default meta;

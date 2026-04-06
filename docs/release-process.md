@@ -179,7 +179,13 @@ The `frontend-neopop/package.json` uses `"version": "0.0.0"` (private package) a
 
 - **Missing module errors** — Add `--hidden-import` for any dynamically imported modules. The workflow already includes uvicorn, parsers, and routers.
 - **pdfplumber** — Use `--collect-all pdfplumber` to bundle all pdfplumber data files.
-- **charset_normalizer** — **macOS and Windows release jobs** both run `pip uninstall charset-normalizer` and `pip install charset-normalizer --no-binary :all:` immediately before PyInstaller, then `--collect-all charset_normalizer`, to avoid mypyc/binary layouts that fail inside frozen apps. Windows PyInstaller jobs in `release.yml` and the optional `build.yml` Windows job fail CI if `__mypyc` appears under `charset_normalizer` in `dist/Burnrate/`.
+- **charset_normalizer** — **macOS and Windows release jobs** both run `pip uninstall charset-normalizer` and `pip install charset-normalizer --no-binary :all:` immediately before PyInstaller, then `--collect-all charset_normalizer`, to avoid mypyc/binary layouts that fail inside frozen apps. Windows PyInstaller jobs in `release.yml` and the optional `build.yml` Windows job fail CI if `__mypyc` appears under `charset_normalizer` in `dist/Burnrate/`. macOS release jobs run an additional check that the active `charset_normalizer` install contains no `__mypyc` artifacts before freezing the sidecar.
+
+### Statement upload “internal error” / `ModuleNotFoundError: …__mypyc` (GitHub [#18](https://github.com/pratik1235/burnrate/issues/18))
+
+- **Cause** — Desktop builds bundle Python with PyInstaller. Wheels of `charset-normalizer` can ship mypyc native modules that PyInstaller does not collect reliably, so statement upload fails with a generic API error while logs show a missing `*__mypyc` module.
+- **Fix in tree** — Official builds use pure-Python `charset-normalizer` and `--collect-all charset_normalizer` (see [scripts/build-windows.bat](https://github.com/pratik1235/burnrate/blob/main/scripts/build-windows.bat), [scripts/build-macos.sh](https://github.com/pratik1235/burnrate/blob/main/scripts/build-macos.sh), and `release.yml`). Users on older installers should **upgrade** to a release built with the current pipeline.
+- **If reports persist** — Ask for the **app version** and **install source** (GitHub Release `.exe` / `.dmg`, Homebrew, Docker, or `pip`/dev server). Only frozen desktop builds hit this failure mode; Docker and `uvicorn` from a normal venv use a regular Python import path and should not show `pyimod02_importers` in the traceback. Confirm local rebuilds run the charset steps above and do not use `pyinstaller burnrate-server.spec` without reinstalling `charset-normalizer` from source (see comment in [burnrate-server.spec](https://github.com/pratik1235/burnrate/blob/main/burnrate-server.spec)).
 
 ### Homebrew formula update fails
 

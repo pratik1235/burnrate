@@ -498,15 +498,26 @@ All endpoints are prefixed with `/api`. Base URL for frontend: `/api`.
 ```json
 {
   "status": "ok",
+  "input_total": 6,
   "total": 5,
   "success": 3,
   "failed": 0,
   "duplicate": 1,
   "card_not_found": 0,
   "parse_error": 1,
-  "skipped": 0
+  "password_needed": 0,
+  "skipped": 1,
+  "rejected": [
+    { "file_name": "readme.md", "reason": "invalid_type" }
+  ],
+  "outcomes": [
+    { "file_name": "jan.pdf", "status": "success", "message": null },
+    { "file_name": "feb.pdf", "status": "duplicate", "message": "Statement already imported" }
+  ]
 }
 ```
+
+`input_total` counts multipart parts; `total` is files queued after validation. `rejected` lists pre-queue skips (`missing_filename`, `invalid_type`, `file_too_large`). `outcomes` has one row per queued file (completion order). See `docs/specs/issue-16-bulk-upload-feedback.md`.
 
 **GET /statements Response:**
 ```json

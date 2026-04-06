@@ -1,4 +1,5 @@
 import { Button, Row, Typography } from '@cred/neopop-web/lib/components';
+import type { ComponentPropsWithoutRef, CSSProperties } from 'react';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import type { LucideIcon } from 'lucide-react';
 
@@ -27,6 +28,8 @@ type LabelTypographyOverrides = Partial<{
   as: 'p' | 'span';
 }>;
 
+type NeoPopRowProps = ComponentPropsWithoutRef<typeof Row>;
+
 export type ButtonWithIconProps = NeoPopButtonPassthrough & {
   /** Lucide icon component rendered to the left of the label. */
   icon: LucideIcon;
@@ -36,6 +39,14 @@ export type ButtonWithIconProps = NeoPopButtonPassthrough & {
   iconProps?: Omit<React.ComponentPropsWithoutRef<LucideIcon>, 'size'>;
   /** Horizontal gap between icon and label (NeoPOP `Row` `gap`). */
   gap?: number;
+  /** Flex alignment for the icon + label row (`Row.alignItems`). */
+  alignItems?: NeoPopRowProps['alignItems'];
+  /** Main-axis distribution for the icon + label row (`Row.justifyContent`). */
+  justifyContent?: NeoPopRowProps['justifyContent'];
+  /** Whether the icon + label row may wrap (`Row.flexWrap`). */
+  flexWrap?: NeoPopRowProps['flexWrap'];
+  /** Additional props for the inner NeoPOP `Row` (e.g. `style`, `className`). Applied after the props above; can override `gap` / alignment. */
+  rowProps?: Omit<NeoPopRowProps, 'children'>;
   /** Button label; rendered with NeoPOP `Typography` per project UI standards. */
   children: React.ReactNode;
   /** Optional overrides for label typography. */
@@ -51,6 +62,10 @@ export function ButtonWithIcon({
   iconSize = 14,
   iconProps,
   gap = 6,
+  alignItems = 'center',
+  justifyContent = 'space-around',
+  flexWrap,
+  rowProps,
   children,
   labelTypographyProps,
   ...buttonProps
@@ -64,9 +79,23 @@ export function ButtonWithIcon({
     as,
   } = labelTypographyProps ?? {};
 
+  const { style: rowStyleOverride, ...rowRest } = rowProps ?? {};
+  const rowStyle: CSSProperties = {
+    columnGap: gap,
+    rowGap: flexWrap === 'wrap' ? gap : undefined,
+    ...rowStyleOverride,
+  };
+
   return (
     <Button {...buttonProps}>
-      <Row alignItems="center" justifyContent="space-around" gap={gap}>
+      <Row
+        alignItems={alignItems}
+        justifyContent={justifyContent}
+        flexWrap={flexWrap}
+        {...rowRest}
+        style={rowStyle}
+        data-bwi-gap={gap}
+      >
         <Icon size={iconSize} aria-hidden {...iconProps} />
         <Typography
           as={as}

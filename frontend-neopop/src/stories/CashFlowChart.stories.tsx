@@ -14,6 +14,14 @@ const meta = {
   title: 'NeoPOP/CashFlowChart',
   component: CashFlowChart,
   parameters: { layout: 'centered' },
+  argTypes: {
+    data: { control: 'object' },
+    currency: { control: 'text' },
+    className: { control: 'text' },
+  },
+  args: {
+    currency: 'INR',
+  },
 } satisfies Meta<typeof CashFlowChart>;
 
 export default meta;

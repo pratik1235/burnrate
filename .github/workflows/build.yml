@@ -112,6 +112,26 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt pyinstaller
 
+      - name: Force pure-Python charset_normalizer
+        run: |
+          pip uninstall -y charset-normalizer || true
+          pip install charset-normalizer --no-binary :all:
+
+      - name: Guard against charset_normalizer mypyc artifacts (macOS sidecar)
+        run: |
+          python - <<'PY'
+          import pathlib
+          import charset_normalizer
+          root = pathlib.Path(charset_normalizer.__file__).resolve().parent
+          bad = [p for p in root.rglob("*") if "__mypyc" in p.name]
+          if bad:
+              print("::error::Regression: mypyc artifacts under charset_normalizer")
+              for p in bad:
+                  print(p)
+              raise SystemExit(1)
+          print("OK: no mypyc artifacts under charset_normalizer")
+          PY
+
       - name: Install frontend dependencies
         working-directory: frontend-neopop
         run: npm ci
@@ -125,12 +145,15 @@ jobs:
           bash scripts/generate-icons.sh
 
       - name: Build Python sidecar
+        env:
+          PYTHONPATH: .
         run: |
           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
           pyinstaller \
             --name burnrate-server \
             --onefile \
             --noconfirm \
+            --paths . \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.loops \
             --hidden-import uvicorn.loops.auto \
@@ -155,7 +178,9 @@ jobs:
             --hidden-import backend.routers.statements \
             --hidden-import backend.routers.tags \
             --hidden-import backend.routers.transactions \
+            --collect-all backend \
             --collect-all pdfplumber \
+            --collect-all charset_normalizer \
             scripts/launch.py
           mkdir -p src-tauri/binaries
           cp "dist/burnrate-server" "src-tauri/binaries/burnrate-server-${TRIPLE}"

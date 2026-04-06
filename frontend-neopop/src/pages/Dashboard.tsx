@@ -10,9 +10,11 @@ import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
 import { useAnalytics, useTransactions, useCards, useMilestones } from '@/hooks/useApi';
 import { uploadStatement, uploadStatementsBulk, getStatementPeriods } from '@/lib/api';
+import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/Toast';
-import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
+import { Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { ElevatedCard } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
@@ -444,34 +446,16 @@ function DashboardContent() {
     try {
       const result = await uploadStatementsBulk(files);
       toast.dismiss(loadingId);
-
+      notifyBulkUploadToasts(result, toast);
       if (result.success > 0) {
-        toast.success(`${result.success} of ${result.total} statements imported`);
         setTimeout(() => window.location.reload(), 1500);
-      }
-      if (result.card_not_found > 0) {
-        toast.warning(
-          `${result.card_not_found} statement(s) skipped — card not added yet. Add the card in Settings to process them.`
-        );
-      }
-      if (result.parse_error > 0) {
-        toast.warning(
-          `${result.parse_error} statement(s) could not be parsed. Check Customize → Reparse/Remove for details.`
-        );
-      }
-      if (result.success === 0 && result.card_not_found === 0) {
-        if (result.duplicate > 0 && result.failed === 0) {
-          toast.info('All statements already imported');
-        } else if (result.failed > 0) {
-          toast.error(`${result.failed} of ${result.total} statements failed`);
-        }
       }
       return result;
     } catch (err) {
       toast.dismiss(loadingId);
       const message = err instanceof Error ? err.message : 'Bulk upload failed';
       toast.error(message);
-      return { status: 'error', total: files.length, success: 0, failed: files.length, duplicate: 0, skipped: 0 };
+      return syntheticBulkUploadFailure(files.length);
     }
   };
 
@@ -481,16 +465,18 @@ function DashboardContent() {
       <Content>
         <FilterRow>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Button
+            <ButtonWithIcon
+              icon={SlidersHorizontal}
               variant={hasActiveFilters ? 'secondary' : 'primary'}
               kind="elevated"
               size="small"
               colorMode="dark"
               onClick={() => setFilterOpen(true)}
+              gap={6}
+              justifyContent="center"
             >
-              <SlidersHorizontal size={14} style={{ marginRight: 6 }} />
               Filters {hasActiveFilters ? `(${activeCount})` : ''}
-            </Button>
+            </ButtonWithIcon>
             {hasActiveFilters && (
               <CloseButton onClick={clearFilters} variant="inline" />
             )}

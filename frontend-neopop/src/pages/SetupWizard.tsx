@@ -1,12 +1,33 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mainColors } from '@cred/neopop-web/lib/primitives';
 import { toast } from '@/components/Toast';
-import { SetupForm, type SetupFormInitialData } from '@/components/SetupForm';
+import {
+  SetupForm,
+  type CardEntry,
+  type SetupFormData,
+  type SetupFormInitialData,
+} from '@/components/SetupForm';
 import { submitSetup, useSettings } from '@/hooks/useApi';
-import { updateSettings } from '@/lib/api';
+import { deleteCard, updateSettings } from '@/lib/api';
 import { CloseButton } from '@/components/CloseButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import styled from 'styled-components';
+
+/**
+ * Card IDs that were present when the update form loaded but are missing from the submitted list.
+ * Uses stable server IDs so removal matches DELETE /api/cards/{id} (same cascade as the Cards page).
+ */
+export function removedCardIds(
+  baseline: CardEntry[] | undefined,
+  submitted: SetupFormData['cards'],
+): string[] {
+  const kept = new Set(submitted.map((c) => c.id).filter((id): id is string => Boolean(id)));
+  return (baseline ?? [])
+    .filter((c): c is CardEntry & { id: string } => typeof c.id === 'string' && c.id.length > 0)
+    .filter((c) => !kept.has(c.id))
+    .map((c) => c.id);
+}
 
 const PageWrapper = styled.div`
   min-height: 100vh;
@@ -21,6 +42,8 @@ const PageWrapper = styled.div`
 export function SetupWizard() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+  const [pendingSave, setPendingSave] = useState<SetupFormData | null>(null);
   const { settings, loading: settingsLoading } = useSettings();
 
   const isUpdate = !!settings?.configured;
@@ -34,31 +57,50 @@ export function SetupWizard() {
       dobYear: settings.dobYear,
       watchFolder: settings.watchFolder,
       displayCurrency: settings.displayCurrency ?? '',
-      cards: settings.cards?.map((c) => ({ bank: c.bank, last4: c.last4 })),
+      cards: settings.cards?.map((c) => ({ id: c.id, bank: c.bank, last4: c.last4 })),
     };
   }, [settings]);
 
-  const handleSubmit = async (data: {
-    name: string;
-    dobDay: string;
-    dobMonth: string;
-    dobYear: string;
-    cards: { bank: string; last4: string }[];
-    watchFolder: string;
-    displayCurrency: string;
-  }) => {
+  /** Baseline card rows (with server IDs) captured once when the update form is first populated */
+  const baselineCardsRef = useRef<SetupFormInitialData['cards'] | undefined>(undefined);
+  useEffect(() => {
+    if (!isUpdate || !initialData?.cards?.length) return;
+    if (baselineCardsRef.current !== undefined) return;
+    baselineCardsRef.current = initialData.cards.map((c) => ({ ...c }));
+  }, [isUpdate, initialData]);
+
+  const persistUpdate = async (data: SetupFormData) => {
+    const baseline = baselineCardsRef.current ?? initialData?.cards;
+    const toRemove = removedCardIds(baseline, data.cards);
+    for (const id of toRemove) {
+      await deleteCard(id);
+    }
+    await updateSettings({
+      name: data.name,
+      dobDay: data.dobDay,
+      dobMonth: data.dobMonth,
+      dobYear: data.dobYear,
+      watchFolder: data.watchFolder,
+      displayCurrency: data.displayCurrency || undefined,
+      cards: data.cards.map(({ bank, last4 }) => ({ bank, last4 })),
+    });
+  };
+
+  const handleSubmit = async (data: SetupFormData) => {
+    if (isUpdate) {
+      const baseline = baselineCardsRef.current ?? initialData?.cards;
+      const toRemove = removedCardIds(baseline, data.cards);
+      if (toRemove.length > 0) {
+        setPendingSave(data);
+        setConfirmSaveOpen(true);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       if (isUpdate) {
-        await updateSettings({
-          name: data.name,
-          dobDay: data.dobDay,
-          dobMonth: data.dobMonth,
-          dobYear: data.dobYear,
-          watchFolder: data.watchFolder,
-          displayCurrency: data.displayCurrency || undefined,
-          cards: data.cards,
-        });
+        await persistUpdate(data);
         toast.success('Profile updated!');
       } else {
         await submitSetup({
@@ -81,6 +123,27 @@ export function SetupWizard() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleConfirmSaveRemovals = async () => {
+    if (!pendingSave) return;
+    setConfirmSaveOpen(false);
+    setSubmitting(true);
+    try {
+      await persistUpdate(pendingSave);
+      toast.success('Profile updated!');
+      navigate('/dashboard');
+    } catch {
+      toast.error('Setup failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+      setPendingSave(null);
+    }
+  };
+
+  const handleCancelSaveRemovals = () => {
+    setConfirmSaveOpen(false);
+    setPendingSave(null);
   };
 
   const handleClose = () => {
@@ -107,6 +170,19 @@ export function SetupWizard() {
           />
         )}
       </div>
+      <ConfirmModal
+        open={confirmSaveOpen}
+        title="Remove Card"
+        message={
+          pendingSave && removedCardIds(baselineCardsRef.current ?? initialData?.cards, pendingSave.cards).length > 1
+            ? 'Saving will remove these cards and all of their transactions and statements. This cannot be undone.'
+            : 'Saving will remove this card and all of its transactions and statements. This cannot be undone.'
+        }
+        confirmLabel="Remove and save"
+        variant="danger"
+        onConfirm={() => void handleConfirmSaveRemovals()}
+        onCancel={handleCancelSaveRemovals}
+      />
     </PageWrapper>
   );
 }

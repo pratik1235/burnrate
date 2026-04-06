@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { fn } from '@storybook/test';
 import { TransactionRow } from '@/components/TransactionRow';
 import type { Transaction } from '@/lib/types';
 
@@ -19,6 +20,18 @@ const meta = {
   title: 'NeoPOP/TransactionRow',
   component: TransactionRow,
   parameters: { layout: 'centered' },
+  argTypes: {
+    transaction: { control: 'object' },
+    exclusionMode: { control: 'boolean' },
+    isExcluded: { control: 'boolean' },
+    className: { control: 'text' },
+    onToggleExclude: { action: 'toggleExclude' },
+  },
+  args: {
+    exclusionMode: false,
+    isExcluded: false,
+    onToggleExclude: fn(),
+  },
 } satisfies Meta<typeof TransactionRow>;
 
 export default meta;

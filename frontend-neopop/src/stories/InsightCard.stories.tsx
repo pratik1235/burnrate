@@ -5,6 +5,10 @@ const meta = {
   title: 'NeoPOP/InsightCard',
   component: InsightCard,
   parameters: { layout: 'centered' },
+  argTypes: {
+    text: { control: 'text' },
+    className: { control: 'text' },
+  },
 } satisfies Meta<typeof InsightCard>;
 
 export default meta;

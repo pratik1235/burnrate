@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button, InputField, Row } from '@cred/neopop-web/lib/components';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
+import { Button, InputField } from '@cred/neopop-web/lib/components';
 import { Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
@@ -8,12 +9,14 @@ import { BANK_CONFIG } from '@/lib/types';
 import { Plus, Trash2, FolderOpen, Shield } from 'lucide-react';
 import { api } from '@/lib/api';
 
-interface CardEntry {
+export interface CardEntry {
+  /** Present for cards loaded from the server (update flow); omitted for newly added rows */
+  id?: string;
   bank: Bank;
   last4: string;
 }
 
-interface SetupFormData {
+export interface SetupFormData {
   name: string;
   dobDay: string;
   dobMonth: string;
@@ -60,7 +63,10 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
   const cancelledRef = useRef(false);
 
   useEffect(() => {
-    return () => { cancelledRef.current = true; };
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -101,15 +107,19 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
     }
   }, []);
 
-  const addCard = () => setCards([...cards, { bank: 'hdfc', last4: '' }]);
+  const addCard = useCallback(() => {
+    setCards((prev) => [...prev, { bank: 'hdfc', last4: '' }]);
+  }, []);
 
-  const removeCard = (index: number) => {
-    if (cards.length > 1) setCards(cards.filter((_, i) => i !== index));
-  };
+  const removeCard = useCallback((index: number) => {
+    setCards((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+  }, []);
 
-  const updateCard = (index: number, field: keyof CardEntry, value: string) => {
-    setCards(cards.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
-  };
+  const updateCard = useCallback((index: number, field: keyof CardEntry, value: string) => {
+    setCards((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)),
+    );
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,7 +271,10 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
               </Typography>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {cards.map((card, index) => (
-                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div
+                    key={card.id ?? `new-${index}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
+                  >
                     <select
                       value={card.bank}
                       onChange={(e) => updateCard(index, 'bank', e.target.value)}
@@ -342,32 +355,27 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                 ))}
               </div>
               <div style={{ height: 3 }} />
-              <Button
+              <ButtonWithIcon
                 type="button"
+                icon={Plus}
                 variant="primary"
                 kind="elevated"
                 size="small"
                 colorMode="dark"
                 onClick={addCard}
+                gap={6}
+                justifyContent="flex-start"
+                labelTypographyProps={{ fontSize: 12, color: colorPalette.rss[500] }}
                 style={{
                   marginTop: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 12,
-                  color: colorPalette.rss[500],
                   background: 'none',
                   border: 'none',
                   alignSelf: 'flex-start',
                   maxWidth: 180,
                 }}
               >
-                <Row alignItems="center" gap={4}>
-                  <Plus size={14} style={{ marginRight: 4 }} />
-                  Add another card
-                </Row>
-
-              </Button>
+                Add another card
+              </ButtonWithIcon>
             </div>
 
             <div style={{ overflow: 'hidden', minWidth: 0 }}>
@@ -382,10 +390,19 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWatchFolder(e.target.value)}
                   />
                 </div>
-                <Button type="button" variant="primary" kind="elevated" size="medium" colorMode="dark" onClick={handleBrowse}>
-                  <FolderOpen size={14} style={{ marginRight: 4 }} />
+                <ButtonWithIcon
+                  type="button"
+                  icon={FolderOpen}
+                  variant="primary"
+                  kind="elevated"
+                  size="medium"
+                  colorMode="dark"
+                  onClick={() => void handleBrowse()}
+                  gap={4}
+                  justifyContent="center"
+                >
                   Browse
-                </Button>
+                </ButtonWithIcon>
               </div>
               <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginTop: 4 }}>
                 Tip: Sync your Google Drive here for auto-import

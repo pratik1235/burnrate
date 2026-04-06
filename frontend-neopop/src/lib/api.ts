@@ -24,7 +24,7 @@ export interface Settings {
   watchFolder?: string;
   /** Optional UI preference: INR | USD */
   displayCurrency?: string;
-  cards?: { bank: Bank; last4: string }[];
+  cards?: { id: string; bank: Bank; last4: string }[];
 }
 
 /** Raw API response from GET /settings */
@@ -162,7 +162,11 @@ export async function getSettings(): Promise<Settings> {
     dobYear: data.settings?.dob_year,
     watchFolder: data.settings?.watch_folder,
     displayCurrency: data.settings?.display_currency ?? undefined,
-    cards: data.cards?.map((c) => ({ bank: c.bank as Bank, last4: c.last4 })),
+    cards: data.cards?.map((c) => ({
+      id: c.id,
+      bank: c.bank as Bank,
+      last4: c.last4,
+    })),
   };
 }
 
@@ -185,7 +189,7 @@ export async function updateSettings(payload: {
   if (payload.displayCurrency !== undefined) {
     body.display_currency = payload.displayCurrency || null;
   }
-  if (payload.cards) {
+  if (payload.cards !== undefined) {
     body.cards = payload.cards.map((c) => ({ bank: c.bank, last4: c.last4 }));
   }
   const { data } = await api.put<{ status: string }>('/settings', body);
@@ -238,15 +242,53 @@ export async function uploadStatement(
   return data;
 }
 
+export type BulkRejectReason = 'missing_filename' | 'invalid_type' | 'file_too_large';
+
+export interface BulkRejectedItem {
+  file_name: string;
+  reason: BulkRejectReason;
+}
+
+export interface BulkOutcomeItem {
+  file_name: string;
+  status: string;
+  message?: string | null;
+}
+
 export interface BulkUploadResult {
   status: string;
+  /** Multipart parts received (may exceed queued `total` when some are rejected pre-queue). */
+  input_total: number;
   total: number;
   success: number;
   failed: number;
   duplicate: number;
   card_not_found: number;
   parse_error: number;
+  password_needed: number;
   skipped: number;
+  rejected: BulkRejectedItem[];
+  outcomes: BulkOutcomeItem[];
+}
+
+function normalizeBulkUploadResult(raw: Record<string, unknown>): BulkUploadResult {
+  const total = Number(raw.total) || 0;
+  const rejected = Array.isArray(raw.rejected) ? (raw.rejected as BulkRejectedItem[]) : [];
+  const outcomes = Array.isArray(raw.outcomes) ? (raw.outcomes as BulkOutcomeItem[]) : [];
+  return {
+    status: String(raw.status ?? 'ok'),
+    input_total: typeof raw.input_total === 'number' ? raw.input_total : total,
+    total,
+    success: Number(raw.success) || 0,
+    failed: Number(raw.failed) || 0,
+    duplicate: Number(raw.duplicate) || 0,
+    card_not_found: Number(raw.card_not_found) || 0,
+    parse_error: Number(raw.parse_error) || 0,
+    password_needed: Number(raw.password_needed) || 0,
+    skipped: typeof raw.skipped === 'number' ? raw.skipped : rejected.length,
+    rejected,
+    outcomes,
+  };
 }
 
 export async function uploadStatementsBulk(
@@ -262,7 +304,7 @@ export async function uploadStatementsBulk(
   if (bank) formData.append('bank', bank);
   if (password) formData.append('password', password);
   if (source) formData.append('source', source);
-  const { data } = await api.post<BulkUploadResult>(
+  const { data } = await api.post<Record<string, unknown>>(
     '/statements/upload-bulk',
     formData,
     {
@@ -270,7 +312,7 @@ export async function uploadStatementsBulk(
       timeout: 300000,
     }
   );
-  return data;
+  return normalizeBulkUploadResult(data);
 }
 
 interface StatementRaw {

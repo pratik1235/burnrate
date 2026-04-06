@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { StatUpload } from '@/components/StatUpload';
 import { FilterModal, type BankStatementFilterValues } from '@/components/FilterModal';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
+import { useFilters } from '@/contexts/FilterContext';
+import { useCards } from '@/hooks/useApi';
+import { getBankAccountKeys } from '@/lib/api';
 import { Button, Typography, InputField, Row, Column } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
@@ -18,9 +22,10 @@ import {
 import type { Statement } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
 import { toast } from '@/components/Toast';
+import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
 import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, Files } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 const PageLayout = styled.div`
   min-height: 100vh;
@@ -92,6 +97,39 @@ const UploadRow = styled.div`
 `;
 
 /**
+ * Matches Dashboard `ClickableSpend` around SpendSummary: lift + soft shadow on hover.
+ * Applied only to successfully parsed rows (`$warn` is false).
+ */
+const StatementListRow = styled.div<{ $warn: boolean }>`
+  padding: 14px 16px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  border: ${(p) =>
+    p.$warn ? '1px solid rgba(229,161,0,0.4)' : '1px solid rgba(255,255,255,0.08)'};
+  background: ${(p) => (p.$warn ? 'rgba(229,161,0,0.04)' : 'transparent')};
+
+  ${(p) =>
+    !p.$warn &&
+    css`
+      cursor: pointer;
+      transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+      &:hover {
+        transform: translateY(-3px) scale(1.01);
+        box-shadow: 0 8px 24px rgba(255, 255, 255, 0.06);
+      }
+      &:active {
+        transform: translateY(0) scale(0.99);
+        box-shadow: none;
+      }
+    `}
+`;
+
+/**
  * Visible label `...<parentFolder>/<file>` and full path for native tooltip (hover).
  */
 function statementPathPreview(
@@ -125,8 +163,91 @@ function bankRowMeta(s: Statement) {
   return cfg;
 }
 
+function StatementPathHover({ display, fullPath }: { display: string; fullPath: string }) {
+  const [open, setOpen] = useState(false);
+  const tip = fullPath.trim();
+  if (!tip) {
+    return (
+      <Typography
+        as="span"
+        fontType={FontType.BODY}
+        fontSize={11}
+        fontWeight={FontWeights.REGULAR}
+        color="rgba(255,255,255,0.45)"
+        style={{
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
+          wordBreak: 'break-all',
+          lineHeight: 1.4,
+          textAlign: 'right',
+          display: 'block',
+          maxWidth: 340,
+        }}
+      >
+        {display}
+      </Typography>
+    );
+  }
+  return (
+    <span
+      style={{ position: 'relative', display: 'block', maxWidth: 340, alignSelf: 'stretch' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <Typography
+        as="span"
+        aria-label={`Full path: ${tip}`}
+        fontType={FontType.BODY}
+        fontSize={11}
+        fontWeight={FontWeights.REGULAR}
+        color="rgba(255,255,255,0.45)"
+        style={{
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
+          wordBreak: 'break-all',
+          lineHeight: 1.4,
+          textAlign: 'right',
+          display: 'block',
+          cursor: 'help',
+        }}
+      >
+        {display}
+      </Typography>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            marginTop: 8,
+            zIndex: 400,
+            maxWidth: 'min(420px, 90vw)',
+            padding: '10px 12px',
+            background: colorPalette.popBlack[300],
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            pointerEvents: 'none',
+          }}
+        >
+          <Typography
+            fontType={FontType.BODY}
+            fontSize={11}
+            fontWeight={FontWeights.REGULAR}
+            color="rgba(255,255,255,0.85)"
+            style={{ wordBreak: 'break-all', fontFamily: 'ui-monospace, Menlo, Monaco, monospace' }}
+          >
+            {fullPath}
+          </Typography>
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function Statements() {
   const navigate = useNavigate();
+  const { setFilters } = useFilters();
+  const { cards } = useCards();
+  const [bankAccounts, setBankAccounts] = useState<{ id: string; bank: string; last4: string }[]>([]);
   const [statements, setStatements] = useState<Statement[]>([]);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState<string | null>(null);
@@ -172,6 +293,40 @@ export function Statements() {
     fetchStatements();
   }, [fetchStatements]);
 
+  useEffect(() => {
+    getBankAccountKeys()
+      .then(setBankAccounts)
+      .catch(() => setBankAccounts([]));
+  }, []);
+
+  const openTransactionsForStatement = useCallback(
+    (s: Statement) => {
+      const from = s.periodStart || undefined;
+      const to = s.periodEnd || undefined;
+      const safeCardList = Array.isArray(cards) ? cards : [];
+      if (s.source === 'BANK') {
+        const nb = s.bank.toLowerCase();
+        const match = bankAccounts.find((a) => a.bank.toLowerCase() === nb && a.last4 === s.cardLast4);
+        setFilters({
+          dateRange: { from, to },
+          selectedCards: [],
+          selectedBankAccounts: match ? [match.id] : [],
+          source: 'BANK',
+        });
+      } else {
+        const matchingCard = safeCardList.find((c) => c.bank === s.bank && c.last4 === s.cardLast4);
+        setFilters({
+          dateRange: { from, to },
+          selectedCards: matchingCard ? [matchingCard.id] : [],
+          selectedBankAccounts: [],
+          source: 'CC',
+        });
+      }
+      navigate('/transactions');
+    },
+    [bankAccounts, cards, navigate, setFilters],
+  );
+
   const fmt = (d: string) => {
     if (!d) return '—';
     const date = new Date(d + 'T00:00:00');
@@ -214,23 +369,16 @@ export function Statements() {
     try {
       const result = await uploadStatementsBulk(files, undefined, undefined, 'CC');
       toast.dismiss(loadingId);
+      notifyBulkUploadToasts(result, toast);
       if (result.success > 0) {
-        toast.success(`${result.success} of ${result.total} statements imported`);
         await afterAnyUpload();
-      }
-      if (result.success === 0) {
-        if (result.duplicate > 0 && result.failed === 0) {
-          toast.info('All statements already imported');
-        } else if (result.failed > 0) {
-          toast.error(`${result.failed} of ${result.total} statements failed`);
-        }
       }
       return result;
     } catch (err) {
       toast.dismiss(loadingId);
       const message = err instanceof Error ? err.message : 'Bulk upload failed';
       toast.error(message);
-      return { status: 'error', total: files.length, success: 0, failed: files.length, duplicate: 0, skipped: 0 };
+      return syntheticBulkUploadFailure(files.length);
     }
   };
 
@@ -265,23 +413,16 @@ export function Statements() {
     try {
       const result = await uploadStatementsBulk(files, undefined, undefined, 'BANK');
       toast.dismiss(loadingId);
+      notifyBulkUploadToasts(result, toast);
       if (result.success > 0) {
-        toast.success(`${result.success} of ${result.total} bank statements imported`);
         await afterAnyUpload();
-      }
-      if (result.success === 0) {
-        if (result.duplicate > 0 && result.failed === 0) {
-          toast.info('All statements already imported');
-        } else if (result.failed > 0) {
-          toast.error(`${result.failed} of ${result.total} statements failed`);
-        }
       }
       return result;
     } catch (err) {
       toast.dismiss(loadingId);
       const message = err instanceof Error ? err.message : 'Bulk upload failed';
       toast.error(message);
-      return { status: 'error', total: files.length, success: 0, failed: files.length, duplicate: 0, skipped: 0 };
+      return syntheticBulkUploadFailure(files.length);
     }
   };
 
@@ -317,6 +458,20 @@ export function Statements() {
     }
   };
 
+  /** Deletes without confirmation — used for unparsed / error rows (parse_error, password_needed). */
+  const removeStatementWithoutConfirm = async (id: string) => {
+    setActioning(id);
+    try {
+      await deleteStatement(id);
+      toast.success('Statement deleted');
+      setStatements((prev) => prev.filter((s) => s.id !== id));
+    } catch {
+      toast.error('Delete failed');
+    } finally {
+      setActioning(null);
+    }
+  };
+
   const handlePasswordSubmit = async (stmtId: string) => {
     const pwd = (passwordInputs[stmtId] ?? '').trim();
     if (!pwd) return;
@@ -343,30 +498,7 @@ export function Statements() {
 
   const filePathLine = (s: Statement) => {
     const { display, fullPath } = statementPathPreview(s.filePath, s.fileName);
-    const tip = fullPath.trim();
-    /** `title` must live on the hovered node; wrapping Typography in an outer span hid the tooltip. */
-    return (
-      <Typography
-        as="span"
-        title={tip || undefined}
-        aria-label={tip ? `Full path: ${tip}` : undefined}
-        fontType={FontType.BODY}
-        fontSize={11}
-        fontWeight={FontWeights.REGULAR}
-        color="rgba(255,255,255,0.45)"
-        style={{
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
-          wordBreak: 'break-all',
-          lineHeight: 1.4,
-          textAlign: 'right',
-          display: 'block',
-          maxWidth: 340,
-          cursor: tip ? 'help' : 'default',
-        }}
-      >
-        {display}
-      </Typography>
-    );
+    return <StatementPathHover display={display} fullPath={fullPath} />;
   };
 
   const periodLine = (s: Statement) => (
@@ -394,7 +526,8 @@ export function Statements() {
               Statements
             </Typography>
           </div>
-          <Button
+          <ButtonWithIcon
+            icon={SlidersHorizontal}
             variant={
               stmtFilters.banks.length > 0 || stmtFilters.from || stmtFilters.to || stmtFilters.source
                 ? 'secondary'
@@ -404,12 +537,13 @@ export function Statements() {
             size="small"
             colorMode="dark"
             onClick={() => setFilterOpen(true)}
+            justifyContent="center"
+            gap={6}
           >
-            <SlidersHorizontal size={14} style={{ marginRight: 6 }} />
             Filters
             {(stmtFilters.banks.length > 0 || stmtFilters.from || stmtFilters.to || stmtFilters.source) &&
               ` (${stmtFilters.banks.length + (stmtFilters.from ? 1 : 0) + (stmtFilters.to ? 1 : 0) + (stmtFilters.source ? 1 : 0)})`}
-          </Button>
+          </ButtonWithIcon>
         </div>
 
         <UploadRow>
@@ -460,18 +594,7 @@ export function Statements() {
               const warnBorder = isError || needsPassword;
 
               return (
-                <div
-                  key={s.id}
-                  style={{
-                    padding: '14px 16px',
-                    border: warnBorder ? '1px solid rgba(229,161,0,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 10,
-                    background: warnBorder ? 'rgba(229,161,0,0.04)' : 'transparent',
-                  }}
-                >
+                <StatementListRow key={s.id} $warn={warnBorder}>
                   {needsPassword ? (
                     <Row style={statementBodyRowStyle}>
                       <Column style={statementLeftColStyle}>
@@ -545,18 +668,20 @@ export function Statements() {
                       </Column>
                       <Column style={statementRightColPasswordStyle}>
                         <Row style={statementButtonRowStyle}>
-                          <Button
+                          <ButtonWithIcon
+                            icon={Trash2}
                             variant="secondary"
                             kind="elevated"
                             size="small"
                             colorMode="dark"
-                            onClick={() => setConfirmDeleteId(s.id)}
+                            onClick={() => void removeStatementWithoutConfirm(s.id)}
                             disabled={!!actioning}
+                            justifyContent="center"
+                            gap={4}
                             style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
                           >
-                            <Trash2 size={14} style={{ marginRight: 4 }} />
                             Remove
-                          </Button>
+                          </ButtonWithIcon>
                           <Button
                             variant="primary"
                             kind="elevated"
@@ -623,90 +748,120 @@ export function Statements() {
                       </Column>
                       <Column style={statementRightColStyle}>
                         <Row style={statementButtonRowStyle}>
-                          <Button
+                          <ButtonWithIcon
+                            icon={RefreshCw}
                             variant="primary"
                             kind="elevated"
                             size="small"
                             colorMode="dark"
                             onClick={() => handleReparse(s.id)}
                             disabled={!!actioning}
+                            justifyContent="center"
+                            gap={4}
                           >
-                            <RefreshCw size={14} style={{ marginRight: 4 }} />
                             Retry
-                          </Button>
-                          <Button
+                          </ButtonWithIcon>
+                          <ButtonWithIcon
+                            icon={Trash2}
                             variant="secondary"
                             kind="elevated"
                             size="small"
                             colorMode="dark"
-                            onClick={() => setConfirmDeleteId(s.id)}
+                            onClick={() => void removeStatementWithoutConfirm(s.id)}
                             disabled={!!actioning}
+                            justifyContent="center"
+                            gap={4}
                             style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
                           >
-                            <Trash2 size={14} style={{ marginRight: 4 }} />
                             Remove
-                          </Button>
+                          </ButtonWithIcon>
                         </Row>
                         {filePathLine(s)}
                       </Column>
                     </Row>
                   ) : (
-                    <Row style={statementBodyRowStyle}>
-                      <Column style={statementLeftColStyle}>
-                        <Row style={statementTitleRowStyle}>
-                          <Typography
-                            as="span"
-                            fontType={FontType.BODY}
-                            fontSize={10}
-                            fontWeight={FontWeights.BOLD}
-                            color={sourceLabel === 'BANK' ? colorPalette.info[500] : colorPalette.rss[500]}
-                            style={{
-                              padding: '1px 6px',
-                              borderRadius: 4,
-                              background: sourceLabel === 'BANK' ? 'rgba(59,130,246,0.15)' : 'rgba(255,135,68,0.15)',
-                            }}
-                          >
-                            {sourceLabel}
-                          </Typography>
-                          <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-                            {bankConfig.name}
-                            {s.cardLast4 ? ` …${s.cardLast4}` : ''}
-                          </Typography>
-                        </Row>
-                        {periodLine(s)}
-                        {transactionCountLine(s.transactionCount)}
-                      </Column>
-                      <Column style={statementRightColStyle}>
-                        <Row style={statementButtonRowStyle}>
-                          <Button
-                            variant="primary"
-                            kind="elevated"
-                            size="small"
-                            colorMode="dark"
-                            onClick={() => handleReparse(s.id)}
-                            disabled={!!actioning}
-                          >
-                            <RefreshCw size={14} style={{ marginRight: 4 }} />
-                            Refresh statement
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            kind="elevated"
-                            size="small"
-                            colorMode="dark"
-                            onClick={() => setConfirmDeleteId(s.id)}
-                            disabled={!!actioning}
-                            style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
-                          >
-                            <Trash2 size={14} style={{ marginRight: 4 }} />
-                            Remove
-                          </Button>
-                        </Row>
-                        {filePathLine(s)}
-                      </Column>
-                    </Row>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        openTransactionsForStatement(s);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter' && e.key !== ' ') return;
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        e.preventDefault();
+                        openTransactionsForStatement(s);
+                      }}
+                      style={{ cursor: 'pointer', borderRadius: 12 }}
+                    >
+                      <Row style={statementBodyRowStyle}>
+                        <Column style={statementLeftColStyle}>
+                          <Row style={statementTitleRowStyle}>
+                            <Typography
+                              as="span"
+                              fontType={FontType.BODY}
+                              fontSize={10}
+                              fontWeight={FontWeights.BOLD}
+                              color={sourceLabel === 'BANK' ? colorPalette.info[500] : colorPalette.rss[500]}
+                              style={{
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                background: sourceLabel === 'BANK' ? 'rgba(59,130,246,0.15)' : 'rgba(255,135,68,0.15)',
+                              }}
+                            >
+                              {sourceLabel}
+                            </Typography>
+                            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                              {bankConfig.name}
+                              {s.cardLast4 ? ` …${s.cardLast4}` : ''}
+                            </Typography>
+                          </Row>
+                          {periodLine(s)}
+                          {transactionCountLine(s.transactionCount)}
+                        </Column>
+                        <Column style={statementRightColStyle}>
+                          <Row style={statementButtonRowStyle}>
+                            <ButtonWithIcon
+                              icon={RefreshCw}
+                              variant="primary"
+                              kind="elevated"
+                              size="small"
+                              colorMode="dark"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleReparse(s.id);
+                              }}
+                              disabled={!!actioning}
+                              justifyContent="center"
+                              gap={4}
+                            >
+                              Refresh statement
+                            </ButtonWithIcon>
+                            <ButtonWithIcon
+                              icon={Trash2}
+                              variant="secondary"
+                              kind="elevated"
+                              size="small"
+                              colorMode="dark"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(s.id);
+                              }}
+                              disabled={!!actioning}
+                              justifyContent="center"
+                              gap={4}
+                              style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
+                            >
+                              Remove
+                            </ButtonWithIcon>
+                          </Row>
+                          {filePathLine(s)}
+                        </Column>
+                      </Row>
+                    </div>
                   )}
-                </div>
+                </StatementListRow>
               );
             })}
           </div>

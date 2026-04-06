@@ -1,16 +1,20 @@
 """Statement API endpoints."""
 
 import concurrent.futures
+import logging
 import os
 from datetime import date
+from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import or_
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB per file
 
@@ -21,6 +25,46 @@ router = APIRouter(prefix="/statements", tags=["statements"])
 
 
 ALLOWED_EXTENSIONS = {".pdf", ".csv"}
+
+
+class BulkRejectReason(str, Enum):
+    """Why a multipart file was not queued for processing."""
+
+    missing_filename = "missing_filename"
+    invalid_type = "invalid_type"
+    file_too_large = "file_too_large"
+
+
+class BulkRejectedItem(BaseModel):
+    """Pre-queue rejection (validation before save)."""
+
+    file_name: str
+    reason: BulkRejectReason
+
+
+class BulkOutcomeItem(BaseModel):
+    """Result for one queued file (order follows pool completion)."""
+
+    file_name: str
+    status: str
+    message: Optional[str] = None
+
+
+class BulkUploadResponse(BaseModel):
+    """Response for POST /statements/upload-bulk."""
+
+    status: str = "ok"
+    input_total: int
+    total: int = Field(description="Files queued for processing")
+    success: int = 0
+    failed: int = 0
+    duplicate: int = 0
+    card_not_found: int = 0
+    parse_error: int = 0
+    password_needed: int = 0
+    skipped: int = Field(description="Count of pre-queue rejections; equals len(rejected)")
+    rejected: List[BulkRejectedItem] = Field(default_factory=list)
+    outcomes: List[BulkOutcomeItem] = Field(default_factory=list)
 
 
 def _get_file_ext(filename: str) -> str:
@@ -68,40 +112,48 @@ def upload_statement(
     return result
 
 
-@router.post("/upload-bulk")
+@router.post("/upload-bulk", response_model=BulkUploadResponse)
 async def upload_bulk(
     files: List[UploadFile] = File(...),
     bank: Optional[str] = Form(None),
     password: Optional[str] = Form(None),
     source: Optional[str] = Form("CC"),
-) -> Dict[str, Any]:
+) -> BulkUploadResponse:
     """Accept multiple PDF/CSV files. Files are queued and processed with
     max 10 concurrently via the shared processing pool."""
     from backend.services import processing_queue
 
-    saved: List[str] = []
-    skipped: List[str] = []
+    input_total = len(files)
+    rejected: List[BulkRejectedItem] = []
+    jobs: List[tuple[str, str]] = []
 
     for f in files:
         if not f.filename:
-            skipped.append("<unknown>")
+            rejected.append(
+                BulkRejectedItem(file_name="unknown", reason=BulkRejectReason.missing_filename)
+            )
             continue
+        display_name = PurePosixPath(f.filename).name or "unknown"
         ext = _get_file_ext(f.filename)
         if ext not in ALLOWED_EXTENSIONS:
-            skipped.append(f.filename)
+            rejected.append(
+                BulkRejectedItem(file_name=display_name, reason=BulkRejectReason.invalid_type)
+            )
             continue
-        basename = PurePosixPath(f.filename).name or f"upload{ext}"
+        basename = display_name or f"upload{ext}"
         safe_name = f"{uuid4().hex}_{basename}"
         persistent_path = str(UPLOADS_DIR / safe_name)
         content = await f.read()
         if len(content) > MAX_UPLOAD_SIZE:
-            skipped.append(f.filename)
+            rejected.append(
+                BulkRejectedItem(file_name=display_name, reason=BulkRejectReason.file_too_large)
+            )
             continue
         with open(persistent_path, "wb") as out:
             out.write(content)
-        saved.append(persistent_path)
+        jobs.append((persistent_path, display_name))
 
-    if not saved:
+    if not jobs:
         raise HTTPException(status_code=400, detail="No valid PDF or CSV files provided")
 
     stmt_source = (source or "CC").upper()
@@ -109,26 +161,40 @@ async def upload_bulk(
         stmt_source = "CC"
 
     bank_lower = bank.lower() if bank else None
-    futures = [
-        processing_queue.submit(
+    future_to_name: Dict[concurrent.futures.Future, str] = {}
+    for path, display_name in jobs:
+        fut = processing_queue.submit(
             pdf_path=path,
             bank=bank_lower,
             manual_password=password,
             source=stmt_source,
         )
-        for path in saved
-    ]
+        future_to_name[fut] = display_name
 
     results = {
-        "total": len(saved), "success": 0, "failed": 0,
-        "duplicate": 0, "card_not_found": 0, "parse_error": 0,
+        "total": len(jobs),
+        "success": 0,
+        "failed": 0,
+        "duplicate": 0,
+        "card_not_found": 0,
+        "parse_error": 0,
         "password_needed": 0,
-        "skipped": len(skipped),
     }
-    for future in concurrent.futures.as_completed(futures):
+    outcomes: List[BulkOutcomeItem] = []
+
+    for future in concurrent.futures.as_completed(future_to_name):
+        display_name = future_to_name[future]
         try:
             result = future.result()
             status = result.get("status", "error")
+            msg = result.get("message")
+            if isinstance(msg, str):
+                msg = msg.strip() or None
+            else:
+                msg = None
+            outcomes.append(
+                BulkOutcomeItem(file_name=display_name, status=status, message=msg)
+            )
             if status == "success":
                 results["success"] += 1
             elif status == "duplicate":
@@ -142,9 +208,30 @@ async def upload_bulk(
             else:
                 results["failed"] += 1
         except Exception:
+            logger.exception("Bulk upload processing failed for file=%s", display_name)
+            outcomes.append(
+                BulkOutcomeItem(
+                    file_name=display_name,
+                    status="error",
+                    message="Processing failed",
+                )
+            )
             results["failed"] += 1
 
-    return {"status": "ok", **results}
+    return BulkUploadResponse(
+        status="ok",
+        input_total=input_total,
+        total=results["total"],
+        success=results["success"],
+        failed=results["failed"],
+        duplicate=results["duplicate"],
+        card_not_found=results["card_not_found"],
+        parse_error=results["parse_error"],
+        password_needed=results["password_needed"],
+        skipped=len(rejected),
+        rejected=rejected,
+        outcomes=outcomes,
+    )
 
 
 def _process_one_statement(

@@ -7,13 +7,14 @@ import { TopMerchants } from '@/components/TopMerchants';
 import { CashFlowChart } from '@/components/CashFlowChart';
 import { CardComparison } from '@/components/CardComparison';
 import { InsightCard } from '@/components/InsightCard';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { CloseButton } from '@/components/CloseButton';
 import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
 import { useAnalytics } from '@/hooks/useApi';
 import { CATEGORY_CONFIG } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Button, Typography } from '@cred/neopop-web/lib/components';
+import { Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { SlidersHorizontal, Gauge, TrendingUp, Wallet } from 'lucide-react';
@@ -314,16 +315,18 @@ function AnalyticsContent() {
       <Content>
         <ActionBar>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Button
+            <ButtonWithIcon
+              icon={SlidersHorizontal}
               variant={hasActiveFilters ? 'secondary' : 'primary'}
               kind="elevated"
               size="small"
               colorMode="dark"
               onClick={() => setFilterOpen(true)}
+              gap={6}
+              justifyContent="center"
             >
-              <SlidersHorizontal size={14} style={{ marginRight: 6 }} />
               Filters {hasActiveFilters ? `(${activeCount})` : ''}
-            </Button>
+            </ButtonWithIcon>
             {hasActiveFilters && (
               <CloseButton variant="inline" onClick={clearFilters} />
             )}

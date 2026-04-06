@@ -1,17 +1,47 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { fn } from '@storybook/test';
 import { Button } from '@cred/neopop-web/lib/components';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { Upload, Plus, RefreshCw } from 'lucide-react';
+
+const elevationDirectionOptions = [
+  'bottom-right',
+  'top-right',
+  'bottom-left',
+  'top-left',
+  'bottom-center',
+  'top-center',
+  'right-center',
+  'left-center',
+] as const;
 
 const meta = {
   title: 'NeoPOP/Button',
   component: Button,
   parameters: { layout: 'centered' },
   argTypes: {
+    children: { control: 'text' },
     variant: { control: 'select', options: ['primary', 'secondary'] },
     kind: { control: 'select', options: ['elevated', 'flat', 'link'] },
     size: { control: 'select', options: ['big', 'medium', 'small'] },
     colorMode: { control: 'select', options: ['dark', 'light'] },
+    disabled: { control: 'boolean' },
+    showArrow: { control: 'boolean' },
+    fullWidth: { control: 'boolean' },
+    elevationDirection: { control: 'select', options: [...elevationDirectionOptions] },
+    colorConfig: { control: 'object', description: 'Override NeoPOP button colors' },
+    textStyle: { control: 'object', description: 'Typography props (fontType, fontSize, fontWeight, …)' },
+    spacingConfig: { control: 'object', description: 'padding, height, iconHeight' },
+    style: { control: 'object' },
+    className: { control: 'text' },
+    type: { control: 'select', options: ['button', 'submit', 'reset'] },
+    title: { control: 'text' },
+    icon: { control: 'text', description: 'NeoPOP icon key (elevated/flat buttons)' },
+    onClick: { action: 'clicked' },
+  },
+  args: {
+    onClick: fn(),
+    type: 'button',
   },
 } satisfies Meta<typeof Button>;
 
@@ -25,7 +55,6 @@ export const PrimaryElevated: Story = {
     kind: 'elevated',
     size: 'big',
     colorMode: 'dark',
-    onClick: () => {},
   },
 };
 
@@ -36,7 +65,6 @@ export const SecondaryFlat: Story = {
     kind: 'flat',
     size: 'medium',
     colorMode: 'dark',
-    onClick: () => {},
   },
 };
 
@@ -47,7 +75,6 @@ export const PrimaryFlat: Story = {
     kind: 'flat',
     size: 'big',
     colorMode: 'dark',
-    onClick: () => {},
   },
 };
 
@@ -58,7 +85,6 @@ export const Small: Story = {
     kind: 'elevated',
     size: 'small',
     colorMode: 'dark',
-    onClick: () => {},
   },
 };
 
@@ -70,7 +96,6 @@ export const WithArrow: Story = {
     size: 'big',
     colorMode: 'dark',
     showArrow: true,
-    onClick: () => {},
   },
 };
 
@@ -82,7 +107,6 @@ export const Disabled: Story = {
     size: 'big',
     colorMode: 'dark',
     disabled: true,
-    onClick: () => {},
   },
 };
 
@@ -160,78 +184,3 @@ export const AllVariants: Story = {
   ),
 };
 
-const buttonStoryDefaults = {
-  variant: 'primary' as const,
-  kind: 'elevated' as const,
-  size: 'big' as const,
-  colorMode: 'dark' as const,
-  onClick: () => {},
-};
-
-/** Icon + label via `ButtonWithIcon` (NeoPOP `Button` + `Row` + `Typography`). */
-export const ButtonWithIconPrimary: Story = {
-  name: 'ButtonWithIcon — Primary',
-  render: () => (
-    <ButtonWithIcon icon={Upload} {...buttonStoryDefaults}>
-      Upload PDF
-    </ButtonWithIcon>
-  ),
-  args: {
-    children: 'Upload PDF',
-    ...buttonStoryDefaults,
-  },
-};
-
-export const ButtonWithIconSecondarySmall: Story = {
-  name: 'ButtonWithIcon — Secondary small',
-  render: () => (
-    <ButtonWithIcon
-      icon={Plus}
-      variant="secondary"
-      kind="elevated"
-      size="small"
-      colorMode="dark"
-      onClick={() => {}}
-    >
-      Add offer
-    </ButtonWithIcon>
-  ),
-  args: {
-    children: 'Add offer',
-    variant: 'secondary',
-    kind: 'elevated',
-    size: 'small',
-    colorMode: 'dark',
-    onClick: () => {},
-  },
-};
-
-export const ButtonWithIconAnimatedIcon: Story = {
-  name: 'ButtonWithIcon — Icon props',
-  render: () => (
-    <>
-      {spinKeyframes}
-      <ButtonWithIcon
-        icon={RefreshCw}
-        variant="primary"
-        kind="elevated"
-        size="medium"
-        colorMode="dark"
-        iconProps={{
-          style: { animation: 'storybook-button-spin 1s linear infinite' },
-        }}
-        onClick={() => {}}
-      >
-        Sync in progress
-      </ButtonWithIcon>
-    </>
-  ),
-  args: {
-    children: 'Sync in progress',
-    variant: 'primary',
-    kind: 'elevated',
-    size: 'medium',
-    colorMode: 'dark',
-    onClick: () => {},
-  },
-};

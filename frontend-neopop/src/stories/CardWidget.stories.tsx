@@ -1,10 +1,21 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { CardWidget } from '@/components/CardWidget';
+import { BANK_CONFIG, type Bank } from '@/lib/types';
+
+const BANK_OPTIONS = Object.keys(BANK_CONFIG) as Bank[];
 
 const meta = {
   title: 'NeoPOP/CardWidget',
   component: CardWidget,
   parameters: { layout: 'centered' },
+  argTypes: {
+    bank: { control: 'select', options: BANK_OPTIONS },
+    last4: { control: 'text' },
+    totalSpend: { control: 'number' },
+    spendLines: { control: 'object', description: 'When set and non-empty, replaces single totalSpend display' },
+    transactionCount: { control: 'number' },
+    className: { control: 'text' },
+  },
 } satisfies Meta<typeof CardWidget>;
 
 export default meta;

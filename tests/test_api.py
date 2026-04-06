@@ -123,6 +123,33 @@ class TestStatementUpload:
         assert resp.status_code == 200
         data = resp.json()
         assert data["duplicate"] == 3, "All 3 should be duplicates on re-upload"
+        assert data["input_total"] == 3
+        assert data["rejected"] == []
+        assert len(data["outcomes"]) == 3
+        for o in data["outcomes"]:
+            assert o["status"] == "duplicate"
+
+    def test_bulk_upload_rejects_invalid_type_with_per_file_detail(self, api_client):
+        filepath = FIXTURES / HDFC_STATEMENT
+        with open(filepath, "rb") as pdf_f:
+            resp = api_client.post(
+                "/api/statements/upload-bulk",
+                files=[
+                    ("files", ("notes.txt", b"not a pdf", "text/plain")),
+                    ("files", (HDFC_STATEMENT, pdf_f, "application/pdf")),
+                ],
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["input_total"] == 2
+        assert data["total"] == 1
+        assert data["skipped"] == 1
+        assert len(data["rejected"]) == 1
+        assert data["rejected"][0]["file_name"] == "notes.txt"
+        assert data["rejected"][0]["reason"] == "invalid_type"
+        assert len(data["outcomes"]) == 1
+        assert data["outcomes"][0]["file_name"] == HDFC_STATEMENT
+        assert data["outcomes"][0]["status"] == "duplicate"
 
 
 # =====================================================================

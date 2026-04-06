@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.database import SessionLocal, get_db
 from backend.models.models import Card, Settings
+from backend.services.card_delete import delete_card_cascade
 
 
 def _validate_watch_folder(folder: Optional[str]) -> Optional[str]:
@@ -200,13 +201,19 @@ def update_settings(
 
     cards_added = 0
     if body.cards is not None:
-        existing = {
-            (c.bank.lower(), c.last4)
-            for c in db.query(Card).all()
-        }
+        def _norm_last4(raw: str) -> str:
+            return raw[-4:] if len(raw) >= 4 else raw
+
+        wanted = {(c.bank.lower(), _norm_last4(c.last4)) for c in body.cards}
+        for card_row in list(db.query(Card).all()):
+            key = (card_row.bank.lower(), card_row.last4)
+            if key not in wanted:
+                delete_card_cascade(db, card_row.id)
+
+        existing = {(c.bank.lower(), c.last4) for c in db.query(Card).all()}
         for card_in in body.cards:
             bank = card_in.bank.lower()
-            last4 = card_in.last4[-4:] if len(card_in.last4) >= 4 else card_in.last4
+            last4 = _norm_last4(card_in.last4)
             if (bank, last4) not in existing:
                 db.add(Card(bank=bank, last4=last4, name=card_in.name))
                 cards_added += 1

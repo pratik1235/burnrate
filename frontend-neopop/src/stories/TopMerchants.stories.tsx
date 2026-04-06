@@ -13,6 +13,14 @@ const meta = {
   title: 'NeoPOP/TopMerchants',
   component: TopMerchants,
   parameters: { layout: 'centered' },
+  argTypes: {
+    data: { control: 'object' },
+    currency: { control: 'text' },
+    className: { control: 'text' },
+  },
+  args: {
+    currency: 'INR',
+  },
 } satisfies Meta<typeof TopMerchants>;
 
 export default meta;

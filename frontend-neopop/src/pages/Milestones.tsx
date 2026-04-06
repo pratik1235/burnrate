@@ -6,6 +6,7 @@ import { mainColors, colorPalette } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { useMilestones, useCards } from '@/hooks/useApi';
 import { createMilestone, deleteMilestone, archiveMilestone, triggerMilestoneSync } from '@/lib/api';
+import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { toast } from '@/components/Toast';
 import { CloseButton } from '@/components/CloseButton';
 import { Target, TrendingUp, Calendar, RefreshCw, Plus, Trash2, Archive } from 'lucide-react';
@@ -188,20 +189,31 @@ export function Milestones() {
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button kind="elevated" size="small" colorMode="dark" variant="primary" onClick={handleSync}>
-              <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} style={{ marginRight: 6 }} />
+            <ButtonWithIcon
+              icon={RefreshCw}
+              kind="elevated"
+              size="small"
+              colorMode="dark"
+              variant="primary"
+              onClick={handleSync}
+              iconProps={{ className: syncing ? 'animate-spin' : undefined }}
+              gap={6}
+              justifyContent="center"
+            >
               {syncing ? 'Syncing...' : 'Sync'}
-            </Button>
-            <Button
+            </ButtonWithIcon>
+            <ButtonWithIcon
+              icon={Plus}
               kind="elevated"
               size="small"
               colorMode="dark"
               variant="secondary"
               onClick={() => setShowCreateModal(true)}
+              gap={6}
+              justifyContent="center"
             >
-              <Plus size={14} style={{ marginRight: 6 }} />
               Add Milestone
-            </Button>
+            </ButtonWithIcon>
           </div>
         </Header>
 

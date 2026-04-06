@@ -88,6 +88,21 @@ jobs:
           pip uninstall -y charset-normalizer || true
           pip install charset-normalizer --no-binary :all:
 
+      - name: Guard against charset_normalizer mypyc artifacts (macOS sidecar)
+        run: |
+          python - <<'PY'
+          import pathlib
+          import charset_normalizer
+          root = pathlib.Path(charset_normalizer.__file__).resolve().parent
+          bad = [p for p in root.rglob("*") if "__mypyc" in p.name]
+          if bad:
+              print("::error::Regression: mypyc artifacts under charset_normalizer")
+              for p in bad:
+                  print(p)
+              raise SystemExit(1)
+          print("OK: no mypyc artifacts under charset_normalizer")
+          PY
+
       - name: Install frontend dependencies
         working-directory: frontend-neopop
         run: npm ci
@@ -178,6 +193,21 @@ jobs:
         run: |
           pip uninstall -y charset-normalizer || true
           pip install charset-normalizer --no-binary :all:
+
+      - name: Guard against charset_normalizer mypyc artifacts (macOS sidecar)
+        run: |
+          python - <<'PY'
+          import pathlib
+          import charset_normalizer
+          root = pathlib.Path(charset_normalizer.__file__).resolve().parent
+          bad = [p for p in root.rglob("*") if "__mypyc" in p.name]
+          if bad:
+              print("::error::Regression: mypyc artifacts under charset_normalizer")
+              for p in bad:
+                  print(p)
+              raise SystemExit(1)
+          print("OK: no mypyc artifacts under charset_normalizer")
+          PY
 
       - name: Install frontend dependencies
         working-directory: frontend-neopop
