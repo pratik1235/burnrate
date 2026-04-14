@@ -1,4 +1,4 @@
-import { Button, Column, Row, Typography } from '@cred/neopop-web/lib/components';
+import { Button, Row, Typography } from '@cred/neopop-web/lib/components';
 import type { ComponentPropsWithoutRef, CSSProperties } from 'react';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import type { LucideIcon } from 'lucide-react';
@@ -55,7 +55,7 @@ export type ButtonWithIconProps = NeoPopButtonPassthrough & {
 
 /**
  * NeoPOP primary/secondary CTA with a Lucide icon on the left and typographic label on the right.
- * Uses `Button` + `Row` + `Typography` only (no custom button primitives).
+ * Uses `Button` + `Row` + `Typography`; the icon sits in a span for optical vertical alignment with the label.
  */
 export function ButtonWithIcon({
   icon: Icon,
@@ -96,11 +96,15 @@ export function ButtonWithIcon({
         style={rowStyle}
         data-bwi-gap={gap}
       >
-        <Column>
-          
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            transform: 'translateY(0.01px)',
+          }}
+        >
           <Icon size={iconSize} aria-hidden {...iconProps} />
-        </Column>
-        {/* <Icon size={iconSize} aria-hidden {...iconProps} /> */}
+        </span>
         <Typography
           as={as}
           fontType={fontType}

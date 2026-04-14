@@ -62,6 +62,12 @@ const TagBtn = styled.div`
   opacity: 0;
   transition: opacity 0.15s;
   flex-shrink: 0;
+
+  /* Reduce trigger height by ~20% — NeoPOP DropdownContainer is a div with 10px vertical padding */
+  [class*="DropdownContainer"] {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
 `;
 
 const RowContainer = styled.div<{ $isCcPayment: boolean; $isExcluded: boolean }>`

@@ -13,7 +13,7 @@ import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
 import { useAnalytics } from '@/hooks/useApi';
 import { CATEGORY_CONFIG } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toLocalDateString } from '@/lib/utils';
 import { Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
@@ -81,7 +81,7 @@ type Preset = 'this_month' | '3_months' | '6_months' | '1_year' | 'custom';
 
 function getDateRangeFromPreset(preset: Preset): { from?: string; to?: string } {
   const now = new Date();
-  const to = now.toISOString().split('T')[0]!;
+  const to = toLocalDateString(now);
   const from = new Date(now);
 
   switch (preset) {
@@ -100,7 +100,7 @@ function getDateRangeFromPreset(preset: Preset): { from?: string; to?: string } 
     default:
       return {};
   }
-  return { from: from.toISOString().split('T')[0], to };
+  return { from: toLocalDateString(from), to };
 }
 
 function generateInsight(
@@ -159,7 +159,7 @@ function presetFromDateRange(dr: { from?: string; to?: string }): Preset | undef
   if (!dr.from && !dr.to) return undefined;
   if (!dr.from || !dr.to) return 'custom';
   const now = new Date();
-  const to = now.toISOString().split('T')[0]!;
+  const to = toLocalDateString(now);
   if (dr.to !== to) return 'custom';
   for (const p of ['this_month', '3_months', '6_months', '1_year'] as const) {
     const r = getDateRangeFromPreset(p);

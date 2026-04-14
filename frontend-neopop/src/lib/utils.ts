@@ -16,6 +16,13 @@ export function formatCurrency(amount: number, currencyCode: CurrencyCode = 'INR
   }).format(amount);
 }
 
+export function toLocalDateString(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function formatCurrencyCompact(amount: number, currencyCode: CurrencyCode = 'INR'): string {
   const code = (currencyCode || 'INR').toUpperCase().slice(0, 3);
   if (code === 'INR') {

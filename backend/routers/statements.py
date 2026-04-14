@@ -82,6 +82,19 @@ def _normalize_original_path(raw: Optional[str]) -> Optional[str]:
     return s[:ORIGINAL_PATH_MAX_LEN]
 
 
+def _coerce_original_upload_path(raw: Optional[str], persistent_path: str) -> Optional[str]:
+    """Drop client-reported original path when it is the same file as the persisted upload copy."""
+    norm = _normalize_original_path(raw)
+    if not norm:
+        return None
+    try:
+        if Path(norm).resolve() == Path(persistent_path).resolve():
+            return None
+    except OSError:
+        pass
+    return norm
+
+
 def _parse_original_paths_for_files(raw: Optional[str], num_files: int) -> List[Optional[str]]:
     if not raw or not str(raw).strip() or num_files <= 0:
         return [None] * num_files
@@ -168,7 +181,7 @@ def upload_statement(
         db_session=db,
         manual_password=password,
         source=stmt_source,
-        original_upload_path=_normalize_original_path(original_path),
+        original_upload_path=_coerce_original_upload_path(original_path, persistent_path),
     )
     return result
 
@@ -231,7 +244,7 @@ async def upload_bulk(
             bank=bank_lower,
             manual_password=password,
             source=stmt_source,
-            original_upload_path=orig_upload,
+            original_upload_path=_coerce_original_upload_path(orig_upload, path),
         )
         future_to_name[fut] = display_name
 

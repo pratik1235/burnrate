@@ -6,13 +6,13 @@ import { SelectableElevatedCard as ElevatedCard } from '@/components/SelectableE
 import { mainColors, colorPalette } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { useOffers } from '@/hooks/useApi';
-import { createOffer, deleteOffer, hideOffer, triggerOfferSync } from '@/lib/api';
+import { createOffer, deleteOffer, triggerOfferSync } from '@/lib/api';
 import type { GetOffersParams } from '@/lib/api';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { toast } from '@/components/Toast';
 import { CloseButton } from '@/components/CloseButton';
 import { SelectDropdown, type SelectDropdownOption } from '@/components/SelectDropdown';
-import { Gift, Percent, RefreshCw, Plus, EyeOff, Trash2, ExternalLink } from 'lucide-react';
+import { Gift, Percent, RefreshCw, Plus, Trash2, ExternalLink } from 'lucide-react';
 import { BANK_CONFIG } from '@/lib/types';
 import type { Bank } from '@/lib/types';
 import styled from 'styled-components';
@@ -244,11 +244,6 @@ export function Offers() {
     }
   };
 
-  const handleHide = async (id: string) => {
-    await hideOffer(id);
-    refetch();
-  };
-
   const handleDelete = async (id: string) => {
     await deleteOffer(id);
     toast.success('Offer deleted');
@@ -337,7 +332,6 @@ export function Offers() {
         )}
 
         <ActionBar>
-          <div style={{ flex: 1, minWidth: 200 }} />
           <div
             style={{
               display: 'flex',
@@ -545,39 +539,21 @@ export function Offers() {
                     {offer.title}
                   </Typography>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    {offer.isUserCreated ? (
-                      <button
-                        type="button"
-                        aria-label="Delete offer"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: 4,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                        }}
-                        onClick={() => handleDelete(offer.id)}
-                      >
-                        <Trash2 size={14} color="rgba(255,255,255,0.35)" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label="Hide offer"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: 4,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                        }}
-                        onClick={() => handleHide(offer.id)}
-                      >
-                        <EyeOff size={14} color="rgba(255,255,255,0.35)" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      aria-label="Delete offer"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 4,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      onClick={() => handleDelete(offer.id)}
+                    >
+                      <Trash2 size={14} color="rgba(255,255,255,0.35)" />
+                    </button>
                   </div>
                 </div>
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { Button, Typography, Tag, InputField, Row, Column } from '@cred/neopop-web/lib/components';
@@ -6,14 +6,14 @@ import { SelectableElevatedCard as ElevatedCard } from '@/components/SelectableE
 import { mainColors, colorPalette } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { useMilestones, useCards } from '@/hooks/useApi';
-import { createMilestone, deleteMilestone, archiveMilestone, triggerMilestoneSync } from '@/lib/api';
+import { createMilestone, deleteMilestone, triggerMilestoneSync } from '@/lib/api';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { toast } from '@/components/Toast';
 import { CloseButton } from '@/components/CloseButton';
 import { SelectDropdown, type SelectDropdownOption } from '@/components/SelectDropdown';
-import { Target, TrendingUp, Calendar, RefreshCw, Plus, Trash2, Archive } from 'lucide-react';
+import { Target, TrendingUp, Calendar, RefreshCw, Plus, Trash2 } from 'lucide-react';
 import { BANK_CONFIG } from '@/lib/types';
-import type { Bank, Milestone } from '@/lib/types';
+import type { Bank } from '@/lib/types';
 import styled from 'styled-components';
 
 const PageLayout = styled.div`
@@ -36,11 +36,24 @@ const Header = styled.div`
   gap: 12px;
 `;
 
-const CardSection = styled.div`
+const FilterRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+`;
+
+const FilterStack = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 20px;
+  margin-bottom: 20px;
+`;
+
+const FilterBlock = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 `;
 
 const ProgressBarContainer = styled.div`
@@ -104,6 +117,12 @@ const milestoneDropdownTrigger = {
   chevron: 'rgba(255,255,255,0.5)',
 };
 
+const filterDropdownWrapper: CSSProperties = {
+  minWidth: 200,
+  maxWidth: 280,
+  flexShrink: 0,
+};
+
 const PERIOD_KIND_OPTIONS: SelectDropdownOption[] = [
   { value: 'calendar_month', label: 'Monthly' },
   { value: 'calendar_quarter', label: 'Quarterly' },
@@ -128,15 +147,80 @@ export function Milestones() {
   const { milestones, refetch } = useMilestones();
   const { cards } = useCards();
 
+  const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
+  const [selectedLast4s, setSelectedLast4s] = useState<string[]>([]);
+  const [bankSelectValue, setBankSelectValue] = useState('');
+  const [last4SelectValue, setLast4SelectValue] = useState('');
+
   const activeMilestones = milestones.filter((m) => !m.isArchived);
-  const groupedByCard = activeMilestones.reduce(
-    (acc, m) => {
-      const key = m.cardId;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(m);
-      return acc;
-    },
-    {} as Record<string, Milestone[]>,
+
+  const filteredMilestones = useMemo(() => {
+    if (selectedBanks.length === 0 && selectedLast4s.length === 0) return activeMilestones;
+    return activeMilestones.filter((m) => {
+      const card = cards.find((c) => c.id === m.cardId);
+      if (!card) return false;
+      if (selectedBanks.length > 0 && !selectedBanks.includes(card.bank)) return false;
+      if (selectedLast4s.length > 0 && !selectedLast4s.includes(card.last4)) return false;
+      return true;
+    });
+  }, [activeMilestones, cards, selectedBanks, selectedLast4s]);
+
+  const uniqueBanks = useMemo(() => {
+    const seen = new Set<string>();
+    return cards
+      .filter((c) => {
+        if (seen.has(c.bank)) return false;
+        seen.add(c.bank);
+        return true;
+      })
+      .map((c) => [c.bank, BANK_CONFIG[c.bank as Bank]?.name || c.bank] as const)
+      .sort((a, b) => a[1].localeCompare(b[1]));
+  }, [cards]);
+
+  const uniqueLast4s = useMemo(() => [...new Set(cards.map((c) => c.last4))].sort(), [cards]);
+
+  const toggleBank = useCallback(
+    (slug: string) =>
+      setSelectedBanks((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug])),
+    [],
+  );
+  const clearBanks = useCallback(() => setSelectedBanks([]), []);
+
+  const toggleLast4 = useCallback(
+    (l: string) =>
+      setSelectedLast4s((prev) => (prev.includes(l) ? prev.filter((s) => s !== l) : [...prev, l])),
+    [],
+  );
+  const clearLast4s = useCallback(() => setSelectedLast4s([]), []);
+
+  const onBankDropdownChange = useCallback((slug: string) => {
+    if (!slug) return;
+    setSelectedBanks((prev) => (prev.includes(slug) ? prev : [...prev, slug]));
+    setBankSelectValue('');
+  }, []);
+
+  const onLast4DropdownChange = useCallback((l: string) => {
+    if (!l) return;
+    setSelectedLast4s((prev) => (prev.includes(l) ? prev : [...prev, l]));
+    setLast4SelectValue('');
+  }, []);
+
+  const unselectedBanks = useMemo(
+    () => uniqueBanks.filter(([slug]) => !selectedBanks.includes(slug)),
+    [uniqueBanks, selectedBanks],
+  );
+  const unselectedLast4s = useMemo(
+    () => uniqueLast4s.filter((l) => !selectedLast4s.includes(l)),
+    [uniqueLast4s, selectedLast4s],
+  );
+
+  const bankFilterOptions = useMemo<SelectDropdownOption[]>(
+    () => unselectedBanks.map(([slug, name]) => ({ value: slug, label: name })),
+    [unselectedBanks],
+  );
+  const last4FilterOptions = useMemo<SelectDropdownOption[]>(
+    () => unselectedLast4s.map((l) => ({ value: l, label: `···· ${l}` })),
+    [unselectedLast4s],
   );
 
   const handleTabChange = useCallback(
@@ -163,11 +247,6 @@ export function Milestones() {
   const handleDelete = async (id: string) => {
     await deleteMilestone(id);
     toast.success('Milestone deleted');
-    refetch();
-  };
-
-  const handleArchive = async (id: string) => {
-    await archiveMilestone(id);
     refetch();
   };
 
@@ -198,7 +277,7 @@ export function Milestones() {
               fontWeight={FontWeights.EXTRA_BOLD}
               color={mainColors.white}
             >
-              Milestones & Goals
+              Milestones & Goals on Credit Cards
             </Typography>
             {activeMilestones.length > 0 && (
               <Tag
@@ -260,158 +339,247 @@ export function Milestones() {
           </Typography>
         </div>
 
-        {activeMilestones.length === 0 ? (
+        {activeMilestones.length > 0 && (
+          <FilterStack>
+            <FilterBlock>
+              <Typography
+                fontType={FontType.BODY}
+                fontSize={12}
+                fontWeight={FontWeights.SEMI_BOLD}
+                color="rgba(255,255,255,0.55)"
+              >
+                Filter by bank
+              </Typography>
+              <FilterRow>
+                {unselectedBanks.length === 0 ? (
+                  <Typography
+                    fontType={FontType.BODY}
+                    fontSize={13}
+                    color="rgba(255,255,255,0.35)"
+                    style={{ flex: '1 1 180px', minWidth: 0 }}
+                  >
+                    All banks are in the filter — remove one to add another.
+                  </Typography>
+                ) : (
+                  <SelectDropdown
+                    options={bankFilterOptions}
+                    value={bankSelectValue}
+                    onChange={onBankDropdownChange}
+                    placeholder="Select bank"
+                    ariaLabel="Add bank filter"
+                    wrapperStyle={filterDropdownWrapper}
+                    colorConfig={milestoneDropdownTrigger}
+                    menuEdgeColors={edgeAccent}
+                  />
+                )}
+                <Button
+                  variant={selectedBanks.length === 0 ? 'secondary' : 'primary'}
+                  kind="elevated"
+                  size="small"
+                  colorMode="dark"
+                  onClick={clearBanks}
+                >
+                  All banks
+                </Button>
+                {[...selectedBanks]
+                  .sort((a, b) => a.localeCompare(b))
+                  .map((slug) => (
+                    <Button
+                      key={slug}
+                      variant="secondary"
+                      kind="elevated"
+                      size="small"
+                      colorMode="dark"
+                      onClick={() => toggleBank(slug)}
+                    >
+                      {BANK_CONFIG[slug as Bank]?.name ?? slug}
+                    </Button>
+                  ))}
+              </FilterRow>
+            </FilterBlock>
+
+            <FilterBlock>
+              <Typography
+                fontType={FontType.BODY}
+                fontSize={12}
+                fontWeight={FontWeights.SEMI_BOLD}
+                color="rgba(255,255,255,0.55)"
+              >
+                Filter by card
+              </Typography>
+              <FilterRow>
+                {unselectedLast4s.length === 0 ? (
+                  <Typography
+                    fontType={FontType.BODY}
+                    fontSize={13}
+                    color="rgba(255,255,255,0.35)"
+                    style={{ flex: '1 1 180px', minWidth: 0 }}
+                  >
+                    All cards are in the filter — remove one to add another.
+                  </Typography>
+                ) : (
+                  <SelectDropdown
+                    options={last4FilterOptions}
+                    value={last4SelectValue}
+                    onChange={onLast4DropdownChange}
+                    placeholder="Select card"
+                    ariaLabel="Add card filter"
+                    wrapperStyle={filterDropdownWrapper}
+                    colorConfig={milestoneDropdownTrigger}
+                    menuEdgeColors={edgeAccent}
+                  />
+                )}
+                <Button
+                  variant={selectedLast4s.length === 0 ? 'secondary' : 'primary'}
+                  kind="elevated"
+                  size="small"
+                  colorMode="dark"
+                  onClick={clearLast4s}
+                >
+                  All cards
+                </Button>
+                {[...selectedLast4s].sort().map((l) => (
+                  <Button
+                    key={l}
+                    variant="secondary"
+                    kind="elevated"
+                    size="small"
+                    colorMode="dark"
+                    onClick={() => toggleLast4(l)}
+                  >
+                    ···· {l}
+                  </Button>
+                ))}
+              </FilterRow>
+            </FilterBlock>
+          </FilterStack>
+        )}
+
+        {filteredMilestones.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center' }}>
             <Target size={48} style={{ marginBottom: 16, opacity: 0.25, color: colorPalette.rss[500] }} />
             <Typography fontType={FontType.BODY} fontSize={16} color="rgba(255,255,255,0.55)">
-              No active milestones. Add one or trigger a sync to import predefined milestones.
+              {activeMilestones.length === 0
+                ? 'No active milestones. Add one or trigger a sync to import predefined milestones.'
+                : 'No milestones match the selected filters.'}
             </Typography>
           </div>
         ) : (
-          <>
-            {Object.entries(groupedByCard).map(([cardId, cardMilestones]) => {
-              const card = cards.find((c) => c.id === cardId);
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {filteredMilestones.map((m) => {
+              const card = cards.find((c) => c.id === m.cardId);
               const bankName = card ? BANK_CONFIG[card.bank as Bank]?.name : 'Unknown';
               const lastFour = card?.last4 || '****';
 
               return (
-                <CardSection key={cardId}>
-                  <Typography
-                    fontType={FontType.BODY}
-                    fontSize={11}
-                    fontWeight={FontWeights.SEMI_BOLD}
-                    color="rgba(255,255,255,0.45)"
-                    style={{
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                      paddingLeft: 4,
-                    }}
-                  >
-                    {bankName} ···· {lastFour}
-                  </Typography>
-                  {cardMilestones.map((m) => (
-                    <ElevatedCard
-                      key={m.id}
-                      backgroundColor={mainColors.black}
-                      edgeColors={edgeAccent}
-                      style={{
-                        padding: 16,
-                        maxWidth: 'none',
-                        maxHeight: 'none',
-                        display: 'block',
-                        backgroundColor: 'transparent',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                            <Typography
-                              fontType={FontType.BODY}
-                              fontSize={14}
-                              fontWeight={FontWeights.BOLD}
-                              color={mainColors.white}
-                            >
-                              {m.title}
-                            </Typography>
-                            <Tag
-                              colorMode="dark"
-                              colorConfig={{
-                                background: 'rgba(255,135,68,0.15)',
-                                color: colorPalette.rss[400],
-                              }}
-                            >
-                              {m.milestoneType}
-                            </Tag>
-                            {m.isAutoCreated && (
-                              <Tag
-                                colorMode="dark"
-                                colorConfig={{
-                                  background: 'rgba(59,130,246,0.2)',
-                                  color: mainColors.white,
-                                }}
-                              >
-                                Auto
-                              </Tag>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                            <Typography
-                              fontType={FontType.BODY}
-                              fontSize={12}
-                              fontWeight={FontWeights.REGULAR}
-                              color="rgba(255,255,255,0.45)"
-                              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                            >
-                              <TrendingUp size={12} style={{ flexShrink: 0 }} />
-                              ₹{m.currentAmount.toLocaleString()} / ₹{m.targetAmount.toLocaleString()}
-                            </Typography>
-                            <Typography
-                              fontType={FontType.BODY}
-                              fontSize={12}
-                              fontWeight={FontWeights.REGULAR}
-                              color="rgba(255,255,255,0.45)"
-                              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                            >
-                              <Calendar size={12} style={{ flexShrink: 0 }} />
-                              {m.daysLeft} days left
-                            </Typography>
-                          </div>
-                          <ProgressBarContainer>
-                            <ProgressBarFill $percent={m.percent} />
-                          </ProgressBarContainer>
-                          <Typography
-                            fontType={FontType.BODY}
-                            fontSize={12}
-                            fontWeight={FontWeights.REGULAR}
-                            color="rgba(255,255,255,0.5)"
-                            style={{ marginTop: 6 }}
-                          >
-                            {m.percent.toFixed(1)}% • ₹{m.remaining.toLocaleString()} remaining
-                          </Typography>
-                        </div>
-
-                        <MilestoneActions>
-                          {m.isCustom ? (
-                            <button
-                              type="button"
-                              aria-label="Delete milestone"
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                padding: 6,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                              }}
-                              onClick={() => handleDelete(m.id)}
-                            >
-                              <Trash2 size={14} color="rgba(255,255,255,0.35)" />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              aria-label="Archive milestone"
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                padding: 6,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                              }}
-                              onClick={() => handleArchive(m.id)}
-                            >
-                              <Archive size={14} color="rgba(255,255,255,0.35)" />
-                            </button>
-                          )}
-                        </MilestoneActions>
+                <ElevatedCard
+                  key={m.id}
+                  backgroundColor={mainColors.black}
+                  edgeColors={edgeAccent}
+                  style={{
+                    padding: 16,
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                    display: 'block',
+                    backgroundColor: 'transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <Typography
+                          fontType={FontType.BODY}
+                          fontSize={14}
+                          fontWeight={FontWeights.BOLD}
+                          color={mainColors.white}
+                        >
+                          {m.title}
+                        </Typography>
+                        <Typography
+                          fontType={FontType.BODY}
+                          fontSize={12}
+                          fontWeight={FontWeights.REGULAR}
+                          color="rgba(255,255,255,0.4)"
+                        >
+                          {bankName} ···· {lastFour}
+                        </Typography>
+                        <Tag
+                          colorMode="dark"
+                          colorConfig={{
+                            background: 'rgba(255,135,68,0.15)',
+                            color: colorPalette.rss[400],
+                          }}
+                        >
+                          {m.milestoneType}
+                        </Tag>
+                        <Tag
+                          colorMode="dark"
+                          colorConfig={{
+                            background: m.isAutoCreated ? 'rgba(59,130,246,0.2)' : 'rgba(16,185,129,0.2)',
+                            color: mainColors.white,
+                          }}
+                        >
+                          {m.isAutoCreated ? 'Auto' : 'Manual'}
+                        </Tag>
                       </div>
-                    </ElevatedCard>
-                  ))}
-                </CardSection>
+                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                        <Typography
+                          fontType={FontType.BODY}
+                          fontSize={12}
+                          fontWeight={FontWeights.REGULAR}
+                          color="rgba(255,255,255,0.45)"
+                          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <TrendingUp size={12} style={{ flexShrink: 0 }} />
+                          ₹{m.currentAmount.toLocaleString()} / ₹{m.targetAmount.toLocaleString()}
+                        </Typography>
+                        <Typography
+                          fontType={FontType.BODY}
+                          fontSize={12}
+                          fontWeight={FontWeights.REGULAR}
+                          color="rgba(255,255,255,0.45)"
+                          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Calendar size={12} style={{ flexShrink: 0 }} />
+                          {m.daysLeft} days left
+                        </Typography>
+                      </div>
+                      <ProgressBarContainer>
+                        <ProgressBarFill $percent={m.percent} />
+                      </ProgressBarContainer>
+                      <Typography
+                        fontType={FontType.BODY}
+                        fontSize={12}
+                        fontWeight={FontWeights.REGULAR}
+                        color="rgba(255,255,255,0.5)"
+                        style={{ marginTop: 6 }}
+                      >
+                        {m.percent.toFixed(1)}% • ₹{m.remaining.toLocaleString()} remaining
+                      </Typography>
+                    </div>
+
+                    <MilestoneActions>
+                      <button
+                        type="button"
+                        aria-label="Delete milestone"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 6,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                        onClick={() => handleDelete(m.id)}
+                      >
+                        <Trash2 size={14} color="rgba(255,255,255,0.35)" />
+                      </button>
+                    </MilestoneActions>
+                  </div>
+                </ElevatedCard>
               );
             })}
-          </>
+          </div>
         )}
 
         {showCreateModal && (

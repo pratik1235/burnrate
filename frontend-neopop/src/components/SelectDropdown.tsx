@@ -99,6 +99,13 @@ const Root = styled.div<{ $disabled?: boolean }>`
   pointer-events: ${(p) => (p.$disabled ? 'none' : 'auto')};
 `;
 
+const TriggerWrap = styled.div`
+  & > * {
+    width: 100%;
+    box-sizing: border-box;
+  }
+`;
+
 const MenuPosition = styled.div<{ $offset: number }>`
   position: absolute;
   left: 0;
@@ -391,7 +398,30 @@ export function SelectDropdown({
       data-select-dropdown-open={open || undefined}
       onMouseDown={onRootMouseDown}
     >
-      <Dropdown {...dropdownProps} />
+      {/* Hidden sizer: forces Root to be at least as wide as the widest option label.
+          Padding mirrors the NeoPOP Dropdown trigger (10px 15px + ~22px chevron). */}
+      <div
+        aria-hidden
+        style={{
+          height: 0,
+          overflow: 'hidden',
+          pointerEvents: 'none',
+        }}
+      >
+        {options.map((opt) => (
+          <div key={opt.value} style={{ whiteSpace: 'nowrap', paddingLeft: 15, paddingRight: 37, fontSize: isMulti ? 12 : 14 }}>
+            {opt.label}
+          </div>
+        ))}
+        {placeholder && (
+          <div style={{ whiteSpace: 'nowrap', paddingLeft: 15, paddingRight: 37, fontSize: isMulti ? 12 : 14 }}>
+            {placeholder}
+          </div>
+        )}
+      </div>
+      <TriggerWrap>
+        <Dropdown {...dropdownProps} />
+      </TriggerWrap>
       {menuMount === 'portal' && listbox ? createPortal(listbox, document.body) : listbox}
     </Root>
   );

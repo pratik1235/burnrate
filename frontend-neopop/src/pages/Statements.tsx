@@ -23,7 +23,7 @@ import type { Statement } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
 import { toast } from '@/components/Toast';
 import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
-import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, Files } from 'lucide-react';
+import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import styled, { css } from 'styled-components';
 
@@ -129,29 +129,89 @@ const StatementListRow = styled.div<{ $warn: boolean }>`
     `}
 `;
 
-/** Client filesystem path for manual uploads only; omitted for folder-watcher imports. */
-function manualUploadOriginalPathLine(s: Statement) {
-  const raw = (s.originalUploadPath ?? '').trim();
-  if (!raw) return null;
+const PathDisplay = styled.span`
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  word-break: break-all;
+  line-height: 1.4;
+  text-align: right;
+  display: block;
+  max-width: 340px;
+  cursor: default;
+
+  .path-full {
+    display: none;
+  }
+  .path-short {
+    display: inline;
+  }
+
+  &:hover {
+    .path-full {
+      display: inline;
+    }
+    .path-short {
+      display: none;
+    }
+  }
+`;
+
+/** Matches server-side manual upload filename: `{uuid32}_{basename}` in data/uploads. */
+const UUID_STORED_FILENAME_PREFIX = /^[0-9a-f]{32}_/i;
+
+function statementStoredBasename(s: Statement): string {
+  const fn = (s.fileName ?? '').trim();
+  if (fn) return fn;
+  const fp = (s.filePath ?? '').trim();
+  if (!fp) return '';
+  const parts = fp.split(/[/\\]/);
+  return parts[parts.length - 1] ?? '';
+}
+
+function isPersistedManualUpload(s: Statement): boolean {
+  return UUID_STORED_FILENAME_PREFIX.test(statementStoredBasename(s));
+}
+
+function looksLikeBurnrateDataUploadsPath(p: string): boolean {
+  return p.replace(/\\/g, '/').toLowerCase().includes('/data/uploads');
+}
+
+/** Resolve the original filesystem path for any statement type; never the internal data/uploads copy. */
+function statementDisplayPathForRow(s: Statement): string | null {
+  if (isPersistedManualUpload(s)) {
+    const fp = (s.filePath ?? '').trim();
+    const candidates = [(s.originalUploadPath ?? '').trim(), (s.displayPath ?? '').trim()].filter(Boolean);
+    for (const c of candidates) {
+      if (fp && c === fp) continue;
+      if (looksLikeBurnrateDataUploadsPath(c)) continue;
+      return c;
+    }
+    return null;
+  }
+  const fp = (s.filePath ?? '').trim();
+  if (!fp) return (s.displayPath ?? '').trim() || null;
+  if (looksLikeBurnrateDataUploadsPath(fp)) return (s.displayPath ?? '').trim() || null;
+  return fp;
+}
+
+function truncatedPathDisplay(fullPath: string): string {
+  const sep = fullPath.includes('/') ? '/' : fullPath.includes('\\') ? '\\' : null;
+  if (!sep) return fullPath;
+  const parts = fullPath.split(sep);
+  const filename = parts[parts.length - 1];
+  return `.../${filename}`;
+}
+
+function statementPathLine(s: Statement) {
+  const fullPath = statementDisplayPathForRow(s);
+  if (!fullPath) return null;
+  const short = truncatedPathDisplay(fullPath);
   return (
-    <Typography
-      as="span"
-      aria-label={`Original file path: ${raw}`}
-      fontType={FontType.BODY}
-      fontSize={11}
-      fontWeight={FontWeights.REGULAR}
-      color="rgba(255,255,255,0.45)"
-      style={{
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
-        wordBreak: 'break-all',
-        lineHeight: 1.4,
-        textAlign: 'right',
-        display: 'block',
-        maxWidth: 340,
-      }}
-    >
-      {raw}
-    </Typography>
+    <PathDisplay aria-label={`Original file path: ${fullPath}`}>
+      <span className="path-short">{short}</span>
+      <span className="path-full">{fullPath}</span>
+    </PathDisplay>
   );
 }
 
@@ -434,13 +494,7 @@ export function Statements() {
     <PageLayout>
       <Navbar activeTab="statements" onTabChange={(tab) => navigate(`/${tab}`)} />
       <Content>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Files size={24} color={colorPalette.rss[500]} />
-            <Typography fontType={FontType.BODY} fontSize={22} fontWeight={FontWeights.BOLD} color={mainColors.white}>
-              Statements
-            </Typography>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: 24 }}>
           <ButtonWithIcon
             icon={SlidersHorizontal}
             variant={
@@ -618,7 +672,7 @@ export function Statements() {
                             Unlock
                           </Button>
                         </Row>
-                        {manualUploadOriginalPathLine(s)}
+                        {statementPathLine(s)}
                       </Column>
                     </Row>
                   ) : isError ? (
@@ -701,7 +755,7 @@ export function Statements() {
                             Remove
                           </ButtonWithIcon>
                         </Row>
-                        {manualUploadOriginalPathLine(s)}
+                        {statementPathLine(s)}
                       </Column>
                     </Row>
                   ) : (
@@ -781,7 +835,7 @@ export function Statements() {
                               Remove
                             </ButtonWithIcon>
                           </Row>
-                          {manualUploadOriginalPathLine(s)}
+                          {statementPathLine(s)}
                         </Column>
                       </Row>
                     </div>

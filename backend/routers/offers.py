@@ -247,8 +247,6 @@ def delete_offer(offer_id: str, db: Session = Depends(get_db)) -> Dict[str, str]
     offer = db.query(CardOffer).filter(CardOffer.id == offer_id).first()
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
-    if not offer.is_user_created:
-        raise HTTPException(status_code=400, detail="Cannot delete fetched offers. Use hide instead.")
 
     db.delete(offer)
     db.commit()

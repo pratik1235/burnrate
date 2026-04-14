@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
 export interface CardEntry {
   /** Present for cards loaded from the server (update flow); omitted for newly added rows */
   id?: string;
-  bank: Bank;
+  bank: Bank | '';
   last4: string;
 }
 
@@ -78,7 +78,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
   const [dobDay, setDobDay] = useState('');
   const [dobMonth, setDobMonth] = useState('');
   const [dobYear, setDobYear] = useState('');
-  const [cards, setCards] = useState<CardEntry[]>([{ bank: 'hdfc', last4: '' }]);
+  const [cards, setCards] = useState<CardEntry[]>([{ bank: '', last4: '' }]);
   const [watchFolder, setWatchFolder] = useState('');
   const [displayCurrency, setDisplayCurrency] = useState('');
 
@@ -133,7 +133,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
   }, []);
 
   const addCard = useCallback(() => {
-    setCards((prev) => [...prev, { bank: 'hdfc', last4: '' }]);
+    setCards((prev) => [...prev, { bank: '', last4: '' }]);
   }, []);
 
   const removeCard = useCallback((index: number) => {
@@ -304,10 +304,12 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                       options={BANK_DROPDOWN_OPTIONS}
                       value={card.bank}
                       onChange={(next) => updateCard(index, 'bank', next)}
+                      placeholder="Select bank"
                       ariaLabel={`Card ${index + 1} issuing bank`}
                       wrapperStyle={bankRowDropdownStyle}
                       colorConfig={setupDropdownTrigger}
-                      menuBackgroundColor="rgba(0,0,0,0.92)"
+                      menuBackgroundColor="#000000"
+                      menuMount="portal"
                     />
                     <div style={{ position: 'relative' }}>
                       <Typography
@@ -331,7 +333,7 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                         placeholder="1234"
                         maxLength={4}
                         style={{
-                          width: 96,
+                          width: 110,
                           paddingLeft: 40,
                           boxSizing: 'border-box',
                           backgroundColor: 'rgba(0, 0, 0, 0.05)',
@@ -421,7 +423,8 @@ export function SetupForm({ onSubmit, className, initialData, isUpdate = false }
                 ariaLabel="Display currency preference"
                 wrapperStyle={{ width: '100%', maxWidth: 280, boxSizing: 'border-box' }}
                 colorConfig={setupDropdownTrigger}
-                menuBackgroundColor="rgba(0,0,0,0.92)"
+                menuBackgroundColor="#000000"
+                menuMount="portal"
               />
               <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)" style={{ marginTop: 4 }}>
                 Does not convert amounts; used for empty states and ordering only.

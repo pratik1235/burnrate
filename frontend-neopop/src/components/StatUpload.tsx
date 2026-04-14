@@ -408,7 +408,7 @@ export function StatUpload({
   const current = statusConfig[status];
   const StatusIcon = current.icon;
   const showDualDropzones = Boolean(onBulkUpload);
-  const dropzoneMinHeight = showDualDropzones ? (compact ? 140 : 200) : compact ? 120 : 180;
+  const dropzoneMinHeight = showDualDropzones ? (compact ? 100 : 200) : compact ? 120 : 180;
   const zonePadding = compact ? 12 : 24;
 
   const renderStatusBody = () => (
@@ -602,7 +602,7 @@ export function StatUpload({
                   {compact ? 'Folder' : 'Drop folders or click to choose'}
                 </Typography>
                 <Typography fontType={FontType.BODY} fontSize={compact ? 10 : 11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.38)" style={{ marginTop: 4 }}>
-                  Pick folders one at a time (each dialog is one folder), then Upload — scans subfolders for{' '}
+                  Pick folders one at a time then Upload — scans subfolders for{' '}
                   {describeAllowedFileKinds(resolvedAccept)}
                 </Typography>
               </>

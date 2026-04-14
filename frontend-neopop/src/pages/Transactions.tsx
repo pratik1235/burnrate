@@ -5,7 +5,7 @@ import { TransactionRow } from '@/components/TransactionRow';
 import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
 import { useTransactions, useCards } from '@/hooks/useApi';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toLocalDateString } from '@/lib/utils';
 import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
 import { Button, SearchBar, Row, Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
@@ -194,10 +194,6 @@ function TransactionsContent() {
     });
   }, []);
 
-  const handleResetExclusions = useCallback(() => {
-    setExcludedIds(new Set());
-    setExclusionMode(false);
-  }, []);
 
   const handleCardToggle = (cardId: string) => {
     setFilters({
@@ -254,7 +250,7 @@ function TransactionsContent() {
     if ('showSaveFilePicker' in window) {
       try {
         const handle = await (window as Window & { showSaveFilePicker: (opts: { suggestedName?: string; types?: { description: string; accept: Record<string, string[]> }[] }) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
-          suggestedName: `burnrate_transactions_${new Date().toISOString().split('T')[0]}.csv`,
+          suggestedName: `burnrate_transactions_${toLocalDateString(new Date())}.csv`,
           types: [{ description: 'CSV File', accept: { 'text/csv': ['.csv'] } }],
         });
         const writable = await handle.createWritable();
@@ -271,7 +267,7 @@ function TransactionsContent() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `burnrate_transactions_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `burnrate_transactions_${toLocalDateString(new Date())}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -503,9 +499,14 @@ function TransactionsContent() {
                 kind="elevated"
                 size="small"
                 colorMode="dark"
-                onClick={() => setExclusionMode((m) => !m)}
+                onClick={() => {
+                  setExclusionMode((m) => {
+                    if (m) setExcludedIds(new Set());
+                    return !m;
+                  });
+                }}
               >
-                <Row alignItems="center" style={{ columnGap: 6 }}>
+                <Row alignItems="center" style={{ columnGap: 6, whiteSpace: 'nowrap' }}>
                   <EyeOff size={14} aria-hidden />
                   <Typography
                     as="span"
@@ -515,7 +516,7 @@ function TransactionsContent() {
                     color="inherit"
                     style={{ lineHeight: 1.2 }}
                   >
-                    Temporarily Exclude Txns
+                    Temp Exclude Txns
                   </Typography>
                   {excludedIds.size > 0 && (
                     <span
@@ -557,17 +558,6 @@ function TransactionsContent() {
                 </div>
               )}
             </div>
-            {excludedIds.size > 0 && (
-              <Button
-                variant="secondary"
-                kind="elevated"
-                size="small"
-                colorMode="dark"
-                onClick={handleResetExclusions}
-              >
-                Reset Exclusions
-              </Button>
-            )}
             <ButtonWithIcon
               icon={Download}
               variant="primary"
