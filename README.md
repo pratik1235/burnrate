@@ -180,9 +180,9 @@ Burnrate follows **spec-driven development** — all new features require a spec
 | [Requirements](docs/requirements.md) | Functional and non-functional requirements |
 | [Architecture](docs/architecture.md) | System architecture, data models, API docs, diagrams |
 | [Feature Plans](docs/plans/) | Index of feature specs |
-| [Gmail autosync](docs/plans/gmail-autosync.md) | Optional OAuth Gmail attachment import |
-| [Offers & benefits](docs/plans/offers-benefits.md) | Offer providers, sync, API, and UI |
-| [Bank statements](docs/plans/bank-statements.md) | Bank CSV import, `CC`/`BANK` source, analytics rules |
+
+
+
 
 ## License
 
