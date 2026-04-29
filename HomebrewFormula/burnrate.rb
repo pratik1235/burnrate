@@ -3,10 +3,12 @@ class Burnrate < Formula
 
   desc "Local-only credit card spend analytics"
   homepage "https://github.com/pratik1235/burnrate"
-  url "https://github.com/pratik1235/burnrate/archive/v0.3.0.tar.gz"
+  # ci updates this version on the homebrew repo.
+  url "https://github.com/pratik1235/burnrate/archive/v0.3.1.tar.gz"
   sha256 "PLACEHOLDER"
   license "Apache-2.0"
 
+  depends_on "expat"
   depends_on "node" => :build
   depends_on "python@3.13"
   depends_on "qpdf"
@@ -15,6 +17,13 @@ class Burnrate < Formula
 
   def install
     venv = virtualenv_create(libexec, "python3.13")
+
+    # Ensure Python uses Homebrew's expat, not the outdated system one.
+    # DYLD_LIBRARY_PATH (not FALLBACK) is required because /usr/lib/libexpat.1.dylib
+    # exists on macOS but is too old (missing _XML_SetAllocTrackerActivationThreshold
+    # added in expat 2.6.0). FALLBACK is only checked when the library is not found;
+    # LIBRARY_PATH overrides the hardcoded absolute path in the .so.
+    ENV.prepend_path "DYLD_LIBRARY_PATH", Formula["expat"].opt_lib
 
     system "python3.13", "-m", "pip",
            "--python=#{libexec}/bin/python",
@@ -37,7 +46,9 @@ class Burnrate < Formula
       #!/bin/bash
       export BURNRATE_DATA_DIR="#{var}/burnrate"
       export BURNRATE_STATIC_DIR="#{libexec}/frontend-neopop/dist"
+      export BURNRATE_HOMEBREW="true"
       export PYTHONPATH="#{libexec}:$PYTHONPATH"
+      export DYLD_LIBRARY_PATH="#{Formula["expat"].opt_lib}:$DYLD_LIBRARY_PATH"
       exec "#{libexec}/bin/python" -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 "$@"
     EOS
   end

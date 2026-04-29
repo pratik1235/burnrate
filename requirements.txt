@@ -13,3 +13,6 @@ cryptography==46.0.6
 google-auth==2.38.0
 google-auth-oauthlib==1.2.1
 google-api-python-client==2.161.0
+httpx==0.28.1
+beautifulsoup4==4.13.3
+lxml==5.3.1

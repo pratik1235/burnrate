@@ -163,6 +163,26 @@ async def lifespan(app: FastAPI):
 
     threading.Thread(target=_milestone_sync_loop, name="milestone-sync", daemon=True).start()
 
+    # Browser auto-open for Homebrew distribution only
+    def _open_browser_on_startup() -> None:
+        """Open browser when server starts up (Homebrew only)."""
+        import time
+        import webbrowser
+
+        # Only open browser if running from Homebrew
+        if os.environ.get("BURNRATE_HOMEBREW") != "true":
+            return
+
+        port = int(os.environ.get("BURNRATE_PORT", "8000"))
+        time.sleep(2)  # Wait for server startup
+        try:
+            webbrowser.open(f"http://localhost:{port}")
+            logger.info("Browser opened at http://localhost:%s", port)
+        except Exception:
+            logger.exception("Failed to open browser")
+
+    threading.Thread(target=_open_browser_on_startup, name="browser-opener", daemon=True).start()
+
     yield
 
     from backend.routers.settings import get_watcher_observer
