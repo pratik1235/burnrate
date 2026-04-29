@@ -9,13 +9,13 @@ This document describes the release process for Burnrate, including pre-release 
 Burnrate produces the following release artifacts:
 
 
-| Artifact              | Platform                 | Description                                        |
-| --------------------- | ------------------------ | -------------------------------------------------- |
-| **Docker image**      | linux/amd64, linux/arm64 | Multi-arch image pushed to Docker Hub              |
-| **macOS DMG**         | Apple Silicon (aarch64)  | Native Tauri app with PyInstaller sidecar          |
-| **macOS DMG**         | Intel (x86_64)           | Native Tauri app with PyInstaller sidecar          |
-| **Windows installer** | x86_64                   | PyInstaller + Inno Setup `.exe`                    |
-| **Homebrew formula**  | macOS                    | Auto-updated in `pratik1235/homebrew-burnrate` tap |
+| Artifact              | Platform                 | Description                                                                      |
+| --------------------- | ------------------------ | -------------------------------------------------------------------------------- |
+| **Docker image**      | linux/amd64, linux/arm64 | Multi-arch image pushed to Docker Hub                                            |
+| **macOS DMG**         | Apple Silicon (aarch64)  | Native Tauri app with PyInstaller sidecar                                        |
+| **macOS DMG**         | Intel (x86_64)           | Native Tauri app with PyInstaller sidecar                                        |
+| **Windows installer** | x86_64                   | PyInstaller + Inno Setup `.exe`                                                  |
+| **Homebrew formula**  | macOS                    | Auto-updated in `pratik1235/homebrew-burnrate` tap (no manual edits required)  |
 
 
 ---
@@ -24,7 +24,8 @@ Burnrate produces the following release artifacts:
 
 Before creating a release, complete these steps:
 
-- **Version bump** — Update version in all locations (see §6)
+- **Version bump** — Update version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `scripts/burnrate.iss` (see §6)
+  - **Note:** Do NOT update `HomebrewFormula/burnrate.rb` — it's auto-updated by CI
 - **Changelog** — Document notable changes for the release notes
 - **Local testing** — Run the app locally; verify statement import, analytics, tags
 - **macOS build** — Run `bash scripts/build-macos.sh` and test the DMG
@@ -118,7 +119,13 @@ The `release.yml` workflow runs four main jobs plus a release job.
   1. Download macOS ARM, macOS Intel, Windows artifacts
   2. Rename DMGs to `Burnrate_aarch64.dmg`, `Burnrate_x86_64.dmg`
   3. Create GitHub Release with `softprops/action-gh-release`
-  4. Update Homebrew formula in `pratik1235/homebrew-burnrate` (clone, update version + SHA, commit, push)
+  4. **Automatically update Homebrew formula** in `pratik1235/homebrew-burnrate`:
+     - Clones the tap repository
+     - Copies `HomebrewFormula/burnrate.rb` from main repo as a template
+     - Downloads the release tarball and calculates its SHA256
+     - Uses `sed` to replace the URL and SHA256 in the formula
+     - Commits and pushes the updated formula to the tap
+     - **No manual formula update required** — the version and SHA in the main repo's `HomebrewFormula/burnrate.rb` serve only as a template and do not need to match the release version
 
 ---
 
@@ -135,15 +142,44 @@ Update the release artifact references in the readme.md file.
 - Pull and run the Docker image
 - Run `brew upgrade burnrate` and verify the Homebrew formula
 
-### 5.3 Homebrew formula SHA
+### 5.3 Homebrew formula distribution
 
-The CI automatically updates the Homebrew formula with the correct tarball URL and SHA256. If `HOMEBREW_TAP_TOKEN`(it is already set) is not set, this step is skipped. To update manually:
+**The Homebrew formula is updated automatically by the release workflow.** No manual action is required.
+
+#### How it works
+
+1. The `HomebrewFormula/burnrate.rb` file in the main repository serves as a **template**
+2. When a release tag is pushed, the workflow (`.github/workflows/release.yml` lines 419-450):
+   - Downloads the release tarball (`https://github.com/pratik1235/burnrate/archive/v{VERSION}.tar.gz`)
+   - Calculates the actual SHA256 checksum
+   - Clones `pratik1235/homebrew-burnrate` tap repository
+   - Copies the template formula from the main repo
+   - Replaces the URL and SHA256 using `sed` commands
+   - Commits and pushes the updated formula to the tap
+3. Users can then run `brew upgrade burnrate` to get the new version
+
+#### Template approach
+
+The version and SHA256 in `HomebrewFormula/burnrate.rb` in the main repo **do not need to match the current release**. They serve as placeholders that get replaced by the workflow. This means:
+
+- You **do not** need to manually update `HomebrewFormula/burnrate.rb` when cutting a release
+- The workflow calculates the correct SHA256 from the actual tarball
+- The workflow fills in the correct version from the git tag
+
+#### Requirements
+
+- `HOMEBREW_TAP_TOKEN` secret must be set in repository secrets (already configured)
+- The token must have write access to `pratik1235/homebrew-burnrate`
+
+#### Manual update (emergency only)
+
+If the workflow fails and you need to update manually:
 
 ```bash
-VERSION="0.2.1"
+VERSION="0.3.1"
 TARBALL_URL="https://github.com/pratik1235/burnrate/archive/v${VERSION}.tar.gz"
 SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
-# Update HomebrewFormula/burnrate.rb: url and sha256
+# Clone tap, update Formula/burnrate.rb with new url and sha256, commit, push
 ```
 
 ---
@@ -153,13 +189,15 @@ SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
 Update the version in these files when cutting a release:
 
 
-| File                          | Location                                                          |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `src-tauri/tauri.conf.json`   | `"version": "0.2.1"`                                              |
-| `src-tauri/Cargo.toml`        | `version = "0.2.1"`                                               |
-| `scripts/burnrate.iss`        | `AppVersion=0.2.1`                                                |
-| `HomebrewFormula/burnrate.rb` | `url "https://github.com/.../archive/v0.2.1.tar.gz"` and `sha256` |
+| File                          | Location                 | Notes                                                          |
+| ----------------------------- | ------------------------ | -------------------------------------------------------------- |
+| `src-tauri/tauri.conf.json`   | `"version": "0.2.1"`     | **Required** — Used by Tauri builds                            |
+| `src-tauri/Cargo.toml`        | `version = "0.2.1"`      | **Required** — Used by Cargo and Tauri                         |
+| `scripts/burnrate.iss`        | `AppVersion=0.2.1`       | **Required** — Used by Windows Inno Setup installer            |
+| `HomebrewFormula/burnrate.rb` | `url` and `sha256`       | **Template only** — Auto-updated by CI, no manual edit needed  |
 
+
+**Important:** The `HomebrewFormula/burnrate.rb` file is a template. The release workflow automatically updates the version, URL, and SHA256 when pushing to the Homebrew tap. You do not need to manually update this file.
 
 The `frontend-neopop/package.json` uses `"version": "0.0.0"` (private package) and does not need to be updated.
 
@@ -189,9 +227,19 @@ The `frontend-neopop/package.json` uses `"version": "0.0.0"` (private package) a
 
 ### Homebrew formula update fails
 
-- Ensure `HOMEBREW_TAP_TOKEN` is set in the repo secrets.
-- The token must have write access to `pratik1235/homebrew-burnrate`.
-- If the formula has no changes (e.g. SHA matches), the workflow exits successfully without pushing.
+The workflow automatically updates the Homebrew tap at `pratik1235/homebrew-burnrate` by:
+1. Using `HomebrewFormula/burnrate.rb` from the main repo as a template
+2. Downloading the release tarball and calculating its SHA256
+3. Replacing URL and SHA256 values using `sed` commands (lines 419-450 in `release.yml`)
+4. Committing and pushing to the tap repository
+
+**Common issues:**
+- Ensure `HOMEBREW_TAP_TOKEN` is set in the repo secrets
+- The token must have write access to `pratik1235/homebrew-burnrate`
+- Check the "Update Homebrew formula" step in the release workflow logs
+- The workflow skips the push if the formula is unchanged (same SHA256)
+
+**Remember:** You never need to manually update `HomebrewFormula/burnrate.rb` before a release. The workflow handles everything automatically.
 
 ### Docker build fails
 
