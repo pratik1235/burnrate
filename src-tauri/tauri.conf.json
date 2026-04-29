@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui-dev/tauri-v2-schema/main/tauri.schema.json",
   "productName": "Burnrate",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "com.burnrate.desktop",
   "build": {
     "frontendDist": "../frontend-neopop/dist",

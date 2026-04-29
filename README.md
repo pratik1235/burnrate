@@ -52,8 +52,8 @@ Then open http://localhost:8000 in your browser.
 ### Docker
 
 ```bash
-docker pull pratik1235/burnrate:v0.3.0
-docker run -p 8000:8000 -v burnrate_data:/data pratik1235/burnrate:v0.3.0
+docker pull pratik1235/burnrate:v0.3.2
+docker run -p 8000:8000 -v burnrate_data:/data pratik1235/burnrate:v0.3.2
 ```
 
 ### macOS — Homebrew
