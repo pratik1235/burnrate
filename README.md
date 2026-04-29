@@ -180,9 +180,7 @@ Burnrate follows **spec-driven development** — all new features require a spec
 | [Requirements](docs/requirements.md) | Functional and non-functional requirements |
 | [Architecture](docs/architecture.md) | System architecture, data models, API docs, diagrams |
 | [Feature Plans](docs/plans/) | Index of feature specs |
-
-
-
+| [Apps Script](apps-script/README.md) | Optional Gmail→Google Drive statement downloader — deploy [`Code.gs`](apps-script/Code.gs) in Google Apps Script |
 
 ## License
 
