@@ -37,8 +37,25 @@ class Settings(Base):
     watch_folder = Column(String(1024), nullable=True)
     display_currency = Column(String(3), nullable=True)
     last_gmail_sync = Column(DateTime, nullable=True)
+    llm_provider = Column(String(20), nullable=True)
+    llm_model = Column(String(100), nullable=True)
+    payment_reminder_last_auto_shown = Column(String(10), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DueReminderAck(Base):
+    """User confirmed paid for a card's billing cycle (latest statement at ack time)."""
+
+    __tablename__ = "due_reminder_acks"
+    __table_args__ = (
+        UniqueConstraint("card_id", "statement_id", name="uq_due_ack_card_statement"),
+    )
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    card_id = Column(String(36), ForeignKey("cards.id", ondelete="CASCADE"), nullable=False)
+    statement_id = Column(String(36), ForeignKey("statements.id", ondelete="CASCADE"), nullable=False)
+    acknowledged_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Card(Base):
@@ -54,6 +71,9 @@ class Card(Base):
     last4 = Column(String(4), nullable=False)
     name = Column(String(255), nullable=True)
     template_id = Column(String(100), nullable=True)  # References CardTemplate.id from frontend
+    manual_next_due_date = Column(Date, nullable=True)
+    manual_next_due_amount = Column(Float, nullable=True)
+    manual_due_acknowledged_for = Column(Date, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -76,9 +96,12 @@ class Statement(Base):
     credit_limit = Column(Float, nullable=True)
     source = Column(String(4), nullable=False, default="CC", server_default="CC")
     status = Column(String(20), nullable=False, default="success")
+    # 1 when status is parse_error (denormalized for filtering and indexing).
+    parse_failed = Column(Integer, nullable=False, default=0, server_default="0")
     status_message = Column(Text, nullable=True)
     imported_at = Column(DateTime, default=datetime.utcnow)
     currency = Column(String(3), nullable=False, default="INR", server_default="INR")
+    payment_due_date = Column(Date, nullable=True)
 
     transactions = relationship("Transaction", back_populates="statement", cascade="all, delete-orphan")
 
@@ -181,6 +204,46 @@ class ProcessingLog(Base):
     transaction_count = Column(Integer, default=0)
     acknowledged = Column(Integer, default=0)  # 0=unread, 1=dismissed
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# LLM Insights (Chat Sessions)
+# ---------------------------------------------------------------------------
+
+class ChatSession(Base):
+    """Conversation container for LLM insights."""
+
+    __tablename__ = "chat_sessions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    title = Column(String(200), nullable=True)
+    provider = Column(String(20), nullable=False, default="ollama")
+    model = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages = relationship(
+        "ChatMessage", back_populates="session",
+        cascade="all, delete-orphan", order_by="ChatMessage.sequence",
+    )
+
+
+class ChatMessage(Base):
+    """Individual message within a chat session."""
+
+    __tablename__ = "chat_messages"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=True)
+    tool_calls = Column(Text, nullable=True)
+    tool_call_id = Column(String(100), nullable=True)
+    tool_name = Column(String(100), nullable=True)
+    sequence = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    session = relationship("ChatSession", back_populates="messages")
 
 
 # ---------------------------------------------------------------------------

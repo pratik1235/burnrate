@@ -20,6 +20,8 @@ export interface BankStatementFilterValues {
   to?: string;
   /** When set, list only credit card or bank-account statements. */
   source?: Source;
+  /** When true, only statements where parsing could not extract data (excludes password-protected). */
+  parseFailuresOnly?: boolean;
 }
 
 interface FilterModalProps {
@@ -60,6 +62,7 @@ export function FilterModal({
   const [localStmtFrom, setLocalStmtFrom] = useState('');
   const [localStmtTo, setLocalStmtTo] = useState('');
   const [localStmtSource, setLocalStmtSource] = useState<'all' | Source>('all');
+  const [localStmtParseFailuresOnly, setLocalStmtParseFailuresOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +100,7 @@ export function FilterModal({
       setLocalStmtFrom(bankStatementFilters?.from ?? '');
       setLocalStmtTo(bankStatementFilters?.to ?? '');
       setLocalStmtSource(bankStatementFilters?.source ?? 'all');
+      setLocalStmtParseFailuresOnly(!!bankStatementFilters?.parseFailuresOnly);
       return;
     }
     setLocalCards(filters.selectedCards);
@@ -156,6 +160,7 @@ export function FilterModal({
         from: localStmtFrom || undefined,
         to: localStmtTo || undefined,
         source: localStmtSource === 'all' ? undefined : localStmtSource,
+        parseFailuresOnly: localStmtParseFailuresOnly ? true : undefined,
       });
       onClose();
       return;
@@ -181,11 +186,12 @@ export function FilterModal({
 
   const handleClearAll = () => {
     if (variant === 'bankStatements') {
-      onApplyBankStatements?.({ banks: [], from: undefined, to: undefined, source: undefined });
+      onApplyBankStatements?.({ banks: [], from: undefined, to: undefined, source: undefined, parseFailuresOnly: undefined });
       setLocalStmtBanks([]);
       setLocalStmtFrom('');
       setLocalStmtTo('');
       setLocalStmtSource('all');
+      setLocalStmtParseFailuresOnly(false);
       onClose();
       return;
     }
@@ -309,6 +315,38 @@ export function FilterModal({
                   {src === 'all' ? 'All' : src}
                 </Button>
               ))}
+            </div>
+            <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)" style={{ marginBottom: 10 }}>
+              Import outcome
+            </Typography>
+            <Typography
+              fontType={FontType.BODY}
+              fontSize={11}
+              fontWeight={FontWeights.REGULAR}
+              color="rgba(255,255,255,0.42)"
+              style={{ marginBottom: 10, lineHeight: 1.45 }}
+            >
+              Parse failures are files that could not be read. Password-protected PDFs appear separately until unlocked.
+            </Typography>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+              <Button
+                variant={!localStmtParseFailuresOnly ? 'secondary' : 'primary'}
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={() => setLocalStmtParseFailuresOnly(false)}
+              >
+                All outcomes
+              </Button>
+              <Button
+                variant={localStmtParseFailuresOnly ? 'secondary' : 'primary'}
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={() => setLocalStmtParseFailuresOnly(true)}
+              >
+                Parse failures only
+              </Button>
             </div>
             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)" style={{ marginBottom: 10 }}>
               Date range

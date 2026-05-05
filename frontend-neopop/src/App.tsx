@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer, toast } from '@/components/Toast';
 import { SetupWizard } from '@/pages/SetupWizard';
@@ -12,6 +12,15 @@ import { Offers } from '@/pages/Offers';
 import { Milestones } from '@/pages/Milestones';
 import { FilterProvider } from '@/contexts/FilterContext';
 import { useSettings, useProcessingLogPoller } from '@/hooks/useApi';
+import { PaymentRemindersModal } from '@/components/PaymentRemindersModal';
+import {
+  getDueReminderAutoPrompt,
+  getDueReminders,
+  recordDueReminderAutoShown,
+  localCalendarDateISO,
+} from '@/lib/api';
+import { InsightsFAB } from '@/components/InsightsFAB';
+import { InsightsPanel } from '@/components/InsightsPanel';
 
 function RootRedirect() {
   const { settings, loading } = useSettings();
@@ -69,12 +78,52 @@ function ProcessingLogWatcher() {
   return null;
 }
 
+function PaymentReminderAutoGate() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ld = localCalendarDateISO();
+        const { show } = await getDueReminderAutoPrompt(ld);
+        if (cancelled || !show) return;
+        const { items } = await getDueReminders(ld);
+        if (cancelled || items.length === 0) return;
+        await recordDueReminderAutoShown(ld);
+        if (!cancelled) setOpen(true);
+      } catch {
+        // optional feature; stay quiet on network errors
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return <PaymentRemindersModal open={open} onClose={() => setOpen(false)} />;
+}
+
 export default function App() {
+  const [insightsOpen, setInsightsOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
+        e.preventDefault();
+        setInsightsOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <BrowserRouter>
       <FilterProvider>
       <ToastContainer />
       <ProcessingLogWatcher />
+      <PaymentReminderAutoGate />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route path="/setup" element={<SetupWizard />} />
@@ -88,6 +137,8 @@ export default function App() {
         <Route path="/offers" element={<Offers />} />
         <Route path="/milestones" element={<Milestones />} />
       </Routes>
+      <InsightsFAB onClick={() => setInsightsOpen(true)} />
+      <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
       </FilterProvider>
     </BrowserRouter>
   );

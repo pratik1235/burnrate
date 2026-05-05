@@ -37,8 +37,14 @@ def _detect_bank_from_filename(filename: str) -> Optional[str]:
     if "rbl bank" in lower or "rbl" in lower:
         return "rbl"
     if "federal" in lower or "federalbank" in lower:
-        return "federal"
+        # If filename explicitly says 'scapia', we can determine the format.
+        if "scapia" in lower:
+            return "federal_scapia"
+        # Otherwise, 'federal' alone is ambiguous between Federal Bank variants;
+        # fall through to content-based detection to distinguish them.
     if "indian bank" in lower or "indianbank" in lower or "indian_bank" in lower:
+        return "indian_bank"
+    if "406229" in lower:
         return "indian_bank"
     return None
 
@@ -151,9 +157,16 @@ def detect_bank(pdf_path: str) -> Optional[str]:
         return "au"
     if "rbl bank" in text_lower or re.search(r"\brbl\b", text_lower):
         return "rbl"
+    # Scapia is a Federal Bank product — detect by content before the generic
+    # 'federal bank' check.  Scapia PDFs say 'scapia' prominently on page 1
+    # and may or may not render 'Federal Bank' as extractable text.
+    if "scapia" in text_lower:
+        return "federal_scapia"
     if "federal bank" in text_lower or re.search(r"\bfederal\s*bank\b", text_lower):
         return "federal"
     if "indian bank" in text_lower and "south indian bank" not in text_lower:
+        return "indian_bank"
+    if "one credit card statement" in text_lower and "4062-29" in text_lower:
         return "indian_bank"
 
     return None

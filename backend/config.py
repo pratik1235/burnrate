@@ -130,3 +130,14 @@ MERCHANT_CATEGORIES: Dict[str, List[str]] = {
         "bbps payment", "neft payment", "imps payment",
     ],
 }
+
+# ---------------------------------------------------------------------------
+# LLM Insights configuration
+# ---------------------------------------------------------------------------
+LLM_PROVIDER = os.getenv("BURNRATE_LLM_PROVIDER", "ollama")
+LLM_OLLAMA_BASE_URL = os.getenv("BURNRATE_LLM_OLLAMA_URL", "http://localhost:11434")
+LLM_OLLAMA_MODEL = os.getenv("BURNRATE_LLM_OLLAMA_MODEL", "llama3.1")
+LLM_MAX_TOOL_ITERATIONS = 5
+LLM_CHAT_TIMEOUT = 150
+LLM_MAX_MESSAGE_LENGTH = 4000
+LLM_MAX_TRANSACTION_RESULTS = 500

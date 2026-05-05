@@ -36,6 +36,7 @@ def _get_parsers() -> Dict[str, Type]:
     """Lazy-load PDF parsers (and thus pdfplumber) only when processing is triggered."""
     from backend.parsers.axis import AxisParser
     from backend.parsers.federal import FederalBankParser
+    from backend.parsers.federal_scapia import ScapiaFederalParser
     from backend.parsers.generic import GenericParser
     from backend.parsers.hdfc import HDFCParser
     from backend.parsers.icici import ICICIParser
@@ -47,6 +48,7 @@ def _get_parsers() -> Dict[str, Type]:
         "icici": ICICIParser,
         "axis": AxisParser,
         "federal": FederalBankParser,
+        "federal_scapia": ScapiaFederalParser,
         "indian_bank": IndianBankParser,
         "idfc_first": IDFCFirstBankParser,
     }
@@ -70,7 +72,7 @@ def _get_bank_csv_parsers() -> Dict[str, Type]:
 SUPPORTED_BANKS = [
     "hdfc", "icici", "axis", "sbi", "amex", "idfc_first",
     "indusind", "kotak", "sc", "yes", "au", "rbl",
-    "federal", "indian_bank",
+    "federal", "federal_scapia", "indian_bank",
 ]
 
 
@@ -94,6 +96,85 @@ def _get_card_last4s(db: Session, bank: Optional[str] = None) -> list:
     if bank:
         cards = [c for c in cards if c.bank.lower() == bank.lower()]
     return [c.last4 for c in cards]
+
+
+def _split_transactions_by_card(
+    transactions: list,
+    visa_last4: Optional[str],
+    rupay_last4: Optional[str],
+) -> Dict[str, list]:
+    """Partition parsed transactions from a combined dual-card statement.
+
+    Routing rules:
+      - card_network='visa'  → VISA card's list
+      - card_network='rupay' → RuPay card's list
+      - card_network=None    → shared transactions (e.g. bill payment credits,
+                               cashbacks with no logo).  Split proportionally
+                               by each card's share of current-cycle debit spend.
+
+    Shared transactions (card_network=None) are duplicated as two separate
+    transactions (one per card) with amounts proportional to their debit share.
+    Any rounding residual (≤ ₹0.01) is assigned to the primary card
+    (whichever has the larger debit total).
+
+    Returns {card_last4: [ParsedTransaction, ...]}.
+    """
+    import copy as _copy
+
+    result: Dict[str, list] = {}
+    if visa_last4:
+        result[visa_last4] = []
+    if rupay_last4:
+        result[rupay_last4] = []
+
+    # Compute each card's current-cycle debit total (for proportional split)
+    visa_debits = Decimal("0")
+    rupay_debits = Decimal("0")
+    for tx in transactions:
+        if tx.type == "debit":
+            amt = Decimal(str(tx.amount))
+            if getattr(tx, "card_network", None) == "visa":
+                visa_debits += amt
+            elif getattr(tx, "card_network", None) == "rupay":
+                rupay_debits += amt
+
+    total_debits = visa_debits + rupay_debits
+    visa_ratio = visa_debits / total_debits if total_debits else Decimal("0")
+    rupay_ratio = rupay_debits / total_debits if total_debits else Decimal("0")
+    # Primary = card with more debits (receives rounding residual)
+    primary_is_rupay = rupay_debits >= visa_debits
+
+    for tx in transactions:
+        network = getattr(tx, "card_network", None)
+        if network == "visa" and visa_last4:
+            result[visa_last4].append(tx)
+        elif network == "rupay" and rupay_last4:
+            result[rupay_last4].append(tx)
+        else:
+            # Shared transaction — split proportionally
+            amt = Decimal(str(tx.amount))
+            visa_share = (amt * visa_ratio).quantize(Decimal("0.01"), ROUND_HALF_UP)
+            rupay_share = (amt * rupay_ratio).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+            # Correct rounding so shares sum exactly to original
+            remainder = amt - visa_share - rupay_share
+            if remainder != Decimal("0"):
+                if primary_is_rupay:
+                    rupay_share += remainder
+                else:
+                    visa_share += remainder
+
+            if visa_last4 and visa_share > Decimal("0"):
+                visa_tx = _copy.copy(tx)
+                visa_tx.amount = float(visa_share)
+                result[visa_last4].append(visa_tx)
+
+            if rupay_last4 and rupay_share > Decimal("0"):
+                rupay_tx = _copy.copy(tx)
+                rupay_tx.amount = float(rupay_share)
+                result[rupay_last4].append(rupay_tx)
+
+    return result
 
 
 def _is_csv(file_path: str) -> bool:
@@ -122,6 +203,7 @@ def _create_password_needed_statement(
         total_spend=0.0,
         source=source,
         status="password_needed",
+        parse_failed=0,
     )
     db_session.add(stmt)
     db_session.commit()
@@ -166,17 +248,33 @@ def process_statement(
         if not _validate_pdf_path(pdf_path, roots):
             return {"status": "error", "message": "Invalid file path", "count": 0}
 
+        if not bank and not is_csv:
+            from backend.parsers.detector import detect_bank
+            bank = detect_bank(pdf_path)
+
         file_hash = _compute_hash(pdf_path)
 
-        existing = db_session.query(Statement).filter(Statement.file_hash == file_hash).first()
-        if existing:
-            return {
-                "status": "duplicate",
-                "message": "Statement already imported",
-                "count": 0,
-                "period": None,
-                "bank": None,
-            }
+        # For combined dual-card statements (e.g. Scapia), one PDF produces
+        # two Statement rows with the same file_hash but different card_last4.
+        # We defer the per-card dedup check to after parsing for them.
+        # For single-card statements, we do a fast pre-check here to avoid re-parsing.
+        _pre_existing_hash = None
+        if bank == "federal_scapia":
+            _pre_existing_hash = db_session.query(Statement).filter(
+                Statement.file_hash == file_hash
+            ).first()
+        else:
+            existing = db_session.query(Statement).filter(
+                Statement.file_hash == file_hash
+            ).first()
+            if existing:
+                return {
+                    "status": "duplicate",
+                    "message": "Statement already imported",
+                    "count": 0,
+                    "period": None,
+                    "bank": bank,
+                }
 
         if is_csv:
             return _process_csv_statement(
@@ -189,10 +287,6 @@ def process_statement(
             )
 
         # ---------- PDF processing (existing logic) ----------
-
-        if not bank:
-            from backend.parsers.detector import detect_bank
-            bank = detect_bank(pdf_path)
 
         profile = _get_user_profile(db_session)
         card_last4s = _get_card_last4s(db_session, bank=bank) if bank else _get_card_last4s(db_session)
@@ -316,14 +410,20 @@ def process_statement(
         parsed = parser.parse(working_path)
 
         card_last4 = getattr(parsed, "card_last4", None)
-        card_id = None
+        card_last4_secondary = getattr(parsed, "card_last4_secondary", None)
+        card_id = None  # only used for single-card fallback below
+
         if card_last4:
+            # Single-card or combined-card (primary is known)
+            # For combined statements card_last4_secondary is also set —
+            # the per-card loop below handles both cards; no early return here.
             card = db_session.query(Card).filter(
                 Card.bank == bank, Card.last4 == card_last4
             ).first()
             if card:
                 card_id = card.id
-            else:
+            elif not card_last4_secondary:
+                # Single-card statement but the card is not registered
                 logger.warning(
                     "Skipping statement — card %s ...%s is not registered",
                     bank, card_last4,
@@ -340,8 +440,13 @@ def process_statement(
                     "bank": bank,
                     "card_last4": card_last4,
                 }
+            # If card_last4_secondary is set but primary card isn't registered,
+            # fall through — the per-card loop will try both and skip unregistered ones.
         else:
-            if len(registered_cards) == 1:
+            if card_last4_secondary:
+                # Parser set secondary but not primary — unusual; let loop handle it.
+                pass
+            elif len(registered_cards) == 1:
                 card_last4 = registered_cards[0].last4
                 card_id = registered_cards[0].id
             else:
@@ -350,13 +455,32 @@ def process_statement(
                     "multiple %s cards are registered",
                     bank,
                 )
+                card_msg = (
+                    f"Could not determine which {bank.upper()} card this "
+                    f"statement belongs to. Multiple cards are registered "
+                    f"for this bank."
+                )
+                statement = Statement(
+                    bank=bank,
+                    card_last4=None,
+                    period_start=None,
+                    period_end=None,
+                    file_hash=file_hash,
+                    file_path=pdf_path,
+                    original_upload_path=original_upload_path,
+                    transaction_count=0,
+                    total_spend=0.0,
+                    source=source,
+                    status="card_last4_not_parsed",
+                    parse_failed=1,
+                    status_message=card_msg,
+                    currency=_parsed_currency(parsed),
+                )
+                db_session.add(statement)
+                db_session.commit()
                 return {
-                    "status": "card_not_found",
-                    "message": (
-                        f"Could not determine which {bank.upper()} card this "
-                        f"statement belongs to. Multiple cards are registered "
-                        f"for this bank."
-                    ),
+                    "status": "card_last4_not_parsed",
+                    "message": card_msg,
                     "count": 0,
                     "period": None,
                     "bank": bank,
@@ -388,8 +512,10 @@ def process_statement(
                 credit_limit=getattr(parsed, "credit_limit", None),
                 source=source,
                 status="parse_error",
+                parse_failed=1,
                 status_message=parse_msg,
                 currency=_parsed_currency(parsed),
+                payment_due_date=getattr(parsed, "payment_due_date", None),
             )
             db_session.add(statement)
             db_session.commit()
@@ -406,57 +532,152 @@ def process_statement(
                 "bank": bank,
             }
 
-        total_decimal = sum(
-            (Decimal(str(t.amount)) for t in parsed.transactions if t.type == "debit"),
-            Decimal(0),
-        )
-        total_spend = float(total_decimal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
         cur = _parsed_currency(parsed)
-        statement = Statement(
-            bank=bank,
-            card_last4=card_last4,
-            period_start=parsed.period_start,
-            period_end=parsed.period_end,
-            file_hash=file_hash,
-            file_path=pdf_path,
-            original_upload_path=original_upload_path,
-            transaction_count=len(parsed.transactions),
-            total_spend=total_spend,
-            total_amount_due=getattr(parsed, "total_amount_due", None),
-            credit_limit=getattr(parsed, "credit_limit", None),
-            source=source,
-            status="success",
-            currency=cur,
-        )
-        db_session.add(statement)
-        db_session.flush()
 
-        for pt in parsed.transactions:
-            category = categorize(pt.merchant, db_session=db_session)
-            tx = Transaction(
-                statement_id=statement.id,
-                date=pt.date,
-                merchant=pt.merchant,
-                amount=pt.amount,
-                type=pt.type,
-                category=category,
-                description=pt.description,
-                bank=bank,
-                card_last4=card_last4,
-                card_id=card_id,
-                source=source,
-                currency=cur,
+        # ---------------------------------------------------------------
+        # Determine if this is a combined dual-card statement (Scapia)
+        # ---------------------------------------------------------------
+        visa_last4 = getattr(parsed, "card_last4", None)
+        rupay_last4 = getattr(parsed, "card_last4_secondary", None)
+        is_combined = bool(visa_last4 and rupay_last4)
+
+        if is_combined:
+            card_partition = _split_transactions_by_card(
+                parsed.transactions, visa_last4, rupay_last4
             )
-            db_session.add(tx)
+        else:
+            # Single-card statement — existing behaviour preserved exactly
+            card_partition = {card_last4: parsed.transactions}
+
+        total_created = 0
+        period_start = parsed.period_start
+        period_end = parsed.period_end
+
+        for c_last4, c_txns in card_partition.items():
+            if not c_last4:
+                continue
+
+            # Per-card dedup: same file_hash + same card_last4 = already imported
+            existing = db_session.query(Statement).filter(
+                Statement.file_hash == file_hash,
+                Statement.card_last4 == c_last4,
+            ).first()
+            if existing:
+                logger.info(
+                    "Duplicate statement (file_hash, card=%s) — skipping", c_last4
+                )
+                continue
+
+            # Resolve card_id for this card
+            card_obj = db_session.query(Card).filter(
+                Card.bank == bank, Card.last4 == c_last4
+            ).first()
+            if not card_obj:
+                logger.warning(
+                    "Card %s not registered for bank %s — skipping this card's rows",
+                    c_last4, bank,
+                )
+                continue
+
+            # Per-card total_amount_due = debits − non-payment credits
+            # Bill payment credits (cc_payment) repay the PREVIOUS month's balance
+            # and must NOT reduce the current cycle's amount due.
+            card_debit_total = sum(
+                Decimal(str(t.amount)) for t in c_txns if t.type == "debit"
+            )
+            card_credit_total = sum(
+                Decimal(str(t.amount))
+                for t in c_txns
+                if t.type == "credit" and getattr(t, "category", None) != "cc_payment"
+            )
+            # category may not yet be resolved (categorizer runs below), so also
+            # exclude credits on transactions that the *parser* already flagged
+            # as cc_payment via pt.category:
+            card_due = max(Decimal("0"), card_debit_total - card_credit_total)
+            card_due = float(card_due.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+            # Sanity-check log: per-card dues should sum ≈ combined parsed due
+            if is_combined:
+                logger.debug(
+                    "Card %s: debits=%.2f credits=%.2f card_due=%.2f "
+                    "(combined_pdf_due=%s)",
+                    c_last4, float(card_debit_total), float(card_credit_total),
+                    card_due, parsed.total_amount_due,
+                )
+
+            stmt = Statement(
+                bank=bank,
+                card_last4=c_last4,
+                period_start=period_start,
+                period_end=period_end,
+                file_hash=file_hash,
+                file_path=pdf_path,
+                original_upload_path=original_upload_path,
+                transaction_count=len(c_txns),
+                total_spend=float(
+                    card_debit_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                ),
+                total_amount_due=card_due,
+                credit_limit=getattr(parsed, "credit_limit", None),
+                source=source,
+                status="success",
+                parse_failed=0,
+                currency=cur,
+                payment_due_date=getattr(parsed, "payment_due_date", None),
+            )
+            db_session.add(stmt)
+            db_session.flush()
+
+            for pt in c_txns:
+                # Use parser-provided category hint; fall back to keyword matching
+                category = pt.category if pt.category else categorize(
+                    pt.merchant, db_session=db_session
+                )
+                tx = Transaction(
+                    statement_id=stmt.id,
+                    date=pt.date,
+                    merchant=pt.merchant,
+                    amount=pt.amount,
+                    type=pt.type,
+                    category=category,
+                    description=pt.description,
+                    bank=bank,
+                    card_last4=c_last4,
+                    card_id=card_obj.id,
+                    source=source,
+                    currency=cur,
+                )
+                db_session.add(tx)
+
+            total_created += len(c_txns)
+
+        # If every card was a duplicate, report as duplicate
+        if total_created == 0:
+            if _pre_existing_hash:
+                return {
+                    "status": "duplicate",
+                    "message": "Statement already imported",
+                    "count": 0,
+                    "period": None,
+                    "bank": bank,
+                }
+            else:
+                return {
+                    "status": "card_not_found",
+                    "message": "No matching registered cards found for this statement.",
+                    "count": 0,
+                    "period": None,
+                    "bank": bank,
+                }
 
         db_session.commit()
 
         return {
             "status": "success",
-            "count": len(parsed.transactions),
+            "count": total_created,
             "period": {
-                "start": parsed.period_start.isoformat() if parsed.period_start else None,
-                "end": parsed.period_end.isoformat() if parsed.period_end else None,
+                "start": period_start.isoformat() if period_start else None,
+                "end": period_end.isoformat() if period_end else None,
             },
             "bank": bank,
         }
@@ -496,9 +717,27 @@ def _process_csv_statement(
         bank = detect_bank_csv(csv_path)
 
     if not bank:
+        bank_msg = "Could not detect bank from CSV filename or content."
+        statement = Statement(
+            bank="unknown",
+            card_last4=None,
+            period_start=None,
+            period_end=None,
+            file_hash=file_hash,
+            file_path=csv_path,
+            original_upload_path=original_upload_path,
+            transaction_count=0,
+            total_spend=0.0,
+            source=source,
+            status="bank_not_parsed",
+            parse_failed=1,
+            status_message=bank_msg,
+        )
+        db_session.add(statement)
+        db_session.commit()
         return {
-            "status": "error",
-            "message": "Could not detect bank from CSV filename or content",
+            "status": "bank_not_parsed",
+            "message": bank_msg,
             "count": 0,
         }
 
@@ -537,6 +776,7 @@ def _process_csv_statement(
             total_spend=0.0,
             source=source,
             status="parse_error",
+            parse_failed=1,
             status_message=parse_msg,
             currency=_parsed_currency(parsed),
         )
@@ -574,13 +814,15 @@ def _process_csv_statement(
         total_spend=total_spend,
         source=source,
         status="success",
+        parse_failed=0,
         currency=cur,
     )
     db_session.add(statement)
     db_session.flush()
 
     for pt in parsed.transactions:
-        category = categorize(pt.merchant, db_session=db_session)
+        # Use parser-provided category hint when available; fall back to keyword matching.
+        category = pt.category if pt.category else categorize(pt.merchant, db_session=db_session)
         tx = Transaction(
             statement_id=statement.id,
             date=pt.date,

@@ -318,6 +318,9 @@ def sync_milestone_definitions(db: Session) -> dict:
                 meta = SyncMetadata(provider=f"milestone_{pid}")
                 db.add(meta)
                 db.flush()
+                # Commit before network I/O: an open transaction after flush holds a
+                # SQLite write lock and blocks other threads (e.g. offer sync) on sync_metadata.
+                db.commit()
 
             try:
                 fetched = provider.fetch_milestones(client, template_ids)

@@ -25,7 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.models.database import SessionLocal, init_db
 from backend.models.models import CategoryDefinition, Settings
-from backend.routers import analytics, cards, categories, gmail, milestones, offers, settings, statements, tags, transactions
+from backend.routers import analytics, cards, categories, due_reminders, gmail, insights, milestones, offers, settings, statements, tags, transactions
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ def seed_categories(db) -> None:
         {"name": "Groceries", "slug": "groceries", "keywords": "bigbasket,blinkit,zepto,dmart,jiomart,swiggy instamart,instamart,nature basket,more", "color": "#14B8A6", "icon": "ShoppingCart"},
         {"name": "CC Bill Payment", "slug": "cc_payment", "keywords": "cc payment,cc pymt,bppy cc payment,bbps payment,neft payment,imps payment,repayment,repayments,bbps,bill payment received", "color": "#6B7280", "icon": "CreditCard"},
         {"name": "Cashback", "slug": "cashback", "keywords": "cashback,cash back", "color": "#06C270", "icon": "Coins"},
+        {"name": "EMI", "slug": "emi", "keywords": "emi,equated monthly installment,installment,prin,interest", "color": "#F59E0B", "icon": "Calculator"},
         {"name": "Other", "slug": "other", "keywords": "", "color": "#9CA3AF", "icon": "MoreHorizontal"},
     ]
     for cat_data in PREBUILT:
@@ -227,6 +228,7 @@ app.add_middleware(
 
 app.include_router(settings.router, prefix="/api")
 app.include_router(cards.router, prefix="/api")
+app.include_router(due_reminders.router, prefix="/api")
 app.include_router(statements.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
@@ -235,6 +237,7 @@ app.include_router(tags.router, prefix="/api")
 app.include_router(gmail.router, prefix="/api")
 app.include_router(offers.router, prefix="/api")
 app.include_router(milestones.router, prefix="/api")
+app.include_router(insights.router, prefix="/api")
 
 _project_root_for_static = Path(__file__).resolve().parent.parent
 _static_candidates = [

@@ -479,6 +479,9 @@ def sync_offers(db: Session) -> dict:
                 meta = SyncMetadata(provider=pid)
                 db.add(meta)
                 db.flush()
+                # Commit before network I/O: flush leaves an open write transaction that
+                # would hold a SQLite lock for the entire fetch (see milestone_fetcher).
+                db.commit()
 
             try:
                 raw_offers = provider.fetch_offers(client)

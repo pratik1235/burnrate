@@ -20,7 +20,8 @@ from typing import List, Optional, Tuple
 
 import pdfplumber
 
-from backend.parsers.base import BaseParser, ParsedStatement, ParsedTransaction
+from backend.parsers.base import BaseParser, ParsedStatement, ParsedTransaction, detect_emi_transaction
+from backend.parsers.payment_due_date import extract_payment_due_date_from_text
 
 logger = logging.getLogger(__name__)
 
@@ -90,13 +91,13 @@ _CREDIT_KEYWORDS = frozenset({
 # Transaction mode codes to strip from merchant descriptions
 _MODE_CODES = [
     "TOKEN_ECOM", "ECOM", "POS", "CONTACTLESS",
-    "IMPS", "NEFT", "UPI", "ATM", "NFC",
+    "IMPS", "NEFT", "ATM", "NFC",
 ]
 
 # Category labels that pdfplumber injects into the text from the PDF table
 _CATEGORY_LABELS = [
     "Food & Dining", "Shopping", "Entertainment", "Travel",
-    "Utilities", "Health", "Education", "Groceries", "Fuel",
+    "Bills and Utilities", "Utilities", "Health", "Education", "Groceries", "Fuel",
     "EMI", "Others", "Miscellaneous", "Personal Care",
     "Insurance", "Government", "Bills & Recharges", "Investments",
     "Rent", "Transfers", "Repayments", "Refunds",
@@ -129,11 +130,12 @@ class IndianBankParser(BaseParser):
         transactions = self._extract_transactions(
             all_lines, table_rows, period_start, period_end,
         )
+        payment_due_date = extract_payment_due_date_from_text(full_text)
 
         logger.info(
-            "Indian Bank parse: card=%s period=%s..%s txns=%d due=%s limit=%s",
+            "Indian Bank parse: card=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
             card_last4, period_start, period_end, len(transactions),
-            total_amount_due, credit_limit,
+            total_amount_due, credit_limit, payment_due_date,
         )
 
         return ParsedStatement(
@@ -144,6 +146,7 @@ class IndianBankParser(BaseParser):
             card_last4=card_last4,
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
+            payment_due_date=payment_due_date,
         )
 
     # ------------------------------------------------------------------
@@ -375,12 +378,16 @@ class IndianBankParser(BaseParser):
         full_desc = f"{merchant} {category}".strip()
         clean = self._clean_merchant(full_desc, category=category)
 
+        # Map the PDF's 'Repayments' category to the app's 'CC Bill Payment' slug
+        parser_category = "cc_payment" if category.lower() in {"repayment", "repayments"} else None
+
         return ParsedTransaction(
             date=parsed_date,
             merchant=clean,
             amount=amount,
             type="credit" if is_credit else "debit",
             description=full_desc,
+            category=parser_category,
         )
 
     # ------------------------------------------------------------------
@@ -410,6 +417,16 @@ class IndianBankParser(BaseParser):
                 detected_cat = cat
                 break
 
+        # Detect EMI transactions first
+        is_emi = detect_emi_transaction(raw_desc, detected_cat)
+
+        # Map the PDF's 'Repayments' category to the app's 'CC Bill Payment' slug
+        parser_category = None
+        if is_emi:
+            parser_category = "emi"
+        elif detected_cat.lower() in {"repayment", "repayments"}:
+            parser_category = "cc_payment"
+
         merchant = self._clean_merchant(raw_desc, category=detected_cat)
         return ParsedTransaction(
             date=parsed_date,
@@ -417,6 +434,7 @@ class IndianBankParser(BaseParser):
             amount=amount,
             type="credit" if is_credit else "debit",
             description=raw_desc,
+            category=parser_category,
         )
 
     # ------------------------------------------------------------------

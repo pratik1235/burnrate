@@ -17,6 +17,7 @@ import pdfplumber
 
 from backend.parsers.base import BaseParser, ParsedStatement, ParsedTransaction
 from backend.parsers.currency_infer import infer_currency_from_document_text
+from backend.parsers.payment_due_date import extract_payment_due_date_from_text
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +94,10 @@ class IDFCFirstBankParser(BaseParser):
             transactions = self._extract_transactions_from_text_lines(text_lines)
 
         currency = infer_currency_from_document_text(full_text)
+        payment_due_date = extract_payment_due_date_from_text(full_text)
 
         logger.debug(
-            "IDFC parse: bank=idfc_first period=%s..%s txns=%d due=%s min_due=%s limit=%s currency=%s",
+            "IDFC parse: bank=idfc_first period=%s..%s txns=%d due=%s min_due=%s limit=%s currency=%s payment_due=%s",
             period_start,
             period_end,
             len(transactions),
@@ -103,6 +105,7 @@ class IDFCFirstBankParser(BaseParser):
             min_amount_due,
             credit_limit,
             currency,
+            payment_due_date,
         )
 
         return ParsedStatement(
@@ -114,6 +117,7 @@ class IDFCFirstBankParser(BaseParser):
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
             currency=currency,
+            payment_due_date=payment_due_date,
         )
 
     @staticmethod

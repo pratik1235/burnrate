@@ -9,6 +9,8 @@ export interface Card {
   bank: Bank;
   last4: string;
   name?: string;
+  manualNextDueDate?: string | null;
+  manualNextDueAmount?: number | null;
 }
 
 export interface Transaction {
@@ -35,7 +37,10 @@ export interface Statement {
   periodEnd: string;
   transactionCount: number;
   totalSpend: number;
+  /** ISO 4217 */
   currency?: string;
+  /** ISO date from statement PDF when parsed */
+  paymentDueDate?: string | null;
   source: Source;
   status: 'success' | 'parse_error' | 'password_needed';
   importedAt: string;
@@ -48,6 +53,8 @@ export interface Statement {
   originalUploadPath?: string | null;
   /** Persisted parse failure text when status is parse_error. */
   statusMessage?: string | null;
+  /** 1 when the file could not be parsed (same as status parse_error); from API for filtering. */
+  parseFailed?: number;
 }
 
 export interface CategoryBreakdown {

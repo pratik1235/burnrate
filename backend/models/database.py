@@ -38,7 +38,8 @@ def _set_sqlite_pragma(dbapi_conn, connection_record):
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=5000")
+    # Allow other threads (background sync, API) to wait on writers longer than default.
+    cursor.execute("PRAGMA busy_timeout=30000")
     cursor.close()
 
 
@@ -78,10 +79,20 @@ def _run_migrations(engine_ref) -> None:
         ("cards", "template_id", "VARCHAR(100)"),
         ("statements", "status_message", "TEXT"),
         ("statements", "original_upload_path", "VARCHAR(2048)"),
+        ("settings", "llm_provider", "VARCHAR(20)"),
+        ("settings", "llm_model", "VARCHAR(100)"),
+        ("statements", "payment_due_date", "DATE"),
+        ("cards", "manual_next_due_date", "DATE"),
+        ("cards", "manual_next_due_amount", "FLOAT"),
+        ("cards", "manual_due_acknowledged_for", "DATE"),
+        ("settings", "payment_reminder_last_auto_shown", "VARCHAR(10)"),
+        ("statements", "parse_failed", "INTEGER NOT NULL DEFAULT 0"),
     ]
 
     with engine_ref.connect() as conn:
         for table, column, col_def in migrations:
+            # Re-inspect to avoid stale cache when adding multiple columns to the same table
+            inspector = sa_inspect(engine_ref)
             if table not in inspector.get_table_names():
                 continue
             existing = {c["name"] for c in inspector.get_columns(table)}
@@ -90,6 +101,14 @@ def _run_migrations(engine_ref) -> None:
                     f"ALTER TABLE {table} ADD COLUMN {column} {col_def}"
                 ))
                 conn.commit()
+                
+                # Backfill parse_failed if we just added it
+                if table == "statements" and column == "parse_failed":
+                    conn.execute(text(
+                        "UPDATE statements SET parse_failed = CASE WHEN status = 'parse_error' "
+                        "THEN 1 ELSE 0 END"
+                    ))
+                    conn.commit()
 
 
 def init_db() -> None:

@@ -193,6 +193,7 @@ export async function updateSettings(payload: {
     body.cards = payload.cards.map((c) => ({ bank: c.bank, last4: c.last4 }));
   }
   const { data } = await api.put<{ status: string }>('/settings', body);
+  _cardsCachePromise = null;
   return data;
 }
 
@@ -209,6 +210,7 @@ export async function setupProfile(payload: SetupProfilePayload): Promise<Settin
     body.display_currency = payload.displayCurrency || null;
   }
   const { data } = await api.post<Settings>('/settings/setup', body);
+  _cardsCachePromise = null;
   return data;
 }
 
@@ -250,6 +252,7 @@ export async function uploadStatement(
       timeout: 60000,
     }
   );
+  _bankAccountsCachePromise = null;
   return data;
 }
 
@@ -327,6 +330,7 @@ export async function uploadStatementsBulk(
       timeout: 300000,
     }
   );
+  _bankAccountsCachePromise = null;
   return normalizeBulkUploadResult(data);
 }
 
@@ -339,6 +343,7 @@ interface StatementRaw {
   transaction_count: number;
   total_spend: number;
   currency?: string | null;
+  payment_due_date?: string | null;
   source: string | null;
   status: string | null;
   imported_at: string | null;
@@ -347,6 +352,7 @@ interface StatementRaw {
   display_path?: string | null;
   original_upload_path?: string | null;
   status_message?: string | null;
+  parse_failed?: number | null;
 }
 
 export interface GetStatementsParams {
@@ -355,6 +361,8 @@ export interface GetStatementsParams {
   banks?: string;
   from?: string;
   to?: string;
+  /** When true, only statements that failed to parse (server filters by parse_failed). */
+  parseFailuresOnly?: boolean;
 }
 
 export async function getStatements(params?: Source | GetStatementsParams): Promise<Statement[]> {
@@ -366,6 +374,7 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     if (params.banks) q.banks = params.banks;
     if (params.from) q.from = params.from;
     if (params.to) q.to = params.to;
+    if (params.parseFailuresOnly) q.parse_failed_only = 'true';
   }
   const { data } = await api.get<StatementRaw[]>('/statements', { params: q });
   return data.map((s) => ({
@@ -377,6 +386,7 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     transactionCount: s.transaction_count,
     totalSpend: s.total_spend,
     currency: (s.currency || 'INR').toUpperCase().slice(0, 3),
+    paymentDueDate: s.payment_due_date ?? null,
     source: (s.source as Source) ?? 'CC',
     status: (s.status as 'success' | 'parse_error' | 'password_needed') ?? 'success',
     importedAt: s.imported_at ?? '',
@@ -385,6 +395,7 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     displayPath: s.display_path ?? null,
     originalUploadPath: s.original_upload_path ?? null,
     statusMessage: s.status_message ?? null,
+    parseFailed: s.parse_failed ?? 0,
   }));
 }
 
@@ -397,14 +408,22 @@ export async function retryWithPassword(
     { password },
     { timeout: 60000 },
   );
+  _bankAccountsCachePromise = null;
   return data;
 }
 
-export async function getBankAccountKeys(): Promise<{ id: string; bank: string; last4: string }[]> {
-  const { data } = await api.get<{ accounts: { id: string; bank: string; last4: string }[] }>(
-    '/transactions/bank-accounts'
-  );
-  return Array.isArray(data?.accounts) ? data.accounts : [];
+let _bankAccountsCachePromise: Promise<{ id: string; bank: string; last4: string }[]> | null = null;
+
+export function getBankAccountKeys(): Promise<{ id: string; bank: string; last4: string }[]> {
+  if (!_bankAccountsCachePromise) {
+    _bankAccountsCachePromise = api.get<{ accounts: { id: string; bank: string; last4: string }[] }>('/transactions/bank-accounts')
+      .then(res => Array.isArray(res.data?.accounts) ? res.data.accounts : [])
+      .catch(err => {
+        _bankAccountsCachePromise = null;
+        throw err;
+      });
+  }
+  return _bankAccountsCachePromise;
 }
 
 export async function getTransactions(
@@ -416,13 +435,77 @@ export async function getTransactions(
   return data;
 }
 
-export async function getCards(): Promise<Card[]> {
-  const { data } = await api.get<Card[]>('/cards');
+let _cardsCachePromise: Promise<Card[]> | null = null;
+
+export function getCards(): Promise<Card[]> {
+  if (!_cardsCachePromise) {
+    _cardsCachePromise = api.get<Card[]>('/cards')
+      .then(res => res.data)
+      .catch(err => {
+        _cardsCachePromise = null;
+        throw err;
+      });
+  }
+  return _cardsCachePromise;
+}
+
+/** Today's date in the browser's local calendar as YYYY-MM-DD (for due-reminder APIs). */
+export function localCalendarDateISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export interface DueReminderItem {
+  cardId: string;
+  bank: string;
+  cardLast4: string;
+  statementId: string | null;
+  dueDate: string;
+  totalAmountDue: number | null;
+  currency: string;
+  usesManualDueDate: boolean;
+}
+
+export async function getDueReminders(localDate: string): Promise<{ items: DueReminderItem[] }> {
+  const { data } = await api.get<{ items: DueReminderItem[] }>('/due-reminders', {
+    params: { local_date: localDate },
+  });
+  return data;
+}
+
+export async function getDueReminderAutoPrompt(localDate: string): Promise<{ show: boolean }> {
+  const { data } = await api.get<{ show: boolean }>('/due-reminders/auto-prompt', {
+    params: { local_date: localDate },
+  });
+  return data;
+}
+
+export async function recordDueReminderAutoShown(localDate: string): Promise<void> {
+  await api.post('/due-reminders/record-auto-shown', { local_date: localDate });
+}
+
+export async function ackDueReminder(cardId: string): Promise<void> {
+  await api.post('/due-reminders/ack', { card_id: cardId });
+}
+
+export async function patchCardDuePreferences(
+  cardId: string,
+  body: { manualNextDueDate?: string | null; manualNextDueAmount?: number | null },
+): Promise<Card> {
+  const payload: Record<string, unknown> = {};
+  if ('manualNextDueDate' in body) payload.manual_next_due_date = body.manualNextDueDate;
+  if ('manualNextDueAmount' in body) payload.manual_next_due_amount = body.manualNextDueAmount;
+  const { data } = await api.patch<Card>(`/cards/${cardId}`, payload);
+  _cardsCachePromise = null;
   return data;
 }
 
 export async function deleteCard(cardId: string): Promise<{ status: string; message: string }> {
   const { data } = await api.delete<{ status: string; message: string }>(`/cards/${cardId}`);
+  _cardsCachePromise = null;
   return data;
 }
 
@@ -518,11 +601,13 @@ export async function updateTransactionTags(transactionId: string, tags: string[
 
 export async function deleteStatement(statementId: string): Promise<{ status: string; message: string }> {
   const { data } = await api.delete<{ status: string; message: string }>(`/statements/${statementId}`);
+  _bankAccountsCachePromise = null;
   return data;
 }
 
 export async function reparseStatement(statementId: string): Promise<{ status: string; count?: number; bank?: string }> {
   const { data } = await api.post<{ status: string; count?: number; bank?: string }>(`/statements/${statementId}/reparse`);
+  _bankAccountsCachePromise = null;
   return data;
 }
 
@@ -537,28 +622,41 @@ export interface CategoryResponse {
   is_prebuilt: boolean;
 }
 
-export async function getAllCategories(): Promise<CategoryResponse[]> {
-  const { data } = await api.get<CategoryResponse[]>('/categories/all');
-  return data;
+let _categoriesCachePromise: Promise<CategoryResponse[]> | null = null;
+
+export function getAllCategories(): Promise<CategoryResponse[]> {
+  if (!_categoriesCachePromise) {
+    _categoriesCachePromise = api.get<CategoryResponse[]>('/categories/all')
+      .then(res => res.data)
+      .catch(err => {
+        _categoriesCachePromise = null;
+        throw err;
+      });
+  }
+  return _categoriesCachePromise;
 }
 
 export async function createCategory(payload: { name: string; keywords: string; color: string }): Promise<CategoryResponse> {
   const { data } = await api.post<CategoryResponse>('/categories/custom', payload);
+  _categoriesCachePromise = null;
   return data;
 }
 
 export async function updateCategory(categoryId: string, payload: { name?: string; keywords?: string; color?: string }): Promise<CategoryResponse> {
   const { data } = await api.put<CategoryResponse>(`/categories/${categoryId}`, payload);
+  _categoriesCachePromise = null;
   return data;
 }
 
 export async function deleteCategoryById(categoryId: string): Promise<{ status: string }> {
   const { data } = await api.delete<{ status: string }>(`/categories/custom/${categoryId}`);
+  _categoriesCachePromise = null;
   return data;
 }
 
 export async function triggerRecategorize(): Promise<{ status: string; updated: number }> {
   const { data } = await api.post<{ status: string; updated: number }>('/categories/recategorize');
+  _categoriesCachePromise = null;
   return data;
 }
 
@@ -568,23 +666,35 @@ export interface TagDefinitionResponse {
   name: string;
 }
 
-export async function getTagDefinitions(): Promise<TagDefinitionResponse[]> {
-  const { data } = await api.get<TagDefinitionResponse[]>('/tags');
-  return data;
+let _tagsCachePromise: Promise<TagDefinitionResponse[]> | null = null;
+
+export function getTagDefinitions(): Promise<TagDefinitionResponse[]> {
+  if (!_tagsCachePromise) {
+    _tagsCachePromise = api.get<TagDefinitionResponse[]>('/tags')
+      .then(res => res.data)
+      .catch(err => {
+        _tagsCachePromise = null;
+        throw err;
+      });
+  }
+  return _tagsCachePromise;
 }
 
 export async function createTagDefinition(name: string): Promise<TagDefinitionResponse> {
   const { data } = await api.post<TagDefinitionResponse>('/tags', { name });
+  _tagsCachePromise = null;
   return data;
 }
 
 export async function deleteTagDefinition(tagId: string): Promise<{ status: string }> {
   const { data } = await api.delete<{ status: string }>(`/tags/${tagId}`);
+  _tagsCachePromise = null;
   return data;
 }
 
 export async function reparseAllStatements(): Promise<{ status: string; total: number; success: number; failed: number; skipped: number }> {
   const { data } = await api.post<{ status: string; total: number; success: number; failed: number; skipped: number }>('/statements/reparse-all', {}, { timeout: 300000 });
+  _bankAccountsCachePromise = null;
   return data;
 }
 

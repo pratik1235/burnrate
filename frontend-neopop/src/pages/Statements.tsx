@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ChangeEvent, type CSSProperties, type KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { StatUpload } from '@/components/StatUpload';
@@ -7,7 +7,7 @@ import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { useFilters } from '@/contexts/FilterContext';
 import { useCards } from '@/hooks/useApi';
 import { getBankAccountKeys } from '@/lib/api';
-import { Button, Typography, InputField, Row, Column } from '@cred/neopop-web/lib/components';
+import { Button, Typography, InputField, Row, Column, SearchBar } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import {
@@ -23,13 +23,16 @@ import type { Statement } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
 import { toast } from '@/components/Toast';
 import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
-import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal } from 'lucide-react';
+import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { CloseButton } from '@/components/CloseButton';
+import { statementMatchesSearch } from '@/lib/statementSearch';
+import { paginateBounds } from '@/lib/pagination';
 import styled from 'styled-components';
 import { SelectableElevatedCard, DEFAULT_ELEVATED_CARD_EDGE_COLORS } from '@/components/SelectableElevatedCard';
 
 const PageLayout = styled.div`
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: ${mainColors.black};
 `;
 
@@ -95,6 +98,43 @@ const UploadRow = styled.div`
   @media (max-width: 720px) {
     grid-template-columns: 1fr;
   }
+`;
+
+const ActionBar = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+`;
+
+const CompactSearchWrapper = styled.div`
+  flex: 1;
+  min-width: 200px;
+  max-width: 400px;
+
+  input {
+    padding: 6px 12px !important;
+    height: 0.2em !important;
+    font-size: 13px !important;
+  }
+  > div {
+    min-height: 0 !important;
+  }
+`;
+
+const STATEMENTS_PAGE_SIZE = 12;
+
+const PaginationFooter = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 `;
 
 /** Lift + soft shadow on hover for clickable (successfully parsed) statement rows. */
@@ -240,6 +280,11 @@ export function Statements() {
   const [stmtFilters, setStmtFilters] = useState<BankStatementFilterValues>({ banks: [] });
   const [filterOpen, setFilterOpen] = useState(false);
   const [availableBanks, setAvailableBanks] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInputValue, setSearchInputValue] = useState('');
+  const [searchClearKey, setSearchClearKey] = useState(0);
+  const [searchTooltipVisible, setSearchTooltipVisible] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
 
   const refreshBankSlugs = useCallback(async () => {
     try {
@@ -259,6 +304,7 @@ export function Statements() {
       if (stmtFilters.from) params.from = stmtFilters.from;
       if (stmtFilters.to) params.to = stmtFilters.to;
       if (stmtFilters.source) params.source = stmtFilters.source;
+      if (stmtFilters.parseFailuresOnly) params.parseFailuresOnly = true;
       const data = await getStatements(params);
       setStatements(data);
     } catch {
@@ -486,33 +532,43 @@ export function Statements() {
     </Typography>
   );
 
-  const sortedStatements = [...statements].sort((a, b) => statementSortPriority(a) - statementSortPriority(b));
+  const sortedStatements = useMemo(() => {
+    const filtered = statements.filter((s) => statementMatchesSearch(s, searchQuery));
+    return [...filtered].sort((a, b) => statementSortPriority(a) - statementSortPriority(b));
+  }, [statements, searchQuery]);
+
+  const totalFiltered = sortedStatements.length;
+  const pagination = useMemo(
+    () => paginateBounds(pageIndex, totalFiltered, STATEMENTS_PAGE_SIZE),
+    [pageIndex, totalFiltered],
+  );
+
+  const pageStatements = useMemo(
+    () => sortedStatements.slice(pagination.start, pagination.end),
+    [sortedStatements, pagination.start, pagination.end],
+  );
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchQuery, stmtFilters.banks, stmtFilters.from, stmtFilters.to, stmtFilters.source, stmtFilters.parseFailuresOnly]);
+
+  useEffect(() => {
+    if (pagination.displayPageIndex !== pageIndex) {
+      setPageIndex(pagination.displayPageIndex);
+    }
+  }, [pagination.displayPageIndex, pageIndex]);
+
+  const filterActiveCount =
+    stmtFilters.banks.length +
+    (stmtFilters.from ? 1 : 0) +
+    (stmtFilters.to ? 1 : 0) +
+    (stmtFilters.source ? 1 : 0) +
+    (stmtFilters.parseFailuresOnly ? 1 : 0);
 
   return (
     <PageLayout>
       <Navbar activeTab="statements" onTabChange={(tab) => navigate(`/${tab}`)} />
       <Content>
-        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: 24 }}>
-          <ButtonWithIcon
-            icon={SlidersHorizontal}
-            variant={
-              stmtFilters.banks.length > 0 || stmtFilters.from || stmtFilters.to || stmtFilters.source
-                ? 'secondary'
-                : 'primary'
-            }
-            kind="elevated"
-            size="small"
-            colorMode="dark"
-            onClick={() => setFilterOpen(true)}
-            justifyContent="center"
-            gap={6}
-          >
-            Filters
-            {(stmtFilters.banks.length > 0 || stmtFilters.from || stmtFilters.to || stmtFilters.source) &&
-              ` (${stmtFilters.banks.length + (stmtFilters.from ? 1 : 0) + (stmtFilters.to ? 1 : 0) + (stmtFilters.source ? 1 : 0)})`}
-          </ButtonWithIcon>
-        </div>
-
         <UploadRow>
           <div>
             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.SEMI_BOLD} color="rgba(255,255,255,0.7)" style={{ marginBottom: 8 }}>
@@ -550,6 +606,96 @@ export function Statements() {
           </div>
         </UploadRow>
 
+        <ActionBar>
+          <ButtonWithIcon
+            icon={SlidersHorizontal}
+            variant={
+              stmtFilters.banks.length > 0 ||
+              stmtFilters.from ||
+              stmtFilters.to ||
+              stmtFilters.source ||
+              stmtFilters.parseFailuresOnly
+                ? 'secondary'
+                : 'primary'
+            }
+            kind="elevated"
+            size="small"
+            colorMode="dark"
+            onClick={() => setFilterOpen(true)}
+            justifyContent="center"
+            gap={6}
+          >
+            Filters
+            {filterActiveCount > 0 ? ` (${filterActiveCount})` : ''}
+          </ButtonWithIcon>
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+              marginLeft: 'auto',
+              flex: '1 1 240px',
+              justifyContent: 'flex-end',
+              maxWidth: 480,
+              position: 'relative',
+            }}
+            onMouseEnter={() => setSearchTooltipVisible(true)}
+            onMouseLeave={() => setSearchTooltipVisible(false)}
+          >
+            {searchTooltipVisible && !searchQuery.trim() && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 6,
+                  background: colorPalette.popBlack[300],
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 8,
+                  padding: '6px 10px',
+                  zIndex: 10,
+                  maxWidth: 280,
+                }}
+              >
+                <Typography
+                  fontType={FontType.BODY}
+                  fontSize={11}
+                  fontWeight={FontWeights.REGULAR}
+                  color="rgba(255,255,255,0.65)"
+                >
+                  Search by bank, card digits, period, file name, or path
+                </Typography>
+              </div>
+            )}
+            <CompactSearchWrapper>
+              <SearchBar
+                key={searchClearKey}
+                placeholder="Search statements..."
+                colorMode={searchQuery.trim() ? 'light' : 'dark'}
+                handleSearchInput={(value: string) => setSearchInputValue(value)}
+                onSubmit={() => setSearchQuery(searchInputValue)}
+                colorConfig={{
+                  border: 'rgba(255,255,255,0.2)',
+                  activeBorder: '#ffffff',
+                  backgroundColor: searchQuery.trim() ? mainColors.white : 'rgba(255,255,255,0.05)',
+                  closeIcon: colorPalette.rss[500],
+                }}
+              />
+            </CompactSearchWrapper>
+            {searchQuery.trim() ? (
+              <CloseButton
+                kind="flat"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchInputValue('');
+                  setSearchClearKey((k) => k + 1);
+                }}
+                variant="inline"
+              />
+            ) : null}
+          </div>
+        </ActionBar>
+
         {loading ? (
           <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
             Loading...
@@ -560,9 +706,34 @@ export function Statements() {
               No statements yet. Upload PDFs or CSVs above to get started.
             </Typography>
           </div>
+        ) : sortedStatements.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center' }}>
+            <Typography
+              fontType={FontType.BODY}
+              fontSize={16}
+              fontWeight={FontWeights.REGULAR}
+              color="rgba(255,255,255,0.6)"
+              style={{ marginBottom: 16 }}
+            >
+              No statements match your search. Try different keywords or clear the search.
+            </Typography>
+            <Button
+              variant="secondary"
+              kind="elevated"
+              size="small"
+              colorMode="dark"
+              onClick={() => {
+                setSearchQuery('');
+                setSearchInputValue('');
+                setSearchClearKey((k) => k + 1);
+              }}
+            >
+              Clear search
+            </Button>
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {sortedStatements.map((s) => {
+            {pageStatements.map((s) => {
               const isError = s.status === 'parse_error';
               const needsPassword = s.status === 'password_needed';
               const sourceLabel = s.source === 'BANK' ? 'BANK' : 'CC';
@@ -848,6 +1019,50 @@ export function Statements() {
                 <ClickableCardWrapper key={s.id}>{card}</ClickableCardWrapper>
               );
             })}
+            <PaginationFooter>
+              <Typography
+                fontType={FontType.BODY}
+                fontSize={12}
+                fontWeight={FontWeights.REGULAR}
+                color="rgba(255,255,255,0.55)"
+              >
+                Page {pagination.displayPageIndex + 1} of {pagination.pageCount}
+                {' · '}
+                {pageStatements.length === 1 ? '1 statement' : `${pageStatements.length} statements`} on this page
+                {' · '}
+                {totalFiltered === 1 ? '1 total' : `${totalFiltered} total`}
+              </Typography>
+              <Row style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <ButtonWithIcon
+                  icon={ChevronLeft}
+                  variant="secondary"
+                  kind="elevated"
+                  size="small"
+                  colorMode="dark"
+                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                  disabled={pagination.displayPageIndex <= 0}
+                  justifyContent="center"
+                  gap={6}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </ButtonWithIcon>
+                <ButtonWithIcon
+                  icon={ChevronRight}
+                  variant="secondary"
+                  kind="elevated"
+                  size="small"
+                  colorMode="dark"
+                  onClick={() => setPageIndex((p) => Math.min(pagination.pageCount - 1, p + 1))}
+                  disabled={pagination.displayPageIndex >= pagination.pageCount - 1}
+                  justifyContent="center"
+                  gap={6}
+                  aria-label="Next page"
+                >
+                  Next
+                </ButtonWithIcon>
+              </Row>
+            </PaginationFooter>
           </div>
         )}
       </Content>

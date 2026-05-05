@@ -375,9 +375,13 @@ def list_statements(
     ),
     from_date: Optional[date] = Query(None, alias="from", description="Filter by period overlap"),
     to_date: Optional[date] = Query(None, alias="to"),
+    parse_failed_only: Optional[bool] = Query(
+        None,
+        description="When true, only statements that failed to parse (could not extract data).",
+    ),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
-    """List all imported statements, optionally filtered by source, bank, and date range."""
+    """List all imported statements, optionally filtered by source, bank, date range, and parse outcome."""
     q = db.query(Statement).order_by(Statement.imported_at.desc())
     if source:
         q = q.filter(Statement.source == source.upper())
@@ -393,6 +397,8 @@ def list_statements(
         q = q.filter(
             or_(Statement.period_start.is_(None), Statement.period_start <= to_date)
         )
+    if parse_failed_only is True:
+        q = q.filter(Statement.parse_failed == 1)
     statements = q.all()
     out: List[Dict[str, Any]] = []
     for s in statements:
@@ -408,10 +414,12 @@ def list_statements(
                 "transaction_count": s.transaction_count,
                 "total_spend": s.total_spend,
                 "total_amount_due": s.total_amount_due,
+                "payment_due_date": s.payment_due_date.isoformat() if getattr(s, "payment_due_date", None) else None,
                 "credit_limit": s.credit_limit,
                 "currency": (getattr(s, "currency", None) or "INR").upper()[:3],
                 "source": getattr(s, "source", None) or "CC",
                 "status": getattr(s, "status", None) or "success",
+                "parse_failed": int(getattr(s, "parse_failed", 0) or 0),
                 "imported_at": s.imported_at.isoformat() if s.imported_at else None,
                 "file_path": fp,
                 "file_name": os.path.basename(fp) if fp else None,

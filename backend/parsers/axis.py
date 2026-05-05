@@ -18,10 +18,10 @@ from typing import List, Optional, Tuple
 import pdfplumber
 
 from backend.parsers.base import BaseParser, ParsedStatement, ParsedTransaction
+from backend.parsers.payment_due_date import extract_payment_due_date_from_text
 
 logger = logging.getLogger(__name__)
 
-# Transaction line: DD/MM/YYYY description amount Dr/Cr [cashback Cr/Dr]
 _TX_LINE_RE = re.compile(
     r"^(\d{2}/\d{2}/\d{4})\s+"
     r"(.+?)\s+"
@@ -63,11 +63,12 @@ class AxisParser(BaseParser):
         total_amount_due = self._extract_total_amount_due(full_text)
         credit_limit = self._extract_credit_limit(full_text)
         transactions = self._extract_transactions(all_lines)
+        payment_due_date = extract_payment_due_date_from_text(full_text)
 
         logger.info(
-            "Axis parse: card=%s period=%s..%s txns=%d due=%s limit=%s",
+            "Axis parse: card=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
             card_last4, period_start, period_end, len(transactions),
-            total_amount_due, credit_limit,
+            total_amount_due, credit_limit, payment_due_date,
         )
 
         return ParsedStatement(
@@ -78,6 +79,7 @@ class AxisParser(BaseParser):
             card_last4=card_last4,
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
+            payment_due_date=payment_due_date,
         )
 
     # ------------------------------------------------------------------

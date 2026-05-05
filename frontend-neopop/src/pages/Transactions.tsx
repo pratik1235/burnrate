@@ -633,7 +633,7 @@ function TransactionsContent() {
             onClick={handleLoadMore}
             style={{ marginTop: 24 }}
           >
-            Load more ({safeTotal - safeTransactions.length} remaining)
+            Load 20 more ({safeTotal - safeTransactions.length} remaining)
           </Button>
         )}
       </Content>

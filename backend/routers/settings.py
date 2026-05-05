@@ -90,6 +90,8 @@ class SettingsUpdateInput(BaseModel):
     dob_year: Optional[str] = None
     watch_folder: Optional[str] = None
     display_currency: Optional[str] = None
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
     cards: Optional[List[CardInput]] = None
 
 
@@ -111,6 +113,8 @@ def get_settings(db: Session = Depends(get_db)) -> Dict[str, Any]:
             "dob_year": settings.dob_year,
             "watch_folder": settings.watch_folder,
             "display_currency": getattr(settings, "display_currency", None),
+            "llm_provider": getattr(settings, "llm_provider", None),
+            "llm_model": getattr(settings, "llm_model", None),
             "created_at": settings.created_at.isoformat() if settings.created_at else None,
             "updated_at": settings.updated_at.isoformat() if settings.updated_at else None,
         },
@@ -198,6 +202,10 @@ def update_settings(
     update_data = body.model_dump(exclude_unset=True)
     if "display_currency" in update_data:
         settings.display_currency = _normalize_display_currency(body.display_currency)
+    if "llm_provider" in update_data:
+        settings.llm_provider = body.llm_provider
+    if "llm_model" in update_data:
+        settings.llm_model = body.llm_model
 
     cards_added = 0
     if body.cards is not None:
