@@ -7,6 +7,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Callable, Dict, Optional, Type
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.models.database import SessionLocal
@@ -217,6 +218,7 @@ def process_statement(
     manual_password: Optional[str] = None,
     source: str = "CC",
     original_upload_path: Optional[str] = None,
+    reparse_mode: bool = False,
 ) -> Dict:
     """
     Process a statement file (PDF or CSV): unlock, parse, categorize, persist.
@@ -263,7 +265,7 @@ def process_statement(
             _pre_existing_hash = db_session.query(Statement).filter(
                 Statement.file_hash == file_hash
             ).first()
-        else:
+        elif not reparse_mode:
             existing = db_session.query(Statement).filter(
                 Statement.file_hash == file_hash
             ).first()
@@ -284,6 +286,7 @@ def process_statement(
                 source=source,
                 db_session=db_session,
                 original_upload_path=original_upload_path,
+                reparse_mode=reparse_mode,
             )
 
         # ---------- PDF processing (existing logic) ----------
@@ -297,84 +300,113 @@ def process_statement(
             unlocked = unlock_pdf(pdf_path, [manual_password], allowed_roots=roots)
             if unlocked:
                 working_path = unlocked
+                from backend.services.keychain import save_statement_password
+                save_statement_password(file_hash, manual_password)
                 if not bank:
                     from backend.parsers.detector import detect_bank
                     detected = detect_bank(working_path)
                     if detected and detected in SUPPORTED_BANKS:
                         bank = detected
             else:
-                _create_password_needed_statement(
-                    db_session, file_hash, pdf_path, bank, source, original_upload_path,
-                )
+                if reparse_mode:
+                    db_session.rollback()
+                else:
+                    _create_password_needed_statement(
+                        db_session, file_hash, pdf_path, bank, source, original_upload_path,
+                    )
                 return {
                     "status": "password_needed",
                     "message": "Could not unlock PDF with provided password",
                     "count": 0,
                 }
-        elif encrypted and profile:
-            if bank:
-                passwords = generate_passwords(
-                    bank=bank,
-                    name=profile.name,
-                    dob_day=profile.dob_day or "",
-                    dob_month=profile.dob_month or "",
-                    card_last4s=card_last4s,
-                    dob_year=profile.dob_year or "",
-                )
-                unlocked = unlock_pdf(pdf_path, passwords, allowed_roots=roots)
+        elif encrypted:
+            from backend.services.keychain import get_statement_password
+            keychain_pwd = get_statement_password(file_hash)
+            
+            unlocked = None
+            if keychain_pwd:
+                unlocked = unlock_pdf(pdf_path, [keychain_pwd], allowed_roots=roots)
                 if unlocked:
                     working_path = unlocked
-                else:
-                    _create_password_needed_statement(
-                        db_session, file_hash, pdf_path, bank, source, original_upload_path,
-                    )
-                    return {
-                        "status": "password_needed",
-                        "message": "Could not unlock PDF - enter password for this statement to be processed",
-                        "count": 0,
-                    }
-            else:
-                unlocked = None
-                for try_bank in SUPPORTED_BANKS:
-                    try_card_last4s = _get_card_last4s(db_session, bank=try_bank)
+                    if not bank:
+                        from backend.parsers.detector import detect_bank
+                        detected = detect_bank(working_path)
+                        if detected and detected in SUPPORTED_BANKS:
+                            bank = detected
+            
+            if not unlocked and profile:
+                if bank:
                     passwords = generate_passwords(
-                        bank=try_bank,
+                        bank=bank,
                         name=profile.name,
                         dob_day=profile.dob_day or "",
                         dob_month=profile.dob_month or "",
-                        card_last4s=try_card_last4s,
+                        card_last4s=card_last4s,
                         dob_year=profile.dob_year or "",
                     )
                     unlocked = unlock_pdf(pdf_path, passwords, allowed_roots=roots)
                     if unlocked:
-                        bank = try_bank
                         working_path = unlocked
-                        logger.info("Unlocked with bank=%s passwords", try_bank)
-                        break
+                    else:
+                        if reparse_mode:
+                            db_session.rollback()
+                        else:
+                            _create_password_needed_statement(
+                                db_session, file_hash, pdf_path, bank, source, original_upload_path,
+                            )
+                        return {
+                            "status": "password_needed",
+                            "message": "Could not unlock PDF - enter password for this statement to be processed",
+                            "count": 0,
+                        }
+                else:
+                    for try_bank in SUPPORTED_BANKS:
+                        try_card_last4s = _get_card_last4s(db_session, bank=try_bank)
+                        passwords = generate_passwords(
+                            bank=try_bank,
+                            name=profile.name,
+                            dob_day=profile.dob_day or "",
+                            dob_month=profile.dob_month or "",
+                            card_last4s=try_card_last4s,
+                            dob_year=profile.dob_year or "",
+                        )
+                        unlocked = unlock_pdf(pdf_path, passwords, allowed_roots=roots)
+                        if unlocked:
+                            bank = try_bank
+                            working_path = unlocked
+                            logger.info("Unlocked with bank=%s passwords", try_bank)
+                            break
 
-                if not unlocked:
+                    if not unlocked:
+                        if reparse_mode:
+                            db_session.rollback()
+                        else:
+                            _create_password_needed_statement(
+                                db_session, file_hash, pdf_path, bank, source, original_upload_path,
+                            )
+                        return {
+                            "status": "password_needed",
+                            "message": "Could not unlock PDF - enter password for this statement to be processed",
+                            "count": 0,
+                        }
+
+                    from backend.parsers.detector import detect_bank
+                    detected = detect_bank(working_path)
+                    if detected and detected in SUPPORTED_BANKS:
+                        bank = detected
+                        
+            if not unlocked and not profile:
+                if reparse_mode:
+                    db_session.rollback()
+                else:
                     _create_password_needed_statement(
                         db_session, file_hash, pdf_path, bank, source, original_upload_path,
                     )
-                    return {
-                        "status": "password_needed",
-                        "message": "Could not unlock PDF - enter password for this statement to be processed",
-                        "count": 0,
-                    }
-
-                from backend.parsers.detector import detect_bank
-                detected = detect_bank(working_path)
-                if detected and detected in SUPPORTED_BANKS:
-                    bank = detected
-        elif encrypted:
-            _create_password_needed_statement(
-                db_session, file_hash, pdf_path, bank, source, original_upload_path,
-            )
-            return {
-                "status": "password_needed",
-                "message": "PDF is password-protected - enter password for this statement to be processed",
-                "count": 0,
-            }
+                return {
+                    "status": "password_needed",
+                    "message": "PDF is password-protected - enter password for this statement to be processed",
+                    "count": 0,
+                }
 
         if not bank:
             return {
@@ -382,6 +414,16 @@ def process_statement(
                 "message": "Could not detect bank",
                 "count": 0,
             }
+
+        parser_key = bank
+        if bank == "federal_scapia":
+            bank = "federal"
+            parser_key = "federal_scapia"
+        elif bank == "federal":
+            from backend.parsers.detector import detect_bank
+            detected = detect_bank(working_path)
+            if detected == "federal_scapia":
+                parser_key = "federal_scapia"
 
         registered_cards = db_session.query(Card).filter(Card.bank == bank).all()
         if not registered_cards:
@@ -403,8 +445,8 @@ def process_statement(
         from backend.parsers.generic import GenericParser
 
         parsers = _get_parsers()
-        if bank in parsers:
-            parser = parsers[bank]()
+        if parser_key in parsers:
+            parser = parsers[parser_key]()
         else:
             parser = GenericParser(bank=bank)
         parsed = parser.parse(working_path)
@@ -498,32 +540,35 @@ def process_statement(
                 f"Could not extract transactions from this {bank.upper()} statement. "
                 f"The PDF format may not be supported yet."
             )
-            statement = Statement(
-                bank=bank,
-                card_last4=card_last4,
-                period_start=None,
-                period_end=None,
-                file_hash=file_hash,
-                file_path=pdf_path,
-                original_upload_path=original_upload_path,
-                transaction_count=0,
-                total_spend=0.0,
-                total_amount_due=getattr(parsed, "total_amount_due", None),
-                credit_limit=getattr(parsed, "credit_limit", None),
-                source=source,
-                status="parse_error",
-                parse_failed=1,
-                status_message=parse_msg,
-                currency=_parsed_currency(parsed),
-                payment_due_date=getattr(parsed, "payment_due_date", None),
-            )
-            db_session.add(statement)
-            db_session.commit()
-
             logger.warning(
                 "Parse error for %s (%s ...%s): no transactions or period extracted",
                 pdf_path, bank, card_last4,
             )
+            if reparse_mode:
+                db_session.rollback()
+            else:
+                statement = Statement(
+                    bank=bank,
+                    card_last4=card_last4,
+                    period_start=None,
+                    period_end=None,
+                    file_hash=file_hash,
+                    file_path=pdf_path,
+                    original_upload_path=original_upload_path,
+                    transaction_count=0,
+                    total_spend=0.0,
+                    total_amount_due=getattr(parsed, "total_amount_due", None),
+                    credit_limit=getattr(parsed, "credit_limit", None),
+                    source=source,
+                    status="parse_error",
+                    parse_failed=1,
+                    status_message=parse_msg,
+                    currency=_parsed_currency(parsed),
+                    payment_due_date=getattr(parsed, "payment_due_date", None),
+                )
+                db_session.add(statement)
+                db_session.commit()
+
             return {
                 "status": "parse_error",
                 "message": parse_msg,
@@ -557,17 +602,6 @@ def process_statement(
             if not c_last4:
                 continue
 
-            # Per-card dedup: same file_hash + same card_last4 = already imported
-            existing = db_session.query(Statement).filter(
-                Statement.file_hash == file_hash,
-                Statement.card_last4 == c_last4,
-            ).first()
-            if existing:
-                logger.info(
-                    "Duplicate statement (file_hash, card=%s) — skipping", c_last4
-                )
-                continue
-
             # Resolve card_id for this card
             card_obj = db_session.query(Card).filter(
                 Card.bank == bank, Card.last4 == c_last4
@@ -579,31 +613,76 @@ def process_statement(
                 )
                 continue
 
-            # Per-card total_amount_due = debits − non-payment credits
-            # Bill payment credits (cc_payment) repay the PREVIOUS month's balance
-            # and must NOT reduce the current cycle's amount due.
+            # Auto-populate Card.name from the detected card variant if it is
+            # not yet set (write-once). Do this even if the statement itself
+            # is a duplicate, so users can re-upload to backfill the name.
+            card_variant = getattr(parsed, "card_variant", None)
+            if card_variant and not card_obj.name:
+                card_obj.name = card_variant
+                logger.info(
+                    "Auto-named card %s ...%s → %r", bank, c_last4, card_variant
+                )
+                db_session.commit()
+
+            # Per-card dedup: same file_hash + same card_last4 = already imported
+            existing = db_session.query(Statement).filter(
+                Statement.file_hash == file_hash,
+                Statement.card_last4 == c_last4,
+            ).first()
+            if existing:
+                logger.info(
+                    "Duplicate statement (file_hash, card=%s) — skipping", c_last4
+                )
+                continue
+
+            # Calculate debit total (always needed for total_spend)
             card_debit_total = sum(
-                Decimal(str(t.amount)) for t in c_txns if t.type == "debit"
+                (Decimal(str(t.amount)) for t in c_txns if t.type == "debit"),
+                Decimal("0")
             )
-            card_credit_total = sum(
-                Decimal(str(t.amount))
-                for t in c_txns
-                if t.type == "credit" and getattr(t, "category", None) != "cc_payment"
+
+            # Per-card total_amount_due: use parsed value from PDF as authoritative source.
+            # The bank's statement calculation accounts for opening balance, interest,
+            # fees, and previous payments — computation from transactions alone is incorrect.
+            # For combined statements (multiple cards in one PDF), parsed value is the total
+            # for all cards, so we must compute per-card dues instead.
+            parsed_due = getattr(parsed, "total_amount_due", None) if not is_combined else None
+            logger.debug(
+                "total_amount_due logic: is_combined=%s, parsed.total_amount_due=%s, parsed_due=%s",
+                is_combined, getattr(parsed, "total_amount_due", None), parsed_due
             )
-            # category may not yet be resolved (categorizer runs below), so also
-            # exclude credits on transactions that the *parser* already flagged
-            # as cc_payment via pt.category:
-            card_due = max(Decimal("0"), card_debit_total - card_credit_total)
-            card_due = float(card_due.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+            if parsed_due is not None:
+                # Use the authoritative value from the PDF
+                card_due = float(Decimal(str(parsed_due)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+            else:
+                # Fallback: compute from transactions (legacy behavior for parsers that don't extract this field)
+                # Bill payment credits (cc_payment) repay the PREVIOUS month's balance
+                # and must NOT reduce the current cycle's amount due.
+                card_credit_total = sum(
+                    (Decimal(str(t.amount))
+                    for t in c_txns
+                    if t.type == "credit" and getattr(t, "category", None) != "cc_payment"),
+                    Decimal("0")
+                )
+                # category may not yet be resolved (categorizer runs below), so also
+                # exclude credits on transactions that the *parser* already flagged
+                # as cc_payment via pt.category:
+                card_due = max(Decimal("0"), card_debit_total - card_credit_total)
+                card_due = float(card_due.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
             # Sanity-check log: per-card dues should sum ≈ combined parsed due
             if is_combined:
-                logger.debug(
-                    "Card %s: debits=%.2f credits=%.2f card_due=%.2f "
-                    "(combined_pdf_due=%s)",
-                    c_last4, float(card_debit_total), float(card_credit_total),
-                    card_due, parsed.total_amount_due,
-                )
+                if parsed_due is not None:
+                    logger.debug(
+                        "Card %s: card_due=%.2f (from parsed PDF, combined_pdf_due=%s)",
+                        c_last4, card_due, parsed.total_amount_due,
+                    )
+                else:
+                    logger.debug(
+                        "Card %s: debits=%.2f credits=%.2f card_due=%.2f (computed)",
+                        c_last4, float(card_debit_total), float(card_credit_total),
+                        card_due,
+                    )
 
             stmt = Statement(
                 bank=bank,
@@ -682,6 +761,20 @@ def process_statement(
             "bank": bank,
         }
 
+    except IntegrityError:
+        logger.warning(
+            "IntegrityError while processing %s — statement already inserted by a concurrent worker (duplicate)",
+            pdf_path,
+        )
+        if db_session:
+            db_session.rollback()
+        return {
+            "status": "duplicate",
+            "message": "Statement already imported",
+            "count": 0,
+            "period": None,
+            "bank": bank,
+        }
     except Exception as e:
         logger.exception("Statement processing failed: %s", e)
         if db_session:
@@ -710,6 +803,7 @@ def _process_csv_statement(
     source: str,
     db_session: Session,
     original_upload_path: Optional[str] = None,
+    reparse_mode: bool = False,
 ) -> Dict:
     """Process a CSV bank statement: detect bank, parse, categorize, persist."""
     if not bank:
@@ -718,23 +812,26 @@ def _process_csv_statement(
 
     if not bank:
         bank_msg = "Could not detect bank from CSV filename or content."
-        statement = Statement(
-            bank="unknown",
-            card_last4=None,
-            period_start=None,
-            period_end=None,
-            file_hash=file_hash,
-            file_path=csv_path,
-            original_upload_path=original_upload_path,
-            transaction_count=0,
-            total_spend=0.0,
-            source=source,
-            status="bank_not_parsed",
-            parse_failed=1,
-            status_message=bank_msg,
-        )
-        db_session.add(statement)
-        db_session.commit()
+        if reparse_mode:
+            db_session.rollback()
+        else:
+            statement = Statement(
+                bank="unknown",
+                card_last4=None,
+                period_start=None,
+                period_end=None,
+                file_hash=file_hash,
+                file_path=csv_path,
+                original_upload_path=original_upload_path,
+                transaction_count=0,
+                total_spend=0.0,
+                source=source,
+                status="bank_not_parsed",
+                parse_failed=1,
+                status_message=bank_msg,
+            )
+            db_session.add(statement)
+            db_session.commit()
         return {
             "status": "bank_not_parsed",
             "message": bank_msg,
@@ -764,29 +861,32 @@ def _process_csv_statement(
             f"Could not extract transactions from this {bank.upper()} CSV. "
             f"The format may not be supported yet."
         )
-        statement = Statement(
-            bank=bank,
-            card_last4=card_last4,
-            period_start=None,
-            period_end=None,
-            file_hash=file_hash,
-            file_path=csv_path,
-            original_upload_path=original_upload_path,
-            transaction_count=0,
-            total_spend=0.0,
-            source=source,
-            status="parse_error",
-            parse_failed=1,
-            status_message=parse_msg,
-            currency=_parsed_currency(parsed),
-        )
-        db_session.add(statement)
-        db_session.commit()
-
         logger.warning(
             "CSV parse error for %s (%s): no transactions extracted",
             csv_path, bank,
         )
+        if reparse_mode:
+            db_session.rollback()
+        else:
+            statement = Statement(
+                bank=bank,
+                card_last4=card_last4,
+                period_start=None,
+                period_end=None,
+                file_hash=file_hash,
+                file_path=csv_path,
+                original_upload_path=original_upload_path,
+                transaction_count=0,
+                total_spend=0.0,
+                source=source,
+                status="parse_error",
+                parse_failed=1,
+                status_message=parse_msg,
+                currency=_parsed_currency(parsed),
+            )
+            db_session.add(statement)
+            db_session.commit()
+
         return {
             "status": "parse_error",
             "message": parse_msg,
