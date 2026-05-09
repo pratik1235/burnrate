@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend import config
 from backend.models.models import ChatMessage, ChatSession, Settings
+from backend.services import aws_credentials
 from backend.services.llm.provider_base import (
     ChatMessage as LLMChatMessage,
     DoneEvent,
@@ -18,6 +19,9 @@ from backend.services.llm.provider_base import (
     ToolCallEvent,
 )
 from backend.services.llm.provider_ollama import OllamaProvider
+from backend.services.llm.provider_anthropic import AnthropicProvider
+from backend.services.llm.provider_openai import OpenAIProvider
+from backend.services.llm.provider_bedrock import BedrockProvider
 from backend.services.llm.system_prompt import build_system_prompt
 from backend.services.llm.tool_executor import execute_tool
 from backend.services.llm.tools import TOOL_DEFINITIONS
@@ -26,11 +30,35 @@ logger = logging.getLogger(__name__)
 
 
 def _get_provider(settings: Settings) -> LLMProvider:
+    """
+    Get LLM provider based on settings.
+    Credentials are auto-resolved from keychain/env by each provider constructor.
+    """
     provider_id = settings.llm_provider or config.LLM_PROVIDER
+    model = settings.llm_model
+
     if provider_id == "ollama":
-        model = settings.llm_model or config.LLM_OLLAMA_MODEL
+        model = model or config.LLM_OLLAMA_MODEL
         return OllamaProvider(model=model)
-    raise ValueError(f"Unsupported LLM provider: {provider_id}")
+
+    elif provider_id == "anthropic":
+        model = model or config.LLM_ANTHROPIC_DEFAULT_MODEL
+        # AnthropicProvider will get key from keychain/env automatically
+        return AnthropicProvider(model=model)
+
+    elif provider_id == "openai":
+        model = model or config.LLM_OPENAI_DEFAULT_MODEL
+        # OpenAIProvider will get key from keychain/env automatically
+        return OpenAIProvider(model=model)
+
+    elif provider_id == "bedrock":
+        model = model or config.LLM_BEDROCK_DEFAULT_MODEL
+        # get_aws_session() handles env/keychain/SSO precedence
+        session = aws_credentials.get_aws_session()
+        return BedrockProvider(model=model, aws_session=session)
+
+    else:
+        raise ValueError(f"Unsupported LLM provider: {provider_id}")
 
 
 def _db_messages_to_llm(db_messages) -> list[LLMChatMessage]:

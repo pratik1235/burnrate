@@ -49,6 +49,25 @@ _CREDIT_LIMIT_RE = re.compile(
 
 _AMOUNT_RE = re.compile(r"`([\d,]+(?:\.\d{2})?)")
 
+# MITC heading on page 2: "Credit Cards> Amazon Pay Credit Card > ..."
+_CARD_VARIANT_MITC_RE = re.compile(
+    r"Credit\s+Cards\s*[>→]\s*([\w\s&+]+?)\s+Credit\s+Card\s*[>→]",
+    re.IGNORECASE,
+)
+
+# Known URL slugs → canonical product name
+_CARD_VARIANT_URL_SLUGS = [
+    ("amazon-pay",   "Amazon Pay"),
+    ("sapphiro",     "Sapphiro"),
+    ("coral",        "Coral"),
+    ("rubyx",        "Rubyx"),
+    ("emeralde",     "Emeralde"),
+    ("platinum",     "Platinum"),
+    ("cashback",     "Cashback"),
+    ("hpcl-coral",  "HPCL Coral"),
+    ("mmt-platinum", "MMT Platinum"),
+]
+
 
 class ICICIParser(BaseParser):
     """Parser for ICICI Bank credit card statements."""
@@ -70,9 +89,11 @@ class ICICIParser(BaseParser):
         transactions = self._extract_transactions(all_lines)
         payment_due_date = extract_payment_due_date_from_text(full_text)
 
+        card_variant = self._extract_card_variant(full_text)
+
         logger.info(
-            "ICICI parse: card=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
-            card_last4, period_start, period_end, len(transactions),
+            "ICICI parse: card=%s variant=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
+            card_last4, card_variant, period_start, period_end, len(transactions),
             total_amount_due, credit_limit, payment_due_date,
         )
 
@@ -85,7 +106,33 @@ class ICICIParser(BaseParser):
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
             payment_due_date=payment_due_date,
+            card_variant=card_variant,
         )
+
+    # ------------------------------------------------------------------
+    # Card variant
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_card_variant(text: str) -> Optional[str]:
+        """Detect ICICI card product name from the full statement text."""
+        # Step 1: MITC heading (page 2) — most reliable
+        m = _CARD_VARIANT_MITC_RE.search(text)
+        if m:
+            return m.group(1).strip().title()
+
+        text_lower = text.lower()
+
+        # Step 2: URL slug patterns in T&C / download links
+        for slug, name in _CARD_VARIANT_URL_SLUGS:
+            if slug in text_lower:
+                return name
+
+        # Step 3: Earnings-section fallback (Amazon Pay rewards text)
+        if "amazon pay balance" in text_lower:
+            return "Amazon Pay"
+
+        return None
 
     # ------------------------------------------------------------------
     # Statement metadata

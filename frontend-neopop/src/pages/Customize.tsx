@@ -306,7 +306,7 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
     setLoading(true);
     getStatements()
       .then((data) => {
-        if (!cancelled) setStatements(data);
+        if (!cancelled) setStatements(data.statements);
       })
       .catch(() => {
         if (!cancelled) {
@@ -340,8 +340,8 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
     try {
       const result = await reparseAllStatements();
       toast.success(`Reparse complete: ${result.success} succeeded, ${result.failed} failed, ${result.skipped} skipped`);
-      const list = await getStatements();
-      setStatements(list);
+      const res = await getStatements();
+      setStatements(res.statements);
     } catch (e) {
       toast.error(extractErrorMsg(e, 'Reparse all failed'));
     } finally {
@@ -355,8 +355,8 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
       const result = await reparseStatement(id);
       if (result.status === 'success') {
         toast.success(`Reparsed ${result.count ?? 0} transactions`);
-        const list = await getStatements();
-        setStatements(list);
+      const res = await getStatements();
+      setStatements(res.statements);
       } else {
         toast.error('Reparse failed');
       }
@@ -395,8 +395,8 @@ export function ReparseRemoveModal({ open, onClose }: { open: boolean; onClose: 
       if (result.status === 'success') {
         toast.success(`Unlocked and imported ${result.count ?? 0} transactions`);
         setPasswordInputs((prev) => { const next = { ...prev }; delete next[stmtId]; return next; });
-        const list = await getStatements();
-        setStatements(list);
+      const res = await getStatements();
+      setStatements(res.statements);
       } else {
         toast.error(result.message ?? 'Could not unlock with this password');
       }

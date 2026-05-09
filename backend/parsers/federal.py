@@ -57,6 +57,13 @@ _CARD_NUM_RE = re.compile(
 
 _CARD_NUM_GENERIC_RE = re.compile(r"(\d{4})[Xx*]{4,}(\d{4})")
 
+_CARD_VARIANT_RE = re.compile(
+    r"(Celesta|Imperio|Signet|Scapia|One\s*Card|Doodhwala|Karbonn|Muthoot|"
+    r"SBI\s*Card|Equitas|Bank\s*of\s*Baroda)"
+    r"\s+(?:Federal\s+)?(?:Bank\s+)?Credit\s+Card",
+    re.IGNORECASE,
+)
+
 _TOTAL_DUE_RE = re.compile(
     r"Total\s+(?:Payment|Amount)\s+Due.*?([\d,]+\.\d{2})",
     re.IGNORECASE | re.DOTALL,
@@ -101,9 +108,11 @@ class FederalBankParser(BaseParser):
         transactions = self._extract_transactions(all_lines)
         payment_due_date = extract_payment_due_date_from_text(full_text)
 
+        card_variant = self._extract_card_variant(full_text)
+
         logger.info(
-            "Federal Bank parse: card=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
-            card_last4, period_start, period_end, len(transactions),
+            "Federal Bank parse: card=%s variant=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
+            card_last4, card_variant, period_start, period_end, len(transactions),
             total_amount_due, credit_limit, payment_due_date,
         )
 
@@ -116,7 +125,20 @@ class FederalBankParser(BaseParser):
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
             payment_due_date=payment_due_date,
+            card_variant=card_variant,
         )
+
+    # ------------------------------------------------------------------
+    # Card variant
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_card_variant(text: str) -> Optional[str]:
+        """Detect card product name from the Federal Bank statement header."""
+        m = _CARD_VARIANT_RE.search(text[:1000])
+        if m:
+            return m.group(1).strip().title()
+        return None
 
     # ------------------------------------------------------------------
     # Statement metadata

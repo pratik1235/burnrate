@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 import { useState } from 'react';
+import styled from 'styled-components';
 import { Typography } from '@cred/neopop-web/lib/components';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
@@ -348,3 +349,84 @@ export const EmptyOptions: StoryObj = {
   name: 'Empty options + emptyMenuContent',
   render: () => <EmptyOptionsDemo />,
 };
+
+const CATEGORY_OPTIONS: SelectDropdownOption[] = [
+  { value: 'food',          label: 'Food & Dining' },
+  { value: 'shopping',      label: 'Shopping' },
+  { value: 'travel',        label: 'Travel' },
+  { value: 'bills',         label: 'Bills & Utilities' },
+  { value: 'entertainment', label: 'Entertainment' },
+  { value: 'fuel',          label: 'Fuel' },
+  { value: 'health',        label: 'Health' },
+  { value: 'groceries',     label: 'Groceries' },
+  { value: 'cc_payment',    label: 'CC Bill Payment' },
+  { value: 'cashback',      label: 'Cashback' },
+  { value: 'other',         label: 'Other' },
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  food: '#F97316',
+  shopping: '#8B5CF6',
+  travel: '#3B82F6',
+  bills: '#6B7280',
+  entertainment: '#EC4899',
+  fuel: '#EAB308',
+  health: '#10B981',
+  groceries: '#14B8A6',
+  cc_payment: '#6B7280',
+  cashback: '#06C270',
+  other: '#9CA3AF',
+};
+
+const CategoryBadgeHover = styled.div`
+  display: inline-flex;
+  border-radius: 12px;
+  transition: box-shadow 0.15s;
+  cursor: pointer;
+
+  &:hover {
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.35);
+  }
+`;
+
+function CategoryBadgePillDemo() {
+  const [cat, setCat] = useState('food');
+  const color = CATEGORY_COLORS[cat] ?? '#9CA3AF';
+  return (
+    <div style={{ background: '#0d0d0d', padding: 24, borderRadius: 8 }}>
+      {/* Simulated transaction row context */}
+      <CategoryBadgeHover>
+        <SelectDropdown
+          selectionMode="single"
+          options={CATEGORY_OPTIONS}
+          value={cat}
+          onChange={setCat}
+          menuMount="portal"
+          menuOffset={4}
+          menuMinWidth={160}
+          menuMaxHeight={240}
+          menuBackgroundColor={colorPalette.popBlack[300]}
+          colorConfig={{
+            border: `${color}40`,
+            text: color,
+            chevron: 'transparent',
+          }}
+          wrapperStyle={{
+            background: `${color}30`,
+            borderRadius: 12,
+            padding: '2px 8px',
+          }}
+          ariaLabel="Change transaction category"
+          onRootMouseDown={(e) => e.stopPropagation()}
+        />
+      </CategoryBadgeHover>
+    </div>
+  );
+}
+
+export const CategoryBadgePill: StoryObj = {
+  name: 'Category badge pill (TransactionRow)',
+  render: () => <CategoryBadgePillDemo />,
+  parameters: { layout: 'centered' },
+};
+

@@ -37,6 +37,14 @@ _CARD_NUM_RE = re.compile(
     re.IGNORECASE,
 )
 
+_CARD_VARIANT_RE = re.compile(
+    r"(Regalia Gold|Regalia|Infinia Metal|Infinia|Diners Club Black|Diners Club Privilege|"
+    r"Diners Club|Millennia|MoneyBack\+|MoneyBack|Swiggy|Tata Neu Infinity|Tata Neu Plus|"
+    r"6E Rewards XL|6E Rewards|Business(?:\s+\w+)?|UPI RuPay|RuPay|Pixel Go|Pixel Play)"
+    r"\s+Credit Card",
+    re.IGNORECASE,
+)
+
 
 _TOTAL_DUE_RE = re.compile(
     r"TOTAL\s+AMOUNT\s+DUE.*?C\s*([\d,]+(?:\.\d{2})?)",
@@ -107,9 +115,11 @@ class HDFCParser(BaseParser):
             payment_due_date = extract_payment_due_date_from_text(full_text)
             fmt = "new"
 
+        card_variant = self._extract_card_variant(header_text)
+
         logger.info(
-            "HDFC parse (%s): card=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
-            fmt, card_last4, period_start, period_end, len(transactions),
+            "HDFC parse (%s): card=%s variant=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
+            fmt, card_last4, card_variant, period_start, period_end, len(transactions),
             total_amount_due, credit_limit, payment_due_date,
         )
 
@@ -122,7 +132,21 @@ class HDFCParser(BaseParser):
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
             payment_due_date=payment_due_date,
+            card_variant=card_variant,
         )
+
+    # ------------------------------------------------------------------
+    # Card variant
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_card_variant(header_text: str) -> Optional[str]:
+        """Detect card product name from the page-1 header."""
+        m = _CARD_VARIANT_RE.search(header_text[:800])
+        if m:
+            # Normalise capitalisation
+            return m.group(1).strip().title()
+        return None
 
     # ------------------------------------------------------------------
     # Statement summary fields

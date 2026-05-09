@@ -81,6 +81,9 @@ class Statement(Base):
     """Imported credit card or bank account statement."""
 
     __tablename__ = "statements"
+    __table_args__ = (
+        UniqueConstraint("file_hash", "card_last4", name="uq_statement_hash_card"),
+    )
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     bank = Column(String(50), nullable=False)

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type CSSProperties, type KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { StatUpload } from '@/components/StatUpload';
 import { FilterModal, type BankStatementFilterValues } from '@/components/FilterModal';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
+import { SelectDropdown } from '@/components/SelectDropdown';
 import { useFilters } from '@/contexts/FilterContext';
 import { useCards } from '@/hooks/useApi';
 import { getBankAccountKeys } from '@/lib/api';
@@ -15,18 +16,19 @@ import {
   type GetStatementsParams,
   deleteStatement,
   reparseStatement,
+  openStatementFile,
   uploadStatement,
   uploadStatementsBulk,
   retryWithPassword,
 } from '@/lib/api';
 import type { Statement } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
+import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/Toast';
 import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
-import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { CloseButton } from '@/components/CloseButton';
-import { statementMatchesSearch } from '@/lib/statementSearch';
 import { paginateBounds } from '@/lib/pagination';
 import styled from 'styled-components';
 import { SelectableElevatedCard, DEFAULT_ELEVATED_CARD_EDGE_COLORS } from '@/components/SelectableElevatedCard';
@@ -47,7 +49,7 @@ const statementBodyRowStyle: CSSProperties = {
   width: '100%',
   flexWrap: 'wrap',
   justifyContent: 'space-around',
-  alignItems: 'flex-start',
+  alignItems: 'center',
   gap: 24,
   boxSizing: 'border-box',
 };
@@ -126,17 +128,6 @@ const CompactSearchWrapper = styled.div`
 
 const STATEMENTS_PAGE_SIZE = 12;
 
-const PaginationFooter = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-`;
-
 /** Lift + soft shadow on hover for clickable (successfully parsed) statement rows. */
 const ClickableCardWrapper = styled.div`
   cursor: pointer;
@@ -167,30 +158,108 @@ const statementCardStyle: CSSProperties = {
 const warnEdgeColors = { bottom: colorPalette.warning[500], right: 'rgba(229,161,0,0.45)' };
 const successEdgeColors = DEFAULT_ELEVATED_CARD_EDGE_COLORS;
 
+/** Sort keys for the statement list sort control. */
+type StatementSortKey = 'default' | 'amount_due_desc' | 'amount_due_asc' | 'due_date_asc' | 'due_date_desc' | 'txn_count_desc' | 'txn_count_asc';
+
+const SORT_OPTIONS: { value: StatementSortKey; label: string }[] = [
+  { value: 'default',         label: 'Default' },
+  { value: 'amount_due_desc', label: 'Amount Due \u2193' },
+  { value: 'amount_due_asc',  label: 'Amount Due \u2191' },
+  { value: 'due_date_asc',    label: 'Payment Due Date \u2191' },
+  { value: 'due_date_desc',   label: 'Payment Due Date \u2193' },
+  { value: 'txn_count_desc',  label: 'Transaction Count \u2193' },
+  { value: 'txn_count_asc',   label: 'Transaction Count \u2191' },
+];
+
+const SortBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+`;
+
+const IconPageBtn = styled.button<{ $disabled?: boolean }>`
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: ${(p) => (p.$disabled ? 'not-allowed' : 'pointer')};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: ${(p) => (p.$disabled ? 0.35 : 1)};
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+  &:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.45);
+  }
+`;
+
+const ActionIconButton = styled.button<{ $danger?: boolean }>`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid ${(p) => (p.$danger ? 'rgba(238,77,55,0.2)' : 'rgba(255, 255, 255, 0.1)')};
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  color: ${(p) => (p.$danger ? mainColors.red : '#ffffff')};
+  
+  &:hover:not(:disabled) {
+    background: ${(p) => (p.$danger ? 'rgba(238,77,55,0.15)' : 'rgba(255, 255, 255, 0.15)')};
+    border-color: ${(p) => (p.$danger ? 'rgba(238,77,55,0.4)' : 'rgba(255, 255, 255, 0.3)')};
+  }
+  
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+`;
+
 const PathDisplay = styled.span`
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.45);
-  word-break: break-all;
   line-height: 1.4;
   text-align: right;
   display: block;
   max-width: 340px;
   cursor: default;
+  position: relative;
 
   .path-full {
     display: none;
   }
   .path-short {
     display: inline;
+    word-break: break-all;
   }
 
   &:hover {
     .path-full {
-      display: inline;
+      display: block;
+      position: absolute;
+      right: 0;
+      top: 120%;
+      transform: translateY(-50%);
+      white-space: normal;
+      word-break: break-all;
+      max-width: 50ch;
+      width: max-content;
+      text-align: left;
+      background-color: ${colorPalette.popBlack[300]};
+      padding: 4px 8px;
+      border-radius: 4px;
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.85);
     }
     .path-short {
-      display: none;
+      visibility: hidden;
     }
   }
 `;
@@ -241,22 +310,47 @@ function truncatedPathDisplay(fullPath: string): string {
   return `.../${filename}`;
 }
 
-function statementPathLine(s: Statement) {
+function statementPathLine(s: Statement, onOpen: (s: Statement) => void) {
   const fullPath = statementDisplayPathForRow(s);
   if (!fullPath) return null;
   const short = truncatedPathDisplay(fullPath);
   return (
-    <PathDisplay aria-label={`Original file path: ${fullPath}`}>
-      <span className="path-short">{short}</span>
-      <span className="path-full">{fullPath}</span>
-    </PathDisplay>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+      <PathDisplay aria-label={`Original file path: ${fullPath}`}>
+        <span className="path-short">{short}</span>
+        <span className="path-full">{fullPath}</span>
+      </PathDisplay>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen(s);
+        }}
+        title="Open file on device"
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 4,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: colorPalette.rss[500],
+          borderRadius: 4,
+          transition: 'color 0.2s, background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = '#fff';
+          e.currentTarget.style.backgroundColor = 'rgba(255,135,68,0.15)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = colorPalette.rss[500];
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <ExternalLink size={12} />
+      </button>
+    </div>
   );
-}
-
-function statementSortPriority(s: Statement): number {
-  if (s.status === 'password_needed') return 0;
-  if (s.status === 'parse_error') return 1;
-  return 2;
 }
 
 function bankRowMeta(s: Statement) {
@@ -270,9 +364,10 @@ function bankRowMeta(s: Statement) {
 export function Statements() {
   const navigate = useNavigate();
   const { setFilters } = useFilters();
-  const { cards } = useCards();
+  const { cards, refetch: refetchCards } = useCards();
   const [bankAccounts, setBankAccounts] = useState<{ id: string; bank: string; last4: string }[]>([]);
   const [statements, setStatements] = useState<Statement[]>([]);
+  const [totalStatements, setTotalStatements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -285,10 +380,27 @@ export function Statements() {
   const [searchClearKey, setSearchClearKey] = useState(0);
   const [searchTooltipVisible, setSearchTooltipVisible] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
+  const [sortKey, setSortKey] = useState<StatementSortKey>(() => {
+    try {
+      const saved = localStorage.getItem('statementsSortKey');
+      if (saved) return saved as StatementSortKey;
+    } catch {
+      // ignore
+    }
+    return 'default';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('statementsSortKey', sortKey);
+    } catch {
+      // ignore
+    }
+  }, [sortKey]);
 
   const refreshBankSlugs = useCallback(async () => {
     try {
-      const rows = await getStatements();
+      const { statements: rows } = await getStatements();
       const slugs = [...new Set(rows.map((r) => r.bank.toLowerCase()))].sort();
       setAvailableBanks(slugs);
     } catch {
@@ -305,15 +417,39 @@ export function Statements() {
       if (stmtFilters.to) params.to = stmtFilters.to;
       if (stmtFilters.source) params.source = stmtFilters.source;
       if (stmtFilters.parseFailuresOnly) params.parseFailuresOnly = true;
-      const data = await getStatements(params);
-      setStatements(data);
+      if (stmtFilters.nonZeroTxnCount) params.nonZeroTxnCount = true;
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+      
+      params.limit = STATEMENTS_PAGE_SIZE;
+      params.offset = pageIndex * STATEMENTS_PAGE_SIZE;
+      
+      if (sortKey === 'amount_due_desc') {
+        params.sortBy = 'amount_due'; params.sortOrder = 'desc';
+      } else if (sortKey === 'amount_due_asc') {
+        params.sortBy = 'amount_due'; params.sortOrder = 'asc';
+      } else if (sortKey === 'due_date_desc') {
+        params.sortBy = 'due_date'; params.sortOrder = 'desc';
+      } else if (sortKey === 'due_date_asc') {
+        params.sortBy = 'due_date'; params.sortOrder = 'asc';
+      } else if (sortKey === 'txn_count_desc') {
+        params.sortBy = 'txn_count'; params.sortOrder = 'desc';
+      } else if (sortKey === 'txn_count_asc') {
+        params.sortBy = 'txn_count'; params.sortOrder = 'asc';
+      } else {
+        params.sortBy = 'default'; params.sortOrder = 'desc';
+      }
+
+      const res = await getStatements(params);
+      setStatements(res.statements);
+      setTotalStatements(res.total);
     } catch {
       toast.error('Failed to load statements');
       setStatements([]);
+      setTotalStatements(0);
     } finally {
       setLoading(false);
     }
-  }, [stmtFilters]);
+  }, [stmtFilters, sortKey, pageIndex, searchQuery]);
 
   useEffect(() => {
     refreshBankSlugs();
@@ -366,6 +502,7 @@ export function Statements() {
   const afterAnyUpload = async () => {
     await refreshBankSlugs();
     await fetchStatements();
+    await refetchCards();
   };
 
   const handleCCUpload = async (file: File, password?: string) => {
@@ -457,6 +594,7 @@ export function Statements() {
       if (result.status === 'success') {
         toast.success(`Reparsed ${result.count ?? 0} transactions`);
         await fetchStatements();
+        await refetchCards();
       } else {
         toast.error('Reparse failed');
       }
@@ -510,6 +648,7 @@ export function Statements() {
           return next;
         });
         await fetchStatements();
+        await refetchCards();
       } else {
         toast.error(result.message ?? 'Could not unlock with this password');
       }
@@ -517,6 +656,14 @@ export function Statements() {
       toast.error('Failed to unlock statement');
     } finally {
       setActioning(null);
+    }
+  };
+
+  const handleOpenFile = async (s: Statement) => {
+    try {
+      await openStatementFile(s.id);
+    } catch {
+      toast.error('Failed to open file');
     }
   };
 
@@ -532,25 +679,17 @@ export function Statements() {
     </Typography>
   );
 
-  const sortedStatements = useMemo(() => {
-    const filtered = statements.filter((s) => statementMatchesSearch(s, searchQuery));
-    return [...filtered].sort((a, b) => statementSortPriority(a) - statementSortPriority(b));
-  }, [statements, searchQuery]);
-
-  const totalFiltered = sortedStatements.length;
   const pagination = useMemo(
-    () => paginateBounds(pageIndex, totalFiltered, STATEMENTS_PAGE_SIZE),
-    [pageIndex, totalFiltered],
+    () => paginateBounds(pageIndex, totalStatements, STATEMENTS_PAGE_SIZE),
+    [pageIndex, totalStatements],
   );
 
-  const pageStatements = useMemo(
-    () => sortedStatements.slice(pagination.start, pagination.end),
-    [sortedStatements, pagination.start, pagination.end],
-  );
+  const pageStatements = statements;
+  const totalFiltered = totalStatements;
 
   useEffect(() => {
     setPageIndex(0);
-  }, [searchQuery, stmtFilters.banks, stmtFilters.from, stmtFilters.to, stmtFilters.source, stmtFilters.parseFailuresOnly]);
+  }, [searchQuery, sortKey, stmtFilters.banks, stmtFilters.from, stmtFilters.to, stmtFilters.source, stmtFilters.parseFailuresOnly, stmtFilters.nonZeroTxnCount]);
 
   useEffect(() => {
     if (pagination.displayPageIndex !== pageIndex) {
@@ -563,7 +702,8 @@ export function Statements() {
     (stmtFilters.from ? 1 : 0) +
     (stmtFilters.to ? 1 : 0) +
     (stmtFilters.source ? 1 : 0) +
-    (stmtFilters.parseFailuresOnly ? 1 : 0);
+    (stmtFilters.parseFailuresOnly ? 1 : 0) +
+    (stmtFilters.nonZeroTxnCount ? 1 : 0);
 
   return (
     <PageLayout>
@@ -684,7 +824,6 @@ export function Statements() {
             </CompactSearchWrapper>
             {searchQuery.trim() ? (
               <CloseButton
-                kind="flat"
                 onClick={() => {
                   setSearchQuery('');
                   setSearchInputValue('');
@@ -700,13 +839,13 @@ export function Statements() {
           <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
             Loading...
           </Typography>
-        ) : statements.length === 0 ? (
+        ) : statements.length === 0 && filterActiveCount === 0 && !searchQuery.trim() ? (
           <div style={{ padding: 48, textAlign: 'center' }}>
             <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.6)">
               No statements yet. Upload PDFs or CSVs above to get started.
             </Typography>
           </div>
-        ) : sortedStatements.length === 0 ? (
+        ) : statements.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center' }}>
             <Typography
               fontType={FontType.BODY}
@@ -715,7 +854,7 @@ export function Statements() {
               color="rgba(255,255,255,0.6)"
               style={{ marginBottom: 16 }}
             >
-              No statements match your search. Try different keywords or clear the search.
+              No statements match your search or filters. Try adjusting them or clear the search.
             </Typography>
             <Button
               variant="secondary"
@@ -726,13 +865,53 @@ export function Statements() {
                 setSearchQuery('');
                 setSearchInputValue('');
                 setSearchClearKey((k) => k + 1);
+                setStmtFilters({ banks: [] });
               }}
             >
-              Clear search
+              Clear filters and search
             </Button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <SortBar>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
+                  Sort by
+                </Typography>
+                <SelectDropdown
+                  options={SORT_OPTIONS}
+                  value={sortKey}
+                  onChange={(v) => setSortKey(v as StatementSortKey)}
+                  colorMode="dark"
+                  menuMount="portal"
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
+                  Page {pagination.displayPageIndex + 1} of {pagination.pageCount}
+                  {' · '}
+                  {pageStatements.length === 1 ? '1 statement' : `${pageStatements.length} statements`} on this page
+                  {' · '}
+                  {totalFiltered === 1 ? '1 total' : `${totalFiltered} total`}
+                </Typography>
+                <IconPageBtn
+                  $disabled={pagination.displayPageIndex <= 0}
+                  disabled={pagination.displayPageIndex <= 0}
+                  aria-label="Previous page"
+                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                >
+                  <ChevronLeft size={15} color="#ffffff" />
+                </IconPageBtn>
+                <IconPageBtn
+                  $disabled={pagination.displayPageIndex >= pagination.pageCount - 1}
+                  disabled={pagination.displayPageIndex >= pagination.pageCount - 1}
+                  aria-label="Next page"
+                  onClick={() => setPageIndex((p) => Math.min(pagination.pageCount - 1, p + 1))}
+                >
+                  <ChevronRight size={15} color="#ffffff" />
+                </IconPageBtn>
+              </div>
+            </SortBar>
             {pageStatements.map((s) => {
               const isError = s.status === 'parse_error';
               const needsPassword = s.status === 'password_needed';
@@ -816,21 +995,15 @@ export function Statements() {
                         />
                       </Column>
                       <Column style={statementRightColPasswordStyle}>
-                        <Row style={statementButtonRowStyle}>
-                          <ButtonWithIcon
-                            icon={Trash2}
-                            variant="secondary"
-                            kind="elevated"
-                            size="small"
-                            colorMode="dark"
+                        <Row style={{ ...statementButtonRowStyle, justifyContent: 'flex-end', gap: 12 }}>
+                          <ActionIconButton
                             onClick={() => void removeStatementWithoutConfirm(s.id)}
                             disabled={!!actioning}
-                            justifyContent="center"
-                            gap={4}
-                            style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
+                            $danger
+                            title="Remove"
                           >
-                            Remove
-                          </ButtonWithIcon>
+                            <Trash2 size={14} />
+                          </ActionIconButton>
                           <Button
                             variant="primary"
                             kind="elevated"
@@ -842,7 +1015,7 @@ export function Statements() {
                             Unlock
                           </Button>
                         </Row>
-                        {statementPathLine(s)}
+                        {statementPathLine(s, handleOpenFile)}
                       </Column>
                     </Row>
                   ) : isError ? (
@@ -895,37 +1068,25 @@ export function Statements() {
                             'Could not extract data from this file. Try reparsing or remove and re-upload.'}
                         </Typography>
                       </Column>
-                      <Column style={statementRightColStyle}>
-                        <Row style={statementButtonRowStyle}>
-                          <ButtonWithIcon
-                            icon={RefreshCw}
-                            variant="primary"
-                            kind="elevated"
-                            size="small"
-                            colorMode="dark"
-                            onClick={() => handleReparse(s.id)}
-                            disabled={!!actioning}
-                            justifyContent="center"
-                            gap={4}
-                          >
-                            Retry
-                          </ButtonWithIcon>
-                          <ButtonWithIcon
-                            icon={Trash2}
-                            variant="secondary"
-                            kind="elevated"
-                            size="small"
-                            colorMode="dark"
-                            onClick={() => void removeStatementWithoutConfirm(s.id)}
-                            disabled={!!actioning}
-                            justifyContent="center"
-                            gap={4}
-                            style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
-                          >
-                            Remove
-                          </ButtonWithIcon>
-                        </Row>
-                        {statementPathLine(s)}
+                      <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center', padding: '12px 14px' }}>
+                        <ActionIconButton
+                          onClick={() => handleReparse(s.id)}
+                          disabled={!!actioning}
+                          title="Retry"
+                        >
+                          <RefreshCw size={14} />
+                        </ActionIconButton>
+                        <ActionIconButton
+                          onClick={() => void removeStatementWithoutConfirm(s.id)}
+                          disabled={!!actioning}
+                          $danger
+                          title="Remove"
+                        >
+                          <Trash2 size={14} />
+                        </ActionIconButton>
+                      </Row>
+                      <Column style={{ ...statementRightColStyle, alignItems: 'flex-end', justifyContent: 'flex-end', flex: '1 1 260px', minWidth: 120 }}>
+                        {statementPathLine(s, handleOpenFile)}
                       </Column>
                     </Row>
                   ) : (
@@ -969,43 +1130,41 @@ export function Statements() {
                           {periodLine(s)}
                           {transactionCountLine(s.transactionCount)}
                         </Column>
-                        <Column style={statementRightColStyle}>
-                          <Row style={statementButtonRowStyle}>
-                            <ButtonWithIcon
-                              icon={RefreshCw}
-                              variant="primary"
-                              kind="elevated"
-                              size="small"
-                              colorMode="dark"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleReparse(s.id);
-                              }}
-                              disabled={!!actioning}
-                              justifyContent="center"
-                              gap={4}
-                            >
-                              Refresh statement
-                            </ButtonWithIcon>
-                            <ButtonWithIcon
-                              icon={Trash2}
-                              variant="secondary"
-                              kind="elevated"
-                              size="small"
-                              colorMode="dark"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfirmDeleteId(s.id);
-                              }}
-                              disabled={!!actioning}
-                              justifyContent="center"
-                              gap={4}
-                              style={{ color: mainColors.red, borderColor: 'rgba(238,77,55,0.4)' }}
-                            >
-                              Remove
-                            </ButtonWithIcon>
-                          </Row>
-                          {statementPathLine(s)}
+                        <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center', padding: '12px 14px' }}>
+                          <ActionIconButton
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              void handleReparse(s.id);
+                            }}
+                            disabled={!!actioning}
+                            title="Refresh statement"
+                          >
+                            <RefreshCw size={14} />
+                          </ActionIconButton>
+                          <ActionIconButton
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              setConfirmDeleteId(s.id);
+                            }}
+                            disabled={!!actioning}
+                            $danger
+                            title="Remove statement"
+                          >
+                            <Trash2 size={14} />
+                          </ActionIconButton>
+                        </Row>
+                        <Column style={{ ...statementRightColStyle, alignItems: 'flex-end', justifyContent: 'flex-start', flex: '1 1 260px', minWidth: 120 }}>
+                          {s.totalAmountDue != null && (
+                            <div style={{ textAlign: 'right', marginTop: -9 }}>
+                              <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)">
+                                Amount Due
+                              </Typography>
+                              <Typography fontType={FontType.BODY} fontSize={15} fontWeight={FontWeights.BOLD} color={colorPalette.rss[500]}>
+                                {formatCurrency(s.totalAmountDue, s.currency ?? 'INR')}
+                              </Typography>
+                            </div>
+                          )}
+                          {statementPathLine(s, handleOpenFile)}
                         </Column>
                       </Row>
                     </div>
@@ -1019,50 +1178,6 @@ export function Statements() {
                 <ClickableCardWrapper key={s.id}>{card}</ClickableCardWrapper>
               );
             })}
-            <PaginationFooter>
-              <Typography
-                fontType={FontType.BODY}
-                fontSize={12}
-                fontWeight={FontWeights.REGULAR}
-                color="rgba(255,255,255,0.55)"
-              >
-                Page {pagination.displayPageIndex + 1} of {pagination.pageCount}
-                {' · '}
-                {pageStatements.length === 1 ? '1 statement' : `${pageStatements.length} statements`} on this page
-                {' · '}
-                {totalFiltered === 1 ? '1 total' : `${totalFiltered} total`}
-              </Typography>
-              <Row style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <ButtonWithIcon
-                  icon={ChevronLeft}
-                  variant="secondary"
-                  kind="elevated"
-                  size="small"
-                  colorMode="dark"
-                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-                  disabled={pagination.displayPageIndex <= 0}
-                  justifyContent="center"
-                  gap={6}
-                  aria-label="Previous page"
-                >
-                  Previous
-                </ButtonWithIcon>
-                <ButtonWithIcon
-                  icon={ChevronRight}
-                  variant="secondary"
-                  kind="elevated"
-                  size="small"
-                  colorMode="dark"
-                  onClick={() => setPageIndex((p) => Math.min(pagination.pageCount - 1, p + 1))}
-                  disabled={pagination.displayPageIndex >= pagination.pageCount - 1}
-                  justifyContent="center"
-                  gap={6}
-                  aria-label="Next page"
-                >
-                  Next
-                </ButtonWithIcon>
-              </Row>
-            </PaginationFooter>
           </div>
         )}
       </Content>

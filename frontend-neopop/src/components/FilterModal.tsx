@@ -22,6 +22,8 @@ export interface BankStatementFilterValues {
   source?: Source;
   /** When true, only statements where parsing could not extract data (excludes password-protected). */
   parseFailuresOnly?: boolean;
+  /** When true, only statements with at least 1 transaction (server-side filter). */
+  nonZeroTxnCount?: boolean;
 }
 
 interface FilterModalProps {
@@ -63,6 +65,7 @@ export function FilterModal({
   const [localStmtTo, setLocalStmtTo] = useState('');
   const [localStmtSource, setLocalStmtSource] = useState<'all' | Source>('all');
   const [localStmtParseFailuresOnly, setLocalStmtParseFailuresOnly] = useState(false);
+  const [localStmtNonZeroTxnCount, setLocalStmtNonZeroTxnCount] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +104,7 @@ export function FilterModal({
       setLocalStmtTo(bankStatementFilters?.to ?? '');
       setLocalStmtSource(bankStatementFilters?.source ?? 'all');
       setLocalStmtParseFailuresOnly(!!bankStatementFilters?.parseFailuresOnly);
+      setLocalStmtNonZeroTxnCount(!!bankStatementFilters?.nonZeroTxnCount);
       return;
     }
     setLocalCards(filters.selectedCards);
@@ -161,6 +165,7 @@ export function FilterModal({
         to: localStmtTo || undefined,
         source: localStmtSource === 'all' ? undefined : localStmtSource,
         parseFailuresOnly: localStmtParseFailuresOnly ? true : undefined,
+        nonZeroTxnCount: localStmtNonZeroTxnCount ? true : undefined,
       });
       onClose();
       return;
@@ -186,12 +191,13 @@ export function FilterModal({
 
   const handleClearAll = () => {
     if (variant === 'bankStatements') {
-      onApplyBankStatements?.({ banks: [], from: undefined, to: undefined, source: undefined, parseFailuresOnly: undefined });
+      onApplyBankStatements?.({ banks: [], from: undefined, to: undefined, source: undefined, parseFailuresOnly: undefined, nonZeroTxnCount: undefined });
       setLocalStmtBanks([]);
       setLocalStmtFrom('');
       setLocalStmtTo('');
       setLocalStmtSource('all');
       setLocalStmtParseFailuresOnly(false);
+      setLocalStmtNonZeroTxnCount(false);
       onClose();
       return;
     }
@@ -346,6 +352,20 @@ export function FilterModal({
                 onClick={() => setLocalStmtParseFailuresOnly(true)}
               >
                 Parse failures only
+              </Button>
+            </div>
+            <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)" style={{ marginBottom: 10 }}>
+              Transaction Count
+            </Typography>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+              <Button
+                variant={localStmtNonZeroTxnCount ? 'secondary' : 'primary'}
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={() => setLocalStmtNonZeroTxnCount((v) => !v)}
+              >
+                Non zero txn count
               </Button>
             </div>
             <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)" style={{ marginBottom: 10 }}>

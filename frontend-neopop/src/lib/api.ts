@@ -193,7 +193,6 @@ export async function updateSettings(payload: {
     body.cards = payload.cards.map((c) => ({ bank: c.bank, last4: c.last4 }));
   }
   const { data } = await api.put<{ status: string }>('/settings', body);
-  _cardsCachePromise = null;
   return data;
 }
 
@@ -210,7 +209,6 @@ export async function setupProfile(payload: SetupProfilePayload): Promise<Settin
     body.display_currency = payload.displayCurrency || null;
   }
   const { data } = await api.post<Settings>('/settings/setup', body);
-  _cardsCachePromise = null;
   return data;
 }
 
@@ -342,6 +340,7 @@ interface StatementRaw {
   period_end: string | null;
   transaction_count: number;
   total_spend: number;
+  total_amount_due?: number | null;
   currency?: string | null;
   payment_due_date?: string | null;
   source: string | null;
@@ -363,9 +362,16 @@ export interface GetStatementsParams {
   to?: string;
   /** When true, only statements that failed to parse (server filters by parse_failed). */
   parseFailuresOnly?: boolean;
+  /** When true, only statements with at least 1 transaction (server-side filter). */
+  nonZeroTxnCount?: boolean;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
 }
 
-export async function getStatements(params?: Source | GetStatementsParams): Promise<Statement[]> {
+export async function getStatements(params?: Source | GetStatementsParams): Promise<{ statements: Statement[]; total: number }> {
   const q: Record<string, string> = {};
   if (typeof params === 'string' || params === undefined) {
     if (params) q.source = params;
@@ -375,16 +381,25 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     if (params.from) q.from = params.from;
     if (params.to) q.to = params.to;
     if (params.parseFailuresOnly) q.parse_failed_only = 'true';
+    if (params.nonZeroTxnCount) q.non_zero_txn_count = 'true';
+    if (params.search) q.search = params.search;
+    if (params.sortBy) q.sort_by = params.sortBy;
+    if (params.sortOrder) q.sort_order = params.sortOrder;
+    if (params.limit !== undefined) q.limit = String(params.limit);
+    if (params.offset !== undefined) q.offset = String(params.offset);
   }
-  const { data } = await api.get<StatementRaw[]>('/statements', { params: q });
-  return data.map((s) => ({
-    id: s.id,
+  const { data } = await api.get<{ statements: StatementRaw[]; total: number }>('/statements', { params: q });
+  return {
+    total: data.total,
+    statements: data.statements.map((s) => ({
+      id: s.id,
     bank: s.bank as Bank,
     cardLast4: s.card_last4 ?? '',
     periodStart: s.period_start ?? '',
     periodEnd: s.period_end ?? '',
     transactionCount: s.transaction_count,
     totalSpend: s.total_spend,
+    totalAmountDue: s.total_amount_due ?? null,
     currency: (s.currency || 'INR').toUpperCase().slice(0, 3),
     paymentDueDate: s.payment_due_date ?? null,
     source: (s.source as Source) ?? 'CC',
@@ -396,7 +411,8 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     originalUploadPath: s.original_upload_path ?? null,
     statusMessage: s.status_message ?? null,
     parseFailed: s.parse_failed ?? 0,
-  }));
+  })),
+  };
 }
 
 export async function retryWithPassword(
@@ -435,18 +451,8 @@ export async function getTransactions(
   return data;
 }
 
-let _cardsCachePromise: Promise<Card[]> | null = null;
-
 export function getCards(): Promise<Card[]> {
-  if (!_cardsCachePromise) {
-    _cardsCachePromise = api.get<Card[]>('/cards')
-      .then(res => res.data)
-      .catch(err => {
-        _cardsCachePromise = null;
-        throw err;
-      });
-  }
-  return _cardsCachePromise;
+  return api.get<Card[]>('/cards').then(res => res.data);
 }
 
 /** Today's date in the browser's local calendar as YYYY-MM-DD (for due-reminder APIs). */
@@ -499,13 +505,11 @@ export async function patchCardDuePreferences(
   if ('manualNextDueDate' in body) payload.manual_next_due_date = body.manualNextDueDate;
   if ('manualNextDueAmount' in body) payload.manual_next_due_amount = body.manualNextDueAmount;
   const { data } = await api.patch<Card>(`/cards/${cardId}`, payload);
-  _cardsCachePromise = null;
   return data;
 }
 
 export async function deleteCard(cardId: string): Promise<{ status: string; message: string }> {
   const { data } = await api.delete<{ status: string; message: string }>(`/cards/${cardId}`);
-  _cardsCachePromise = null;
   return data;
 }
 
@@ -608,6 +612,11 @@ export async function deleteStatement(statementId: string): Promise<{ status: st
 export async function reparseStatement(statementId: string): Promise<{ status: string; count?: number; bank?: string }> {
   const { data } = await api.post<{ status: string; count?: number; bank?: string }>(`/statements/${statementId}/reparse`);
   _bankAccountsCachePromise = null;
+  return data;
+}
+
+export async function openStatementFile(statementId: string): Promise<{ status: string; message: string }> {
+  const { data } = await api.post<{ status: string; message: string }>(`/statements/${statementId}/open`);
   return data;
 }
 

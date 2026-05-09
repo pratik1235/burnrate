@@ -36,6 +36,14 @@ _PERIOD_RE = re.compile(
 
 _CARD_NUM_RE = re.compile(r"(\d{4,6})\*{2,}(\d{4})")
 
+_CARD_VARIANT_RE = re.compile(
+    r"(Flipkart Axis Bank|Magnus|Neo|MY Zone|Ace|Atlas|Vistara Infinite|Vistara|"
+    r"Reserve|Privilege|Burgundy Private|Indian Oil Axis|Freecharge|LIC Axis|"
+    r"Airtel Axis|Samsung Axis Bank|Snapdeal Axis|EazyDiner)"
+    r"(?:\s+VISA|\s+Mastercard|\s+RuPay)?\s+Credit Card",
+    re.IGNORECASE,
+)
+
 _KNOWN_MERCHANT_CATS = re.compile(
     r"\s+(?:MISC STORE|DEPT STORES?|GROCERY|ELECTRONICS|"
     r"AIRLINE|HOTEL|RESTAURANT|FUEL|TELECOM|INSURANCE|"
@@ -65,9 +73,11 @@ class AxisParser(BaseParser):
         transactions = self._extract_transactions(all_lines)
         payment_due_date = extract_payment_due_date_from_text(full_text)
 
+        card_variant = self._extract_card_variant(full_text)
+
         logger.info(
-            "Axis parse: card=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
-            card_last4, period_start, period_end, len(transactions),
+            "Axis parse: card=%s variant=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
+            card_last4, card_variant, period_start, period_end, len(transactions),
             total_amount_due, credit_limit, payment_due_date,
         )
 
@@ -80,7 +90,21 @@ class AxisParser(BaseParser):
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
             payment_due_date=payment_due_date,
+            card_variant=card_variant,
         )
+
+    # ------------------------------------------------------------------
+    # Card variant
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_card_variant(text: str) -> Optional[str]:
+        """Detect card product name from the page-1 header line."""
+        # Search only the first 500 chars where the title always appears
+        m = _CARD_VARIANT_RE.search(text[:500])
+        if m:
+            return m.group(1).strip().title()
+        return None
 
     # ------------------------------------------------------------------
     # Statement metadata

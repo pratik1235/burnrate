@@ -223,7 +223,7 @@ class ScapiaFederalParser(BaseParser):
             card_last4_secondary = None
 
         logger.info(
-            "Scapia Federal parse: card=%s secondary=%s period=%s..%s "
+            "Scapia Federal parse: card=%s secondary=%s variant=Scapia period=%s..%s "
             "txns=%d (visa=%d rupay=%d) total_due=%s limit=%s payment_due=%s",
             card_last4, card_last4_secondary,
             period_start, period_end, len(transactions),
@@ -241,6 +241,7 @@ class ScapiaFederalParser(BaseParser):
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
             payment_due_date=payment_due_date,
+            card_variant="Scapia",
         )
 
     # ------------------------------------------------------------------

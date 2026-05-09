@@ -33,6 +33,7 @@ class ParsedStatement:
     credit_limit: Optional[float] = None
     payment_due_date: Optional[date] = None
     currency: str = "INR"
+    card_variant: Optional[str] = None  # Detected product name (e.g. "Regalia Gold"); written to Card.name on first parse only
 
 
 def detect_emi_transaction(merchant: str, description: str = "") -> bool:

@@ -132,9 +132,11 @@ class IndianBankParser(BaseParser):
         )
         payment_due_date = extract_payment_due_date_from_text(full_text)
 
+        card_variant = self._extract_card_variant(full_text)
+
         logger.info(
-            "Indian Bank parse: card=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
-            card_last4, period_start, period_end, len(transactions),
+            "Indian Bank parse: card=%s variant=%s period=%s..%s txns=%d due=%s limit=%s payment_due=%s",
+            card_last4, card_variant, period_start, period_end, len(transactions),
             total_amount_due, credit_limit, payment_due_date,
         )
 
@@ -147,7 +149,20 @@ class IndianBankParser(BaseParser):
             total_amount_due=total_amount_due,
             credit_limit=credit_limit,
             payment_due_date=payment_due_date,
+            card_variant=card_variant,
         )
+
+    # ------------------------------------------------------------------
+    # Card variant
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_card_variant(text: str) -> Optional[str]:
+        """Indian Bank only issues 'One Credit Card' — return it as a constant
+        if the statement header confirms it."""
+        if re.search(r"One\s+Credit\s+Card", text, re.IGNORECASE):
+            return "One Credit Card"
+        return None
 
     # ------------------------------------------------------------------
     # Statement period

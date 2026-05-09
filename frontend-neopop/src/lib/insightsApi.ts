@@ -48,8 +48,16 @@ export const deleteSessionApi = (id: string) => api.delete(`/insights/sessions/$
 export const getInsightsModels = () =>
   api.get<{ models: string[]; error?: string }>('/insights/models').then((r) => r.data);
 
-export const testInsightsConnection = () =>
-  api.post<{ success: boolean; error?: string; latency_ms: number }>('/insights/test').then((r) => r.data);
+export interface TestConnectionRequest {
+  provider: string;
+  model?: string;
+  api_key?: string;
+  aws_access_key?: string;
+  aws_secret_key?: string;
+}
+
+export const testInsightsConnection = (params?: TestConnectionRequest) =>
+  api.post<{ success: boolean; error?: string; latency_ms: number }>('/insights/test', params || {}).then((r) => r.data);
 
 export const saveApiKey = (provider: string, apiKey: string) =>
   api.post('/insights/api-key', { provider, api_key: apiKey });
@@ -58,3 +66,12 @@ export const deleteApiKey = (provider: string) => api.delete(`/insights/api-key/
 
 export const getApiKeyStatus = (provider: string) =>
   api.get<{ configured: boolean }>(`/insights/api-key/${provider}/status`).then((r) => r.data);
+
+export const saveAwsCredentials = (accessKey: string, secretKey: string, region?: string) =>
+  api.post('/insights/aws-credentials', { access_key: accessKey, secret_key: secretKey, region });
+
+export const deleteAwsCredentials = () =>
+  api.delete('/insights/aws-credentials');
+
+export const getAwsCredentialsStatus = () =>
+  api.get<{ configured: boolean; source?: string }>('/insights/aws-credentials/status').then((r) => r.data);

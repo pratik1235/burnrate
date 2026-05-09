@@ -41,6 +41,8 @@ export interface Statement {
   currency?: string;
   /** ISO date from statement PDF when parsed */
   paymentDueDate?: string | null;
+  /** Total amount due as extracted from the statement PDF (null when not parsed or unavailable). */
+  totalAmountDue?: number | null;
   source: Source;
   status: 'success' | 'parse_error' | 'password_needed';
   importedAt: string;

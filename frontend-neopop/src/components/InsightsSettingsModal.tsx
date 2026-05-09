@@ -12,6 +12,9 @@ import {
   saveApiKey,
   deleteApiKey,
   getApiKeyStatus,
+  saveAwsCredentials,
+  deleteAwsCredentials,
+  getAwsCredentialsStatus,
 } from '@/lib/insightsApi';
 
 const Backdrop = styled.div`
@@ -166,7 +169,7 @@ const Btn = styled.button<{ $primary?: boolean }>`
   &:disabled { opacity: 0.5; cursor: default; }
 `;
 
-type Provider = 'ollama' | 'anthropic' | 'openai';
+type Provider = 'ollama' | 'anthropic' | 'openai' | 'bedrock';
 
 interface Props {
   open: boolean;
@@ -179,10 +182,16 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
   const [models, setModels] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; latency_ms?: number; error?: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ provider: Provider; success: boolean; latency_ms?: number; error?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+
+  // AWS Bedrock credentials
+  const [awsAccessKey, setAwsAccessKey] = useState('');
+  const [awsSecretKey, setAwsSecretKey] = useState('');
+  const [awsRegion, setAwsRegion] = useState('us-east-1');
+  const [awsConfigured, setAwsConfigured] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -198,52 +207,92 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
   }, [open]);
 
   useEffect(() => {
-    if (!open || provider === 'ollama') return;
-    getApiKeyStatus(provider).then((s) => setApiKeyConfigured(s.configured)).catch(() => {});
+    if (!open) return;
+    if (provider === 'anthropic' || provider === 'openai') {
+      getApiKeyStatus(provider).then((s) => setApiKeyConfigured(s.configured)).catch(() => {});
+    } else if (provider === 'bedrock') {
+      getAwsCredentialsStatus().then((s) => setAwsConfigured(s.configured)).catch(() => {});
+    }
   }, [open, provider]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await testInsightsConnection();
-      setTestResult(result);
+      const testParams: any = {
+        provider: provider,
+        model: model || undefined,
+      };
+
+      // For cloud providers, include API key if entered but not saved
+      if (provider === 'anthropic' || provider === 'openai') {
+        if (apiKey) {
+          testParams.api_key = apiKey;
+        }
+      } else if (provider === 'bedrock') {
+        if (awsAccessKey && awsSecretKey) {
+          testParams.aws_access_key = awsAccessKey;
+          testParams.aws_secret_key = awsSecretKey;
+        }
+      }
+
+      const result = await testInsightsConnection(testParams);
+      setTestResult({ ...result, provider });
       if (result.success) {
         setConnected(true);
         const m = await getInsightsModels();
         setModels(m.models || []);
       }
     } catch (e) {
-      setTestResult({ success: false, error: e instanceof Error ? e.message : 'Failed' });
+      setTestResult({ provider, success: false, error: e instanceof Error ? e.message : 'Failed' });
     } finally {
       setTesting(false);
     }
-  }, []);
+  }, [provider, model, apiKey, awsAccessKey, awsSecretKey]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
       await api.put('/settings', { llm_provider: provider, llm_model: model });
-      if (provider !== 'ollama' && apiKey) {
+
+      // Save API keys for Anthropic/OpenAI
+      if ((provider === 'anthropic' || provider === 'openai') && apiKey) {
         await saveApiKey(provider, apiKey);
       }
+
+      // Save AWS credentials for Bedrock
+      if (provider === 'bedrock' && awsAccessKey && awsSecretKey) {
+        await saveAwsCredentials(awsAccessKey, awsSecretKey, awsRegion);
+      }
+
       onClose();
     } catch { /* ignore */ } finally {
       setSaving(false);
     }
-  }, [provider, model, apiKey, onClose]);
+  }, [provider, model, apiKey, awsAccessKey, awsSecretKey, awsRegion, onClose]);
 
   const handleDeleteKey = useCallback(async () => {
     try {
-      await deleteApiKey(provider);
-      setApiKeyConfigured(false);
-      setApiKey('');
+      if (provider === 'anthropic' || provider === 'openai') {
+        await deleteApiKey(provider);
+        setApiKeyConfigured(false);
+        setApiKey('');
+      } else if (provider === 'bedrock') {
+        await deleteAwsCredentials();
+        setAwsConfigured(false);
+        setAwsAccessKey('');
+        setAwsSecretKey('');
+      }
     } catch { /* ignore */ }
   }, [provider]);
 
   if (!open) return null;
 
-  const isCloud = provider !== 'ollama';
+  const handleProviderChange = (p: Provider) => {
+    setProvider(p);
+    setTestResult(null);
+    setConnected(false);
+  };
 
   return createPortal(
     <Backdrop onClick={onClose}>
@@ -259,17 +308,21 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
           <div>
             <Label>Provider</Label>
             <ProviderGrid>
-              <ProviderCard $selected={provider === 'ollama'} onClick={() => setProvider('ollama')}>
+              <ProviderCard $selected={provider === 'ollama'} onClick={() => handleProviderChange('ollama')}>
                 Ollama
                 <ProviderLabel>Local</ProviderLabel>
               </ProviderCard>
-              <ProviderCard $selected={provider === 'anthropic'} $disabled onClick={() => setProvider('anthropic')}>
+              <ProviderCard $selected={provider === 'anthropic'} onClick={() => handleProviderChange('anthropic')}>
                 Claude
-                <ProviderLabel>Cloud (Soon)</ProviderLabel>
+                <ProviderLabel>Cloud</ProviderLabel>
               </ProviderCard>
-              <ProviderCard $selected={provider === 'openai'} $disabled onClick={() => setProvider('openai')}>
+              <ProviderCard $selected={provider === 'openai'} onClick={() => handleProviderChange('openai')}>
                 OpenAI
-                <ProviderLabel>Cloud (Soon)</ProviderLabel>
+                <ProviderLabel>Cloud</ProviderLabel>
+              </ProviderCard>
+              <ProviderCard $selected={provider === 'bedrock'} onClick={() => handleProviderChange('bedrock')}>
+                AWS Bedrock
+                <ProviderLabel>Cloud</ProviderLabel>
               </ProviderCard>
             </ProviderGrid>
           </div>
@@ -300,7 +353,7 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
             </>
           )}
 
-          {isCloud && (
+          {(provider === 'anthropic' || provider === 'openai') && (
             <>
               <WarningBox>
                 <AlertTriangle size={18} color={colorPalette.rss[500]} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -316,6 +369,7 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder={apiKeyConfigured ? '••••••••••••' : 'sk-...'}
+                  autoComplete="off"
                 />
               </div>
               {apiKeyConfigured && (
@@ -326,7 +380,56 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
             </>
           )}
 
-          {testResult && (
+          {provider === 'bedrock' && (
+            <>
+              <WarningBox>
+                <AlertTriangle size={18} color={colorPalette.rss[500]} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>
+                  AWS Bedrock processes requests in your configured AWS region. Transaction data
+                  (merchant names, amounts, dates) will be sent to AWS for processing.
+                </span>
+              </WarningBox>
+              <div>
+                <Label>AWS Access Key ID {awsConfigured && '(configured)'}</Label>
+                <InputField
+                  type="password"
+                  value={awsAccessKey}
+                  onChange={(e) => setAwsAccessKey(e.target.value)}
+                  placeholder={awsConfigured ? '••••••••••••' : 'AKIA...'}
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <Label>AWS Secret Access Key</Label>
+                <InputField
+                  type="password"
+                  value={awsSecretKey}
+                  onChange={(e) => setAwsSecretKey(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <Label>AWS Region</Label>
+                <InputField
+                  type="text"
+                  value={awsRegion}
+                  onChange={(e) => setAwsRegion(e.target.value)}
+                  placeholder="us-east-1"
+                />
+              </div>
+              <Typography color="rgba(255,255,255,0.6)" fontSize={12} style={{ marginTop: -8 }}>
+                AWS Bedrock credentials can also be configured via AWS SSO or environment variables.
+              </Typography>
+              {awsConfigured && (
+                <Btn onClick={handleDeleteKey} style={{ alignSelf: 'flex-start' }}>
+                  Remove Credentials
+                </Btn>
+              )}
+            </>
+          )}
+
+          {testResult && testResult.provider === provider && (
             <StatusLine $ok={testResult.success}>
               <Dot $ok={testResult.success} />
               {testResult.success

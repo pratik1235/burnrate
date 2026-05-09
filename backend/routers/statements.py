@@ -4,7 +4,9 @@ import concurrent.futures
 import json
 import logging
 import os
+import platform
 import re
+import subprocess
 from datetime import date
 from enum import Enum
 from pathlib import Path, PurePosixPath
@@ -312,16 +314,26 @@ async def upload_bulk(
 
 
 def _process_one_statement(
-    file_path: str, bank: Optional[str], source: str = "CC",
+    statement_id: str, file_path: str, bank: Optional[str], source: str = "CC", original_upload_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """Process a single statement file in a worker thread."""
     from backend.services.statement_processor import process_statement
 
     session = SessionLocal()
     try:
-        return process_statement(
+        stmt = session.query(Statement).filter(Statement.id == statement_id).first()
+        if stmt:
+            session.delete(stmt)
+            
+        result = process_statement(
             pdf_path=file_path, bank=bank, db_session=session, source=source,
+            original_upload_path=original_upload_path, reparse_mode=True,
         )
+        
+        if result.get("status") != "success":
+            session.rollback()
+            
+        return result
     finally:
         session.close()
 
@@ -336,22 +348,17 @@ def reparse_all_statements(db: Session = Depends(get_db)) -> Dict[str, Any]:
     results = {"total": len(stmts), "success": 0, "failed": 0, "skipped": 0}
 
     valid_entries = [
-        (s.file_path, s.bank, getattr(s, "source", None) or "CC")
+        (s.id, s.file_path, s.bank, getattr(s, "source", None) or "CC", getattr(s, "original_upload_path", None))
         for s in stmts
         if s.file_path and os.path.isfile(s.file_path)
     ]
 
-    for stmt in stmts:
-        if not stmt.file_path or not os.path.isfile(stmt.file_path):
-            results["skipped"] += 1
-            continue
-        db.delete(stmt)
-    db.commit()
+    results["skipped"] = len(stmts) - len(valid_entries)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = {
-            executor.submit(_process_one_statement, path, bank, source): path
-            for path, bank, source in valid_entries
+            executor.submit(_process_one_statement, sid, path, bank, source, orig): path
+            for sid, path, bank, source, orig in valid_entries
         }
         for future in concurrent.futures.as_completed(futures):
             try:
@@ -379,10 +386,19 @@ def list_statements(
         None,
         description="When true, only statements that failed to parse (could not extract data).",
     ),
+    non_zero_txn_count: Optional[bool] = Query(
+        None,
+        description="When true, only return statements with transaction_count > 0.",
+    ),
+    search: Optional[str] = Query(None, description="Search text"),
+    sort_by: Optional[str] = Query("default", description="Field to sort by"),
+    sort_order: Optional[str] = Query("desc", description="Sort direction: asc or desc"),
+    limit: Optional[int] = Query(None, description="Max statements to return"),
+    offset: Optional[int] = Query(0, description="Offset for pagination"),
     db: Session = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """List all imported statements, optionally filtered by source, bank, date range, and parse outcome."""
-    q = db.query(Statement).order_by(Statement.imported_at.desc())
+    q = db.query(Statement)
     if source:
         q = q.filter(Statement.source == source.upper())
     if banks and banks.strip():
@@ -399,6 +415,48 @@ def list_statements(
         )
     if parse_failed_only is True:
         q = q.filter(Statement.parse_failed == 1)
+    if non_zero_txn_count is True:
+        q = q.filter(Statement.transaction_count > 0)
+        
+    if search:
+        search_term = f"%{search}%"
+        q = q.filter(
+            or_(
+                Statement.bank.ilike(search_term),
+                Statement.card_last4.ilike(search_term),
+                Statement.source.ilike(search_term),
+                Statement.file_path.ilike(search_term),
+                Statement.original_upload_path.ilike(search_term),
+                Statement.status.ilike(search_term),
+                Statement.status_message.ilike(search_term),
+            )
+        )
+        
+    total = q.count()
+
+    from sqlalchemy import case, desc, asc
+    priority_expr = case(
+        (Statement.status == 'password_needed', 0),
+        (Statement.status == 'parse_error', 1),
+        else_=2
+    )
+    
+    order_func = desc if sort_order == "desc" else asc
+    
+    if sort_by == "amount_due":
+        q = q.order_by(priority_expr, order_func(Statement.total_amount_due).nullslast())
+    elif sort_by == "due_date":
+        q = q.order_by(priority_expr, order_func(Statement.payment_due_date).nullslast())
+    elif sort_by == "txn_count":
+        q = q.order_by(priority_expr, order_func(Statement.transaction_count))
+    else:
+        q = q.order_by(priority_expr, desc(Statement.imported_at))
+        
+    if limit is not None:
+        q = q.limit(limit)
+    if offset is not None:
+        q = q.offset(offset)
+
     statements = q.all()
     out: List[Dict[str, Any]] = []
     for s in statements:
@@ -428,7 +486,7 @@ def list_statements(
                 "status_message": getattr(s, "status_message", None),
             }
         )
-    return out
+    return {"statements": out, "total": total}
 
 
 @router.get("/processing-logs")
@@ -471,8 +529,17 @@ def delete_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[s
     stmt = db.query(Statement).filter(Statement.id == statement_id).first()
     if not stmt:
         raise HTTPException(status_code=404, detail="Statement not found")
+        
+    file_hash = stmt.file_hash
+        
     db.delete(stmt)
     db.commit()
+    
+    other_stmt = db.query(Statement).filter(Statement.file_hash == file_hash).first()
+    if not other_stmt:
+        from backend.services.keychain import delete_statement_password
+        delete_statement_password(file_hash)
+        
     return {"status": "ok", "message": "Statement and transactions deleted"}
 
 
@@ -508,7 +575,9 @@ def reparse_with_password(
         manual_password=payload.password,
         source=stmt_source,
         original_upload_path=preserved_orig,
+        reparse_mode=True,
     )
+    
     return result
 
 
@@ -542,5 +611,39 @@ def reparse_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[
         db_session=db,
         source=stmt_source,
         original_upload_path=preserved_orig,
+        reparse_mode=True,
     )
+    
     return result
+
+
+@router.post("/{statement_id}/open")
+def open_statement_file(statement_id: str, db: Session = Depends(get_db)) -> Dict[str, str]:
+    """Open the statement file on the host device."""
+    stmt = db.query(Statement).filter(Statement.id == statement_id).first()
+    if not stmt:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    file_path = getattr(stmt, "original_upload_path", None) or stmt.file_path
+    if not file_path or not os.path.isfile(file_path):
+        raise HTTPException(status_code=400, detail="File not found on disk")
+
+    from backend.services.pdf_unlock import _validate_pdf_path, allowed_roots_for_statements
+    if not _validate_pdf_path(file_path, allowed_roots_for_statements(db)):
+        raise HTTPException(status_code=400, detail="File path is not within allowed directories")
+
+    ext = _get_file_ext(file_path)
+    if ext not in {".pdf", ".xls", ".xlsx", ".csv", ".txt"}:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    try:
+        if platform.system() == "Darwin":
+            subprocess.run(["open", file_path], check=True)
+        elif platform.system() == "Windows":
+            os.startfile(file_path)
+        else:
+            subprocess.run(["xdg-open", file_path], check=True)
+        return {"status": "ok", "message": "File opened"}
+    except Exception as e:
+        logger.exception("Failed to open file: %s", file_path)
+        raise HTTPException(status_code=500, detail=f"Failed to open file: {str(e)}")

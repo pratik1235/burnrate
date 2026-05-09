@@ -110,6 +110,18 @@ def _run_migrations(engine_ref) -> None:
                     ))
                     conn.commit()
 
+        if "statements" in inspector.get_table_names():
+            existing_indexes = {idx["name"] for idx in inspector.get_indexes("statements")}
+            if "uq_statement_hash_card" not in existing_indexes:
+                try:
+                    # SQLite treats NULL values as distinct, so this works even if card_last4 is NULL
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX uq_statement_hash_card ON statements(file_hash, card_last4)"
+                    ))
+                    conn.commit()
+                except Exception as e:
+                    print(f"Warning: Could not create unique index uq_statement_hash_card: {e}")
+
 
 def init_db() -> None:
     """Create all tables and ensure data directory exists."""

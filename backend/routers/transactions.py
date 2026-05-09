@@ -120,7 +120,7 @@ def list_transactions(
     # Net spend = sum(debits) − sum(credits) where category != cc_payment.
     filtered_ids = q.with_entities(Transaction.id)
     metrics_q = q.filter(Transaction.category != "cc_payment")
-    total_count = metrics_q.count()
+    total_count = q.count()
 
     by_cur = (
         db.query(
