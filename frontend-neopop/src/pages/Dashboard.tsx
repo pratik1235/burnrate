@@ -4,7 +4,7 @@ import { Navbar } from '@/components/Navbar';
 import { SpendSummary } from '@/components/SpendSummary';
 import { StatUpload } from '@/components/StatUpload';
 import { CardWidget } from '@/components/CardWidget';
-import { CashFlowChart } from '@/components/CashFlowChart';
+import { SpendsChart } from '@/components/SpendsChart';
 import { TransactionRow } from '@/components/TransactionRow';
 import { FilterModal } from '@/components/FilterModal';
 import { useFilters } from '@/contexts/FilterContext';
@@ -557,6 +557,29 @@ function DashboardContent() {
         <Section>
           <SectionHeader>
             <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+              Spends
+            </Typography>
+          </SectionHeader>
+          {loading ? (
+            <Skeleton height="280px" />
+          ) : safeTrendsByCurrency.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {safeTrendsByCurrency.map((block) => (
+                <SpendsChart key={block.currency} data={block.trends} currency={block.currency} />
+              ))}
+            </div>
+          ) : safeTrends.length === 0 ? (
+            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+              No spending data yet. Import statements to see your cash flow.
+            </Typography>
+          ) : (
+            <SpendsChart data={safeTrends} />
+          )}
+        </Section>
+
+        <Section>
+          <SectionHeader>
+            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Milestones & Goals
             </Typography>
             <StyledLink to="/milestones">View all</StyledLink>
@@ -593,29 +616,6 @@ function DashboardContent() {
                 </MilestoneCard>
               ))}
             </MilestonesList>
-          )}
-        </Section>
-
-        <Section>
-          <SectionHeader>
-            <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-              Cash Flow
-            </Typography>
-          </SectionHeader>
-          {loading ? (
-            <Skeleton height="280px" />
-          ) : safeTrendsByCurrency.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {safeTrendsByCurrency.map((block) => (
-                <CashFlowChart key={block.currency} data={block.trends} currency={block.currency} />
-              ))}
-            </div>
-          ) : safeTrends.length === 0 ? (
-            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
-              No spending data yet. Import statements to see your cash flow.
-            </Typography>
-          ) : (
-            <CashFlowChart data={safeTrends} />
           )}
         </Section>
 

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { CashFlowChart } from '@/components/CashFlowChart';
+import { SpendsChart } from '@/components/SpendsChart';
 
 const sampleData = [
   { month: 'Sep', spend: 42000 },
@@ -11,8 +11,8 @@ const sampleData = [
 ];
 
 const meta = {
-  title: 'NeoPOP/CashFlowChart',
-  component: CashFlowChart,
+  title: 'NeoPOP/SpendsChart',
+  component: SpendsChart,
   parameters: { layout: 'centered' },
   argTypes: {
     data: { control: 'object' },
@@ -22,7 +22,7 @@ const meta = {
   args: {
     currency: 'INR',
   },
-} satisfies Meta<typeof CashFlowChart>;
+} satisfies Meta<typeof SpendsChart>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

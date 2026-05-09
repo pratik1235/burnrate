@@ -13,7 +13,7 @@ import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typograph
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { formatCurrencyCompact, formatCurrency } from '@/lib/utils';
 
-interface CashFlowData {
+interface SpendsData {
   month: string;
   spend: number;
 }
@@ -43,13 +43,13 @@ function CustomTooltip({
   );
 }
 
-interface CashFlowChartProps {
-  data: CashFlowData[];
+interface SpendsChartProps {
+  data: SpendsData[];
   currency?: string;
   className?: string;
 }
 
-export function CashFlowChart({ data, currency = 'INR', className }: CashFlowChartProps) {
+export function SpendsChart({ data, currency = 'INR', className }: SpendsChartProps) {
   return (
     <div
       style={{ padding: 20, minWidth: 320, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}
@@ -57,7 +57,7 @@ export function CashFlowChart({ data, currency = 'INR', className }: CashFlowCha
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-          Cash Flow ({currency})
+          Spends ({currency})
         </Typography>
         <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
           {data.length} months

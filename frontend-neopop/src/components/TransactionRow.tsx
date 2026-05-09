@@ -305,6 +305,7 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
           {new Date(transaction.date).toLocaleDateString('en-IN', {
             day: 'numeric',
             month: 'short',
+            year: 'numeric',
           })}
         </Typography>
       </div>

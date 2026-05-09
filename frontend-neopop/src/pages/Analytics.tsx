@@ -4,7 +4,7 @@ import { Navbar } from '@/components/Navbar';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { CategoryDonut } from '@/components/CategoryDonut';
 import { TopMerchants } from '@/components/TopMerchants';
-import { CashFlowChart } from '@/components/CashFlowChart';
+import { SpendsChart } from '@/components/SpendsChart';
 import { CardComparison } from '@/components/CardComparison';
 import { InsightCard } from '@/components/InsightCard';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
@@ -505,7 +505,7 @@ function AnalyticsContent() {
             ) : safeTrendsByCurrency.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {safeTrendsByCurrency.map((block) => (
-                  <CashFlowChart key={block.currency} data={block.trends} currency={block.currency} />
+                  <SpendsChart key={block.currency} data={block.trends} currency={block.currency} />
                 ))}
               </div>
             ) : safeTrends.length === 0 ? (
@@ -515,7 +515,7 @@ function AnalyticsContent() {
                 </Typography>
               </div>
             ) : (
-              <CashFlowChart data={safeTrends} currency={insightCurrency} />
+              <SpendsChart data={safeTrends} currency={insightCurrency} />
             )}
             {loading ? (
               <Skeleton style={{ height: 200 }} />

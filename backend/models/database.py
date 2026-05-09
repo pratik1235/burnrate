@@ -122,6 +122,17 @@ def _run_migrations(engine_ref) -> None:
                 except Exception as e:
                     print(f"Warning: Could not create unique index uq_statement_hash_card: {e}")
 
+        if "cards" in inspector.get_table_names():
+            existing_indexes = {idx["name"] for idx in inspector.get_indexes("cards")}
+            if "uq_card_bank_last4" not in existing_indexes:
+                try:
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX uq_card_bank_last4 ON cards(bank, last4)"
+                    ))
+                    conn.commit()
+                except Exception as e:
+                    print(f"Warning: Could not create unique index uq_card_bank_last4: {e}")
+
 
 def init_db() -> None:
     """Create all tables and ensure data directory exists."""
