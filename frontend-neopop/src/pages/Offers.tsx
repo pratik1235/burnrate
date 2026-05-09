@@ -5,7 +5,7 @@ import { Button, Typography, Tag, InputField, SearchBar } from '@cred/neopop-web
 import { SelectableElevatedCard as ElevatedCard } from '@/components/SelectableElevatedCard';
 import { mainColors, colorPalette } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
-import { useOffers } from '@/hooks/useApi';
+import { useOffers, useCards } from '@/hooks/useApi';
 import { createOffer, deleteOffer, triggerOfferSync } from '@/lib/api';
 import type { GetOffersParams } from '@/lib/api';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
@@ -140,6 +140,7 @@ const edgeAccent = {
 
 export function Offers() {
   const navigate = useNavigate();
+  const { cards: userCards, loading: cardsLoading } = useCards();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInputValue, setSearchInputValue] = useState('');
   const [searchClearKey, setSearchClearKey] = useState(0);
@@ -163,12 +164,14 @@ export function Offers() {
         selectedCategories.length > 0
           ? [...selectedCategories].sort((a, b) => a.localeCompare(b)).join(',')
           : undefined,
+      cards: userCards.length > 0 ? userCards.map((c) => c.id).join(',') : 'none',
       limit: 100,
     }),
-    [searchQuery, banksKey, categoriesKey],
+    [searchQuery, banksKey, categoriesKey, userCards],
   );
 
-  const { offers, total, lastSyncAt, loading, refetch } = useOffers(offersParams);
+  const { offers, total, lastSyncAt, loading: offersLoading, refetch } = useOffers(offersParams);
+  const loading = cardsLoading || offersLoading;
 
   const bankEntries = useMemo(
     () => Object.entries(BANK_CONFIG).sort((a, b) => a[1].name.localeCompare(b[1].name)),

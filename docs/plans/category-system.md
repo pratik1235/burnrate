@@ -170,7 +170,7 @@ Defined in `main.py` `seed_categories()`:
 | fuel | Fuel | hp,bharat petroleum,iocl,... |
 | health | Health | apollo,pharmeasy,1mg,... |
 | groceries | Groceries | bigbasket,blinkit,zepto,... |
-| cc_payment | CC Bill Payment | cc payment,bbps,neft payment,... |
+| cc_payment | CC Bill Payment | cc payment,bbps,neft payment,CREDIT CARD PAYMENTNet Banking,... |
 | other | Other | (empty) |
 
 - On startup: Insert if slug not exists; if exists and is_prebuilt, update keywords if changed
@@ -367,7 +367,7 @@ On startup, `seed_categories` checks: if prebuilt exists and `keywords !=` prede
 | fuel | hp,bharat petroleum,iocl,shell,indian oil,bpcl,hindustan petroleum |
 | health | apollo,pharmeasy,1mg,hospital,medplus,netmeds,practo,lenskart |
 | groceries | bigbasket,blinkit,zepto,dmart,jiomart,swiggy instamart,instamart,nature basket,more |
-| cc_payment | cc payment,cc pymt,bppy cc payment,bbps payment,neft payment,imps payment,repayment,repayments,bbps,bill payment received |
+| cc_payment | cc payment,cc pymt,bppy cc payment,bbps payment,neft payment,imps payment,repayment,repayments,bbps,bill payment received,CREDIT CARD PAYMENTNet Banking |
 | other | (empty) |
 
 ---

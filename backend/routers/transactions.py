@@ -69,6 +69,8 @@ def list_transactions(
     ),
     amount_min: Optional[float] = Query(None),
     amount_max: Optional[float] = Query(None),
+    sort_by: Optional[str] = Query(None, description="amount, date, or category"),
+    sort_order: Optional[str] = Query("desc", description="asc or desc"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> Dict[str, Any]:
@@ -156,9 +158,25 @@ def list_transactions(
     else:
         total_amount = None
 
+    # Apply sorting
+    if sort_by == "amount":
+        if sort_order == "asc":
+            q = q.order_by(Transaction.amount.asc(), Transaction.date.desc())
+        else:
+            q = q.order_by(Transaction.amount.desc(), Transaction.date.desc())
+    elif sort_by == "category":
+        if sort_order == "asc":
+            q = q.order_by(Transaction.category.asc(), Transaction.date.desc())
+        else:
+            q = q.order_by(Transaction.category.desc(), Transaction.date.desc())
+    else:  # default to date
+        if sort_order == "asc":
+            q = q.order_by(Transaction.date.asc(), Transaction.id.asc())
+        else:
+            q = q.order_by(Transaction.date.desc(), Transaction.id.desc())
+
     rows = (
         q.options(joinedload(Transaction.tags))
-        .order_by(Transaction.date.desc())
         .offset(offset)
         .limit(limit)
         .all()

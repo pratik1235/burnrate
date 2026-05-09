@@ -17,20 +17,20 @@
  */
 
 const BANK_CONFIGS = [
-  { name: 'HDFC', domains: ['@hdfcbank.net'] },
-  { name: 'ICICI', domains: ['@icicibank.com'] },
-  { name: 'Axis', domains: ['@axisbank.com'] },
-  { name: 'SBI', domains: ['@sbicard.com'] },
-  { name: 'Amex', domains: ['@americanexpress.co.in', '@aexp.com'] },
-  { name: 'IDFC_FIRST', domains: ['@idfcfirstbank.com'] },
-  { name: 'IndusInd', domains: ['@indusind.com'] },
-  { name: 'Kotak', domains: ['@kotak.com', '@kotakbank.com'] },
-  { name: 'SC', domains: ['@sc.com'] },
-  { name: 'YES', domains: ['@yesbank.in'] },
-  { name: 'AU', domains: ['@aubank.in'] },
-  { name: 'RBL', domains: ['@rblbank.com'] },
-  { name: 'Federal', domains: ['@federalbank.co.in'] },
-  { name: 'Indian_Bank', domains: ['@indianbank.co.in', '@indianbank.net.in'] },
+  { name: 'HDFC', domains: ['@hdfcbank.net', '@hdfcbank.bank.in'], excludeQuery: ' -"Combined Email Statement"' },
+  { name: 'ICICI', domains: ['@icicibank.com', '@icici.bank.in'] },
+  { name: 'Axis', domains: ['@axisbank.com', '@axis.bank.in'] },
+  { name: 'SBI', domains: ['@sbicard.com', '@sbi.bank.in'] },
+  { name: 'Amex', domains: ['@americanexpress.co.in', '@aexp.com', '@amex.bank.in'] },
+  { name: 'IDFC_FIRST', domains: ['@idfcfirstbank.com', '@idfcfirst.bank.in'] },
+  { name: 'IndusInd', domains: ['@indusind.com', '@indusind.bank.in'] },
+  { name: 'Kotak', domains: ['@kotak.com', '@kotakbank.com', '@kotak.bank.in'] },
+  { name: 'SC', domains: ['@sc.com', '@sc.bank.in'] },
+  { name: 'YES', domains: ['@yesbank.in', '@yes.bank.in'] },
+  { name: 'AU', domains: ['@aubank.in', '@au.bank.in'] },
+  { name: 'RBL', domains: ['@rblbank.com', '@rbl.bank.in'] },
+  { name: 'Federal', domains: ['@federalbank.co.in', '@federal.bank.in'] },
+  { name: 'Indian_Bank', domains: ['@indianbank.co.in', '@indianbank.net.in', '@indian.bank.in'] },
 ];
 
 const ROOT_FOLDER_NAME = 'Statements';
@@ -60,6 +60,11 @@ function isHdfcCombinedEmailStatementSubject(subject) {
  */
 function main() {
   const props = PropertiesService.getScriptProperties();
+  // after date
+  // props.setProperty(PROPS_KEY_TIMESTAMP, '2026/01/01');
+  // //  before date
+  // props.setProperty(PROPS_KEY_BEFORE_DATE, '2026/01/01');
+  
   const afterDate = props.getProperty(PROPS_KEY_TIMESTAMP);
   const beforeDateEffective = getEffectiveBeforeDate(props);
   const beforeStored = props.getProperty(PROPS_KEY_BEFORE_DATE);
@@ -138,6 +143,9 @@ function buildQuery(bankConfig, afterDate, beforeDate) {
     ? 'from:' + bankConfig.domains[0]
     : '(' + bankConfig.domains.map(function (d) { return 'from:' + d; }).join(' OR ') + ')';
   let query = fromPart + ' has:attachment filename:pdf subject:(statement OR e-statement)';
+  if (bankConfig.excludeQuery) {
+    query += bankConfig.excludeQuery;
+  }
   if (afterDate) {
     query += ' after:' + afterDate;
   }
@@ -339,8 +347,14 @@ function cleanupBackfillState() {
  * Run from the editor (select printLastRunStats → Run) and open View → Execution log.
  */
 function printLastRunStats() {
+
   const tz = Session.getScriptTimeZone();
   const props = PropertiesService.getScriptProperties();
+
+  // after date
+  // props.setProperty(PROPS_KEY_TIMESTAMP, '2025/11/30');
+  // //  before date
+  // props.setProperty(PROPS_KEY_BEFORE_DATE, '2026/12/31');
   const lastTs = props.getProperty(PROPS_KEY_TIMESTAMP);
   const beforeStored = props.getProperty(PROPS_KEY_BEFORE_DATE);
   const beforeEffective = getEffectiveBeforeDate(props);
@@ -403,3 +417,4 @@ function printLastRunStats() {
     console.log(blob);
   }
 }
+

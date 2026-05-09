@@ -41,7 +41,7 @@ def seed_categories(db) -> None:
         {"name": "Fuel", "slug": "fuel", "keywords": "hp,bharat petroleum,iocl,shell,indian oil,bpcl,hindustan petroleum", "color": "#EAB308", "icon": "Fuel"},
         {"name": "Health", "slug": "health", "keywords": "apollo,pharmeasy,1mg,hospital,medplus,netmeds,practo,lenskart", "color": "#10B981", "icon": "Heart"},
         {"name": "Groceries", "slug": "groceries", "keywords": "bigbasket,blinkit,zepto,dmart,jiomart,swiggy instamart,instamart,nature basket,more", "color": "#14B8A6", "icon": "ShoppingCart"},
-        {"name": "CC Bill Payment", "slug": "cc_payment", "keywords": "cc payment,cc pymt,bppy cc payment,bbps payment,neft payment,imps payment,repayment,repayments,bbps,bill payment received", "color": "#6B7280", "icon": "CreditCard"},
+        {"name": "CC Bill Payment", "slug": "cc_payment", "keywords": "cc payment,cc pymt,bppy cc payment,bbps payment,neft payment,imps payment,repayment,repayments,bbps,bill payment received,CREDIT CARD PAYMENTNet Banking", "color": "#6B7280", "icon": "CreditCard"},
         {"name": "Cashback", "slug": "cashback", "keywords": "cashback,cash back", "color": "#06C270", "icon": "Coins"},
         {"name": "EMI", "slug": "emi", "keywords": "emi,equated monthly installment,installment,prin,interest", "color": "#F59E0B", "icon": "Calculator"},
         {"name": "Other", "slug": "other", "keywords": "", "color": "#9CA3AF", "icon": "MoreHorizontal"},

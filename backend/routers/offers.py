@@ -112,6 +112,8 @@ def list_offers(
                 q = q.filter(
                     CardOffer.bank.in_(card_banks) | (CardOffer.bank == None)
                 )
+            else:
+                q = q.filter(CardOffer.bank == None)
 
     total = q.count()
     rows = q.order_by(CardOffer.created_at.desc()).offset(offset).limit(limit).all()

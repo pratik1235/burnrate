@@ -66,6 +66,8 @@ export interface GetTransactionsParams {
   source?: string;
   amount_min?: number;
   amount_max?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }

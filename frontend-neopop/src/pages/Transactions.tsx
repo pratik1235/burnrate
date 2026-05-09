@@ -10,10 +10,12 @@ import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
 import { Button, SearchBar, Row, Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
-import { SlidersHorizontal, Download, EyeOff } from 'lucide-react';
+import { SlidersHorizontal, Download, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
+import { SelectDropdown } from '@/components/SelectDropdown';
 import { CloseButton } from '@/components/CloseButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { paginateBounds } from '@/lib/pagination';
 import styled from 'styled-components';
 
 const PageLayout = styled.div`
@@ -72,6 +74,42 @@ const DateGroup = styled.div`
   margin-bottom: 24px;
 `;
 
+const SortBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+`;
+
+const IconPageBtn = styled.button<{ $disabled?: boolean }>`
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: ${(p) => (p.$disabled ? 'not-allowed' : 'pointer')};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: ${(p) => (p.$disabled ? 0.35 : 1)};
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+  &:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.45);
+  }
+`;
+
+type TransactionSortKey = 'default' | 'amount_desc' | 'amount_asc' | 'date_asc' | 'date_desc' | 'category_asc' | 'category_desc';
+
+const SORT_OPTIONS: { value: TransactionSortKey; label: string }[] = [
+  { value: 'default',       label: 'Default' },
+  { value: 'amount_desc',   label: 'Amount \u2193' },
+  { value: 'amount_asc',    label: 'Amount \u2191' },
+  { value: 'date_desc',     label: 'Date \u2193' },
+  { value: 'date_asc',      label: 'Date \u2191' },
+  { value: 'category_asc',  label: 'Category \u2191' },
+  { value: 'category_desc', label: 'Category \u2193' },
+];
 
 const PAGE_SIZE = 20;
 
@@ -82,7 +120,16 @@ function TransactionsContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInputValue, setSearchInputValue] = useState('');
   const [searchClearKey, setSearchClearKey] = useState(0);
-  const [page, setPage] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [sortKey, setSortKey] = useState<TransactionSortKey>(() => {
+    try {
+      const saved = localStorage.getItem('transactionsSortKey');
+      if (saved) return saved as TransactionSortKey;
+    } catch {
+      // ignore
+    }
+    return 'default';
+  });
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [searchTooltipVisible, setSearchTooltipVisible] = useState(false);
   const [excludeTooltipVisible, setExcludeTooltipVisible] = useState(false);
@@ -92,6 +139,30 @@ function TransactionsContent() {
 
   const categoryFilter =
     filters.selectedCategories.length === 1 ? filters.selectedCategories[0] : undefined;
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('transactionsSortKey', sortKey);
+    } catch {
+      // ignore
+    }
+  }, [sortKey]);
+
+  let sortBy: string | undefined;
+  let sortOrder: 'asc' | 'desc' | undefined;
+  if (sortKey === 'amount_desc') {
+    sortBy = 'amount'; sortOrder = 'desc';
+  } else if (sortKey === 'amount_asc') {
+    sortBy = 'amount'; sortOrder = 'asc';
+  } else if (sortKey === 'date_desc') {
+    sortBy = 'date'; sortOrder = 'desc';
+  } else if (sortKey === 'date_asc') {
+    sortBy = 'date'; sortOrder = 'asc';
+  } else if (sortKey === 'category_desc') {
+    sortBy = 'category'; sortOrder = 'desc';
+  } else if (sortKey === 'category_asc') {
+    sortBy = 'category'; sortOrder = 'asc';
+  }
 
   const { transactions, total, totalAmount, totalsByCurrency, mixedCurrency, loading } = useTransactions({
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
@@ -106,13 +177,15 @@ function TransactionsContent() {
     source: filters.source !== 'all' ? filters.source : undefined,
     amountMin: filters.amountRange.min,
     amountMax: filters.amountRange.max,
-    limit: (page + 1) * PAGE_SIZE,
-    offset: 0,
+    sortBy,
+    sortOrder,
+    limit: PAGE_SIZE,
+    offset: pageIndex * PAGE_SIZE,
   });
   const { cards } = useCards();
 
   useEffect(() => {
-    setPage(0);
+    setPageIndex(0);
     setExcludedIds(new Set());
     setExclusionMode(false);
   }, [
@@ -127,6 +200,7 @@ function TransactionsContent() {
     filters.direction,
     filters.source,
     searchQuery,
+    sortKey,
   ]);
 
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
@@ -201,17 +275,14 @@ function TransactionsContent() {
         ? filters.selectedCards.filter((id) => id !== cardId)
         : [...filters.selectedCards, cardId],
     });
-    setPage(0);
+    setPageIndex(0);
   };
 
   const handleAllCards = () => {
     setFilters({ selectedCards: [] });
-    setPage(0);
+    setPageIndex(0);
   };
 
-  const handleLoadMore = () => {
-    setPage((p) => p + 1);
-  };
 
   const handleExport = async () => {
     if (safeTransactions.length === 0) return;
@@ -296,6 +367,17 @@ function TransactionsContent() {
     (filters.direction !== 'all' ? 1 : 0) +
     (filters.source !== 'all' ? 1 : 0);
 
+  const pagination = useMemo(
+    () => paginateBounds(pageIndex, safeTotal, PAGE_SIZE),
+    [pageIndex, safeTotal],
+  );
+
+  useEffect(() => {
+    if (pagination.displayPageIndex !== pageIndex) {
+      setPageIndex(pagination.displayPageIndex);
+    }
+  }, [pagination.displayPageIndex, pageIndex]);
+
   return (
     <PageLayout>
       <Navbar activeTab="transactions" onTabChange={(tab) => navigate(`/${tab}`)} />
@@ -358,7 +440,7 @@ function TransactionsContent() {
                 handleSearchInput={(value: string) => setSearchInputValue(value)}
                 onSubmit={() => {
                   setSearchQuery(searchInputValue);
-                  setPage(0);
+                  setPageIndex(0);
                 }}
                 // todo: reduce vertical size of the search bar
                 colorConfig={{
@@ -375,7 +457,7 @@ function TransactionsContent() {
                   setSearchQuery('');
                   setSearchInputValue('');
                   setSearchClearKey((k) => k + 1);
-                  setPage(0);
+                  setPageIndex(0);
                 }}
                 variant="inline"
               />
@@ -598,18 +680,71 @@ function TransactionsContent() {
             </Typography>
           </div>
         ) : (
-          <TransactionList>
-            {Object.entries(groupedByDate).map(([date, txs]) => (
-              <DateGroup key={date}>
-                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {new Date(date).toLocaleDateString('en-IN', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <SortBar>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
+                  Sort by
                 </Typography>
-                {txs.map((tx) => (
+                <SelectDropdown
+                  options={SORT_OPTIONS}
+                  value={sortKey}
+                  onChange={(v) => setSortKey(v as TransactionSortKey)}
+                  colorMode="dark"
+                  menuMount="portal"
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
+                  Page {pagination.displayPageIndex + 1} of {pagination.pageCount}
+                  {' · '}
+                  {safeTransactions.length === 1 ? '1 transaction' : `${safeTransactions.length} transactions`} on this page
+                  {' · '}
+                  {safeTotal === 1 ? '1 total' : `${safeTotal} total`}
+                </Typography>
+                <IconPageBtn
+                  $disabled={pagination.displayPageIndex <= 0}
+                  disabled={pagination.displayPageIndex <= 0}
+                  aria-label="Previous page"
+                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                >
+                  <ChevronLeft size={15} color="#ffffff" />
+                </IconPageBtn>
+                <IconPageBtn
+                  $disabled={pagination.displayPageIndex >= pagination.pageCount - 1}
+                  disabled={pagination.displayPageIndex >= pagination.pageCount - 1}
+                  aria-label="Next page"
+                  onClick={() => setPageIndex((p) => Math.min(pagination.pageCount - 1, p + 1))}
+                >
+                  <ChevronRight size={15} color="#ffffff" />
+                </IconPageBtn>
+              </div>
+            </SortBar>
+            <TransactionList>
+              {sortKey === 'default' || sortKey === 'date_desc' || sortKey === 'date_asc' ? (
+                Object.entries(groupedByDate).map(([date, txs]) => (
+                  <DateGroup key={date}>
+                    <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)" style={{ marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {new Date(date).toLocaleDateString('en-IN', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </Typography>
+                    {txs.map((tx) => (
+                      <TransactionRow
+                        key={tx.id}
+                        transaction={tx}
+                        exclusionMode={exclusionMode}
+                        isExcluded={excludedIds.has(tx.id)}
+                        onToggleExclude={handleToggleExclude}
+                      />
+                    ))}
+                  </DateGroup>
+                ))
+              ) : (
+                safeTransactions.map((tx) => (
                   <TransactionRow
                     key={tx.id}
                     transaction={tx}
@@ -617,24 +752,10 @@ function TransactionsContent() {
                     isExcluded={excludedIds.has(tx.id)}
                     onToggleExclude={handleToggleExclude}
                   />
-                ))}
-              </DateGroup>
-            ))}
-          </TransactionList>
-        )}
-
-        {!loading && safeTransactions.length < safeTotal && (
-          <Button
-            variant="primary"
-            kind="elevated"
-            size="medium"
-            colorMode="dark"
-            fullWidth
-            onClick={handleLoadMore}
-            style={{ marginTop: 24 }}
-          >
-            Load 20 more ({safeTotal - safeTransactions.length} remaining)
-          </Button>
+                ))
+              )}
+            </TransactionList>
+          </div>
         )}
       </Content>
 

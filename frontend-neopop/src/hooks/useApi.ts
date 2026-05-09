@@ -89,6 +89,8 @@ export interface TransactionFilters {
   source?: string;
   amountMin?: number;
   amountMax?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }
@@ -136,6 +138,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (filters.bankAccounts) params.bank_accounts = filters.bankAccounts;
       if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
       if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
+      if (filters.sortBy) params.sort_by = filters.sortBy;
+      if (filters.sortOrder) params.sort_order = filters.sortOrder;
 
       const result = await apiGetTransactions(params);
       setTransactions(Array.isArray(result?.transactions) ? result.transactions : []);
@@ -167,6 +171,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.bankAccounts,
     filters.amountMin,
     filters.amountMax,
+    filters.sortBy,
+    filters.sortOrder,
     filters.limit,
     filters.offset,
   ]);
@@ -193,6 +199,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
         if (filters.bankAccounts) params.bank_accounts = filters.bankAccounts;
         if (filters.amountMin !== undefined) params.amount_min = filters.amountMin;
         if (filters.amountMax !== undefined) params.amount_max = filters.amountMax;
+        if (filters.sortBy) params.sort_by = filters.sortBy;
+        if (filters.sortOrder) params.sort_order = filters.sortOrder;
         const result = await apiGetTransactions(params);
         if (!cancelled) {
           setTransactions(Array.isArray(result?.transactions) ? result.transactions : []);
@@ -229,6 +237,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     filters.bankAccounts,
     filters.amountMin,
     filters.amountMax,
+    filters.sortBy,
+    filters.sortOrder,
     filters.limit,
     filters.offset,
   ]);

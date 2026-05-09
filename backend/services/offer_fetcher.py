@@ -439,6 +439,142 @@ def _guess_category(title: str, desc: Optional[str] = None) -> Optional[str]:
     return None
 
 
+BUILTIN_OFFERS: List[RawOffer] = [
+    # 1. HDFC Regalia Gold
+    RawOffer(
+        title="Welcome Benefit: ₹2,500 gift voucher",
+        source_id="builtin-hdfc-regalia-gold-welcome",
+        description="A ₹2,500 gift voucher upon paying the joining fee. Complimentary Swiggy One and MakeMyTrip (MMT) Black Gold memberships after spending ₹1 Lakh within the first 90 days.",
+        offer_type="welcome_benefit",
+        bank="hdfc",
+    ),
+    RawOffer(
+        title="5X Reward Points on Select Brands",
+        source_id="builtin-hdfc-regalia-gold-5x",
+        description="5X Reward Points (20 points per ₹150) on Myntra, Marks & Spencer, Nykaa, and Reliance Digital.",
+        offer_type="reward_multiplier",
+        bank="hdfc",
+        card_template_id="hdfc-regalia-gold",
+    ),
+    RawOffer(
+        title="Complimentary Airport Lounge Access",
+        source_id="builtin-hdfc-regalia-gold-lounge",
+        description="12 complimentary domestic and 6 international airport lounge visits per year.",
+        offer_type="lounge_access",
+        bank="hdfc",
+        card_template_id="hdfc-regalia-gold",
+    ),
+    # 2. HDFC UPI Rupay
+    RawOffer(
+        title="Welcome Benefit: ₹250 gift voucher",
+        source_id="builtin-hdfc-upi-rupay-welcome",
+        description="A ₹250 gift voucher upon activating the card and paying the joining fee.",
+        offer_type="welcome_benefit",
+        bank="hdfc",
+        card_template_id="hdfc-upi-rupay",
+    ),
+    RawOffer(
+        title="3% CashPoints on Groceries & Dining",
+        source_id="builtin-hdfc-upi-rupay-3pc",
+        description="3% CashPoints on groceries, supermarket, dining, and PayZapp transactions (capped at 500 points/month).",
+        offer_type="cashback",
+        bank="hdfc",
+        card_template_id="hdfc-upi-rupay",
+    ),
+    RawOffer(
+        title="2% CashPoints on Utility Bills",
+        source_id="builtin-hdfc-upi-rupay-2pc",
+        description="2% CashPoints on utility bill payments (capped at 500 points/month).",
+        offer_type="cashback",
+        bank="hdfc",
+        card_template_id="hdfc-upi-rupay",
+    ),
+    # 3. OneCard
+    RawOffer(
+        title="1% Foreign Currency Markup",
+        source_id="builtin-onecard-forex",
+        description="A very low foreign currency markup fee of just 1%.",
+        offer_type="forex_markup",
+        bank="onecard",
+        card_template_id="onecard",
+    ),
+    # 4. Axis Flipkart
+    RawOffer(
+        title="Welcome Benefit: ₹500 Flipkart voucher",
+        source_id="builtin-axis-flipkart-welcome",
+        description="A ₹500 Flipkart voucher on your first transaction within 30 days of card issuance, plus Swiggy discount codes for new users.",
+        offer_type="welcome_benefit",
+        bank="axis",
+        card_template_id="axis-flipkart",
+    ),
+    RawOffer(
+        title="5% Cashback on Flipkart & Cleartrip",
+        source_id="builtin-axis-flipkart-5pc",
+        description="5% cashback on Flipkart and Cleartrip (each capped at ₹4,000 per quarter).",
+        offer_type="cashback",
+        bank="axis",
+        card_template_id="axis-flipkart",
+    ),
+    RawOffer(
+        title="7.5% Cashback on Myntra",
+        source_id="builtin-axis-flipkart-75pc",
+        description="7.5% cashback on Myntra (capped at ₹4,000 per statement quarter).",
+        offer_type="cashback",
+        bank="axis",
+        card_template_id="axis-flipkart",
+    ),
+    RawOffer(
+        title="4% Cashback on Preferred Merchants",
+        source_id="builtin-axis-flipkart-4pc",
+        description="4% unlimited cashback on Swiggy, Uber, PVR, and Cult.fit.",
+        offer_type="cashback",
+        bank="axis",
+        card_template_id="axis-flipkart",
+    ),
+    # 5. Amazon Pay ICICI
+    RawOffer(
+        title="5% Cashback on Amazon India",
+        source_id="builtin-icici-amazon-5pc",
+        description="5% unlimited cashback on Amazon India for Prime members, and 3% for non-Prime members.",
+        offer_type="cashback",
+        bank="icici",
+        card_template_id="icici-amazon-pay",
+    ),
+    RawOffer(
+        title="2% Cashback at Amazon Pay Partners",
+        source_id="builtin-icici-amazon-2pc",
+        description="2% unlimited cashback at 100+ Amazon Pay partner merchants (like Swiggy, BookMyShow, Yatra, etc., when paid via Amazon Pay).",
+        offer_type="cashback",
+        bank="icici",
+        card_template_id="icici-amazon-pay",
+    ),
+    # 6. Federal Bank Scapia
+    RawOffer(
+        title="Zero Forex Markup",
+        source_id="builtin-federal-scapia-forex",
+        description="Pay 0% extra on international transactions.",
+        offer_type="forex_markup",
+        bank="federal_scapia",
+        card_template_id="scapia",
+    ),
+    RawOffer(
+        title="20% Scapia Coins on Travel",
+        source_id="builtin-federal-scapia-20pc",
+        description="20% Scapia Coins on flight and hotel bookings made directly through the Scapia app.",
+        offer_type="reward_multiplier",
+        bank="federal_scapia",
+        card_template_id="scapia",
+    ),
+    RawOffer(
+        title="10% Scapia Coins on Everyday Spends",
+        source_id="builtin-federal-scapia-10pc",
+        description="10% Scapia Coins on eligible online and offline Visa spends, and 5% on RuPay UPI spends (5 Scapia Coins = ₹1).",
+        offer_type="reward_multiplier",
+        bank="federal_scapia",
+        card_template_id="scapia",
+    ),
+]
+
 # All available providers
 ALL_PROVIDERS: List[BaseOfferProvider] = [
     CardExpertAPIProvider(),
@@ -500,6 +636,10 @@ def sync_offers(db: Session) -> dict:
 
             db.commit()
             time.sleep(OFFER_REQUEST_DELAY)
+
+        # Upsert builtin offers
+        count_builtin = _upsert_offers(db, "builtin", BUILTIN_OFFERS)
+        results["builtin"] = {"status": "success", "count": count_builtin}
 
         # Mark expired offers
         today = date.today()

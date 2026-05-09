@@ -128,6 +128,8 @@ MERCHANT_CATEGORIES: Dict[str, List[str]] = {
     "cc_payment": [
         "cc payment", "cc pymt", "bppy cc payment",
         "bbps payment", "neft payment", "imps payment",
+        "repayment", "repayments", "bbps", "bill payment received",
+        "CREDIT CARD PAYMENTNet Banking",
     ],
 }
 
