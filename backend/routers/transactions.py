@@ -10,7 +10,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 from backend.models.database import get_db
-from backend.models.models import Transaction, TransactionTag
+from backend.models.models import CategoryDefinition, Transaction, TransactionTag
 from backend.services.transaction_query import apply_source_account_filters, parse_bank_accounts_param
 
 
@@ -23,6 +23,10 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 class UpdateTagsPayload(BaseModel):
     tags: List[str]
+
+
+class UpdateCategoryPayload(BaseModel):
+    category: str
 
 
 @router.get("/bank-accounts")
@@ -199,6 +203,7 @@ def list_transactions(
                 "source": getattr(r, "source", None) or "CC",
                 "currency": (getattr(r, "currency", None) or "INR").upper()[:3],
                 "tags": [t.tag for t in r.tags],
+                "isManuallyCategorized": getattr(r, "is_manually_categorized", 0),
             }
             for r in rows
         ],
@@ -247,3 +252,33 @@ def update_transaction_tags(
         db.add(TransactionTag(transaction_id=transaction_id, tag=tag))
     db.commit()
     return {"tags": validated}
+
+
+@router.put("/{transaction_id}/category")
+def update_transaction_category(
+    transaction_id: str,
+    payload: UpdateCategoryPayload,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update transaction category manually."""
+    txn = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    slug = payload.category.strip()
+    if not slug:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+        
+    cat_exists = db.query(CategoryDefinition).filter(CategoryDefinition.slug == slug).first()
+    if not cat_exists and slug != "other":
+        raise HTTPException(status_code=400, detail=f"Category '{slug}' is invalid")
+        
+    txn.category = slug
+    txn.is_manually_categorized = 1
+    db.commit()
+    
+    return {
+        "id": txn.id,
+        "category": txn.category,
+        "isManuallyCategorized": txn.is_manually_categorized
+    }

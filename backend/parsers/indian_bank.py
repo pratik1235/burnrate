@@ -54,7 +54,7 @@ _CARD_GENERIC_RE = re.compile(r"(\d{4})[Xx*]{4,8}(\d{4})")
 # ---------------------------------------------------------------------------
 
 _TOTAL_DUE_RE = re.compile(
-    r"Total\s+Amount\s+Due\s*[=\s]*([\d,]+\.\d{2})",
+    r"Total\s+Amount\s+Due\s*[=\s]*(-?[\d,]+\.\d{2})\s*(Cr|Dr|CR|DR)?",
     re.IGNORECASE,
 )
 
@@ -208,7 +208,10 @@ class IndianBankParser(BaseParser):
         values: List[float] = []
         for m in _TOTAL_DUE_RE.finditer(text):
             try:
-                values.append(float(m.group(1).replace(",", "")))
+                val = float(m.group(1).replace(",", ""))
+                if m.group(1).startswith("-") or (m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                values.append(val)
             except ValueError:
                 pass
         # Multiple "Total Amount Due" appear (sidebar summary + illustration).

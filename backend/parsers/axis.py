@@ -138,13 +138,16 @@ class AxisParser(BaseParser):
     @staticmethod
     def _extract_total_amount_due(text: str) -> Optional[float]:
         m = re.search(
-            r"Total\s+Payment\s+Due.*?([\d,]+\.\d{2})",
+            r"Total\s+Payment\s+Due.*?(-?[\d,]+\.\d{2})\s*(Cr|Dr|CR|DR)?",
             text,
             re.IGNORECASE | re.DOTALL,
         )
         if m:
             try:
-                return float(m.group(1).replace(",", ""))
+                val = float(m.group(1).replace(",", ""))
+                if m.group(1).startswith("-") or (m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                return val
             except ValueError:
                 pass
         return None

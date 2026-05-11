@@ -10,7 +10,7 @@ import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
 import { Button, SearchBar, Row, Typography } from '@cred/neopop-web/lib/components';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
-import { SlidersHorizontal, Download, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { SlidersHorizontal, Download, EyeOff, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { ButtonWithIcon } from '@/components/ButtonWithIcon';
 import { SelectDropdown } from '@/components/SelectDropdown';
 import { CloseButton } from '@/components/CloseButton';
@@ -111,7 +111,13 @@ const SORT_OPTIONS: { value: TransactionSortKey; label: string }[] = [
   { value: 'category_desc', label: 'Category \u2193' },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10' },
+  { value: '20', label: '20' },
+  { value: '50', label: '50' },
+  { value: '100', label: '100' },
+  { value: '500', label: '500' },
+];
 
 function TransactionsContent() {
   const navigate = useNavigate();
@@ -179,8 +185,8 @@ function TransactionsContent() {
     amountMax: filters.amountRange.max,
     sortBy,
     sortOrder,
-    limit: PAGE_SIZE,
-    offset: pageIndex * PAGE_SIZE,
+    limit: filters.pageSize,
+    offset: pageIndex * filters.pageSize,
   });
   const { cards } = useCards();
 
@@ -368,8 +374,8 @@ function TransactionsContent() {
     (filters.source !== 'all' ? 1 : 0);
 
   const pagination = useMemo(
-    () => paginateBounds(pageIndex, safeTotal, PAGE_SIZE),
-    [pageIndex, safeTotal],
+    () => paginateBounds(pageIndex, safeTotal, filters.pageSize),
+    [pageIndex, safeTotal, filters.pageSize],
   );
 
   useEffect(() => {
@@ -698,7 +704,42 @@ function TransactionsContent() {
                 <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
                   Page {pagination.displayPageIndex + 1} of {pagination.pageCount}
                   {' · '}
-                  {safeTransactions.length === 1 ? '1 transaction' : `${safeTransactions.length} transactions`} on this page
+                </Typography>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <SelectDropdown
+                    options={PAGE_SIZE_OPTIONS}
+                    value={String(filters.pageSize)}
+                    onChange={(v) => {
+                      setFilters({ pageSize: Number(v) });
+                      setPageIndex(0);
+                    }}
+                    colorMode="dark"
+                    menuMount="portal"
+                    customTrigger={
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="#ffffff">
+                          {filters.pageSize}
+                        </Typography>
+                        <ChevronDown size={12} color="rgba(255, 255, 255, 0.5)" />
+                      </div>
+                    }
+                  />
+                  <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
+                    transactions on this page
+                  </Typography>
+                </div>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
                   {' · '}
                   {safeTotal === 1 ? '1 total' : `${safeTotal} total`}
                 </Typography>

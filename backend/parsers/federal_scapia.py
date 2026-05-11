@@ -71,7 +71,7 @@ _MASKED_CARD_RE = re.compile(r"X{4,}(\d{4})", re.IGNORECASE)
 
 # Total Due: first ₹ amount after "Total Due" or "TotalDue"
 _TOTAL_DUE_RE = re.compile(
-    r"Total\s*Due\b[^\n]*\n([₹\d,]+\.\d{2})",
+    r"Total\s*Due\b[^\n]*\n(-?[₹\d,]+\.\d{2})\s*(Cr|Dr|CR|DR)?",
     re.IGNORECASE,
 )
 
@@ -317,7 +317,11 @@ class ScapiaFederalParser(BaseParser):
         m = _TOTAL_DUE_RE.search(text)
         if m:
             try:
-                return float(m.group(1).replace("₹", "").replace(",", ""))
+                val_str = m.group(1).replace("₹", "").replace(",", "")
+                val = float(val_str)
+                if val_str.startswith("-") or (m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                return val
             except ValueError:
                 pass
         return None

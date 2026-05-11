@@ -6,7 +6,7 @@ import styled from 'styled-components';
 import { formatCurrency } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
 import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
-import { updateTransactionTags, getAllCategories, getTagDefinitions } from '@/lib/api';
+import { updateTransactionTags, updateTransactionCategory, getAllCategories, getTagDefinitions } from '@/lib/api';
 import { SelectDropdown, type SelectDropdownOption } from '@/components/SelectDropdown';
 import {
   UtensilsCrossed,
@@ -70,6 +70,22 @@ const TagBtn = styled.div`
   }
 `;
 
+const CategoryBadge = styled.span<{ $bgColor: string; $color: string }>`
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: ${(p) => p.$bgColor};
+  color: ${(p) => p.$color};
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+
+  &:hover {
+    border-color: ${(p) => p.$color};
+  }
+`;
+
 const RowContainer = styled.div<{ $isCcPayment: boolean; $isExcluded: boolean }>`
   display: flex;
   align-items: center;
@@ -98,6 +114,7 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
   const [tags, setTags] = useState<string[]>(transaction.tags ?? []);
   const [catMap, setCatMap] = useState<Record<string, { name: string; color: string; icon: string }>>({});
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [localCategory, setLocalCategory] = useState<string>(transaction.category);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,10 +136,25 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
     setTags(transaction.tags ?? []);
   }, [transaction.id, transaction.tags?.join(',')]);
 
+  useEffect(() => {
+    setLocalCategory(transaction.category);
+  }, [transaction.id, transaction.category]);
+
   const tagOptions = useMemo<SelectDropdownOption[]>(
     () => availableTags.map((name) => ({ value: name, label: name })),
     [availableTags],
   );
+
+  const categoryOptions = useMemo<SelectDropdownOption[]>(() => {
+    const prebuilt = Object.entries(CATEGORY_CONFIG).map(([slug, config]) => ({
+      value: slug,
+      label: config.label,
+    }));
+    const custom = Object.entries(catMap)
+      .filter(([slug]) => !CATEGORY_CONFIG[slug])
+      .map(([slug, cat]) => ({ value: slug, label: cat.name }));
+    return [...prebuilt, ...custom].sort((a, b) => a.label.localeCompare(b.label));
+  }, [catMap]);
 
   const handleTagSelectionChange = useCallback(
     (next: string[]) => {
@@ -133,14 +165,23 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
     [tags, transaction.id],
   );
 
-  const dynamicCat = catMap[transaction.category];
-  const catColor = dynamicCat?.color ?? CATEGORY_CONFIG[transaction.category]?.color ?? colorPalette.black[50];
-  const catLabel = dynamicCat?.name ?? CATEGORY_CONFIG[transaction.category]?.label ?? transaction.category;
-  const catIcon = dynamicCat?.icon ?? CATEGORY_CONFIG[transaction.category]?.icon ?? 'MoreHorizontal';
+  const handleCategorySelection = useCallback((newSlug: string) => {
+    if (newSlug === localCategory) return;
+    const old = localCategory;
+    setLocalCategory(newSlug);
+    updateTransactionCategory(transaction.id, newSlug).catch(() => {
+      setLocalCategory(old);
+    });
+  }, [transaction.id, localCategory]);
+
+  const dynamicCat = catMap[localCategory];
+  const catColor = dynamicCat?.color ?? CATEGORY_CONFIG[localCategory]?.color ?? colorPalette.black[50];
+  const catLabel = dynamicCat?.name ?? CATEGORY_CONFIG[localCategory]?.label ?? localCategory;
+  const catIcon = dynamicCat?.icon ?? CATEGORY_CONFIG[localCategory]?.icon ?? 'MoreHorizontal';
   const Icon = ICON_MAP[catIcon] ?? MoreHorizontal;
   const bankConfig = BANK_CONFIG[transaction.bank] ?? BANK_CONFIG.hdfc;
   const isCredit = transaction.type === 'credit';
-  const isCcPayment = transaction.category === 'cc_payment';
+  const isCcPayment = localCategory === 'cc_payment';
 
   const handleToggleExclude = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -266,22 +307,35 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
           >
             {transaction.source === 'BANK' ? 'BANK' : 'CC'}
           </Typography>
-          <Typography
-            as="span"
-            fontType={FontType.BODY}
-            fontSize={12}
-            fontWeight={FontWeights.MEDIUM}
-            color={catColor}
-            style={{
-              padding: '2px 8px',
-              borderRadius: 12,
-              backgroundColor: `${catColor}30`,
-              cursor: isCcPayment ? 'help' : 'default',
-            }}
-            title={isCcPayment ? 'Credit card payments are not included in spends calculation' : undefined}
-          >
-            {catLabel}
-          </Typography>
+          <SelectDropdown
+            selectionMode="single"
+            options={categoryOptions}
+            value={localCategory}
+            onChange={handleCategorySelection}
+            menuMount="portal"
+            menuMinWidth={200}
+            menuMaxHeight={300}
+            menuOffset={4}
+            menuBackgroundColor={colorPalette.popBlack[300]}
+            onRootMouseDown={(e) => e.stopPropagation()}
+            customTrigger={
+              <CategoryBadge
+                $bgColor={`${catColor}30`}
+                $color={catColor}
+                title={isCcPayment ? 'Credit card payments are not included in spends calculation' : undefined}
+              >
+                <Typography
+                  as="span"
+                  fontType={FontType.BODY}
+                  fontSize={12}
+                  fontWeight={FontWeights.MEDIUM}
+                  color="inherit"
+                >
+                  {catLabel}
+                </Typography>
+              </CategoryBadge>
+            }
+          />
           <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
             {bankConfig.name} {transaction.cardLast4 ? `...${transaction.cardLast4}` : ''}
           </Typography> 

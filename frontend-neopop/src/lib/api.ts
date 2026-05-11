@@ -373,7 +373,15 @@ export interface GetStatementsParams {
   offset?: number;
 }
 
-export async function getStatements(params?: Source | GetStatementsParams): Promise<{ statements: Statement[]; total: number }> {
+export interface GetStatementsResponse {
+  statements: Statement[];
+  total: number;
+  totalAmountDue?: number | null;
+  totalsByCurrency?: { currency: string; amount: number }[];
+  mixedCurrency?: boolean;
+}
+
+export async function getStatements(params?: Source | GetStatementsParams): Promise<GetStatementsResponse> {
   const q: Record<string, string> = {};
   if (typeof params === 'string' || params === undefined) {
     if (params) q.source = params;
@@ -390,9 +398,18 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     if (params.limit !== undefined) q.limit = String(params.limit);
     if (params.offset !== undefined) q.offset = String(params.offset);
   }
-  const { data } = await api.get<{ statements: StatementRaw[]; total: number }>('/statements', { params: q });
+  const { data } = await api.get<{
+    statements: StatementRaw[];
+    total: number;
+    totalAmountDue?: number | null;
+    totalsByCurrency?: { currency: string; amount: number }[];
+    mixedCurrency?: boolean;
+  }>('/statements', { params: q });
   return {
     total: data.total,
+    totalAmountDue: data.totalAmountDue,
+    totalsByCurrency: data.totalsByCurrency,
+    mixedCurrency: data.mixedCurrency,
     statements: data.statements.map((s) => ({
       id: s.id,
     bank: s.bank as Bank,
@@ -605,6 +622,11 @@ export async function updateTransactionTags(transactionId: string, tags: string[
   return data.tags;
 }
 
+export async function updateTransactionCategory(transactionId: string, category: string): Promise<{ id: string; category: string; isManuallyCategorized: number }> {
+  const { data } = await api.put<{ id: string; category: string; isManuallyCategorized: number }>(`/transactions/${transactionId}/category`, { category });
+  return data;
+}
+
 export async function deleteStatement(statementId: string): Promise<{ status: string; message: string }> {
   const { data } = await api.delete<{ status: string; message: string }>(`/statements/${statementId}`);
   _bankAccountsCachePromise = null;
@@ -665,8 +687,8 @@ export async function deleteCategoryById(categoryId: string): Promise<{ status: 
   return data;
 }
 
-export async function triggerRecategorize(): Promise<{ status: string; updated: number }> {
-  const { data } = await api.post<{ status: string; updated: number }>('/categories/recategorize');
+export async function triggerRecategorize(overrideManual: boolean = false): Promise<{ status: string; updated: number }> {
+  const { data } = await api.post<{ status: string; updated: number }>('/categories/recategorize', { override_manual: overrideManual });
   _categoriesCachePromise = null;
   return data;
 }

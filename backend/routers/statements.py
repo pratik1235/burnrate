@@ -314,7 +314,7 @@ async def upload_bulk(
 
 
 def _process_one_statement(
-    statement_id: str, file_path: str, bank: Optional[str], source: str = "CC", original_upload_path: Optional[str] = None
+    statement_id: str, file_path: str, bank: Optional[str], source: str = "CC", original_upload_path: Optional[str] = None, override_manual: bool = False
 ) -> Dict[str, Any]:
     """Process a single statement file in a worker thread."""
     from backend.services.statement_processor import process_statement
@@ -322,12 +322,21 @@ def _process_one_statement(
     session = SessionLocal()
     try:
         stmt = session.query(Statement).filter(Statement.id == statement_id).first()
+        preserved_manual_categories = {}
         if stmt:
+            if not override_manual:
+                for tx in stmt.transactions:
+                    if getattr(tx, "is_manually_categorized", 0) == 1:
+                        key = f"{tx.date.isoformat()}_{tx.merchant}_{float(tx.amount):.2f}_{tx.type}"
+                        if key not in preserved_manual_categories:
+                            preserved_manual_categories[key] = []
+                        preserved_manual_categories[key].append(tx.category)
             session.delete(stmt)
             
         result = process_statement(
             pdf_path=file_path, bank=bank, db_session=session, source=source,
             original_upload_path=original_upload_path, reparse_mode=True,
+            preserved_manual_categories=preserved_manual_categories,
         )
         
         if result.get("status") != "success":
@@ -338,9 +347,13 @@ def _process_one_statement(
         session.close()
 
 
+class ReparseAllPayload(BaseModel):
+    override_manual: bool = False
+
 @router.post("/reparse-all")
-def reparse_all_statements(db: Session = Depends(get_db)) -> Dict[str, Any]:
+def reparse_all_statements(payload: Optional[ReparseAllPayload] = None, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Queue all statements for reparsing with max 10 concurrent."""
+    override_manual = payload.override_manual if payload else False
     stmts = db.query(Statement).all()
     if not stmts:
         return {"status": "ok", "total": 0, "queued": 0, "skipped": 0}
@@ -357,7 +370,7 @@ def reparse_all_statements(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = {
-            executor.submit(_process_one_statement, sid, path, bank, source, orig): path
+            executor.submit(_process_one_statement, sid, path, bank, source, orig, override_manual): path
             for sid, path, bank, source, orig in valid_entries
         }
         for future in concurrent.futures.as_completed(futures):
@@ -434,7 +447,36 @@ def list_statements(
         
     total = q.count()
 
-    from sqlalchemy import case, desc, asc
+    from sqlalchemy import case, desc, asc, func
+    from decimal import Decimal, ROUND_HALF_UP
+
+    filtered_ids = q.with_entities(Statement.id)
+    by_cur = (
+        db.query(
+            Statement.currency,
+            func.sum(Statement.total_amount_due).label("sum_amt")
+        )
+        .filter(Statement.id.in_(filtered_ids))
+        .group_by(Statement.currency)
+        .all()
+    )
+
+    totals_by_currency = []
+    for r in by_cur:
+        amt = float(Decimal(str(r.sum_amt or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        totals_by_currency.append({
+            "currency": (r.currency or "INR").upper()[:3],
+            "amount": amt,
+        })
+    totals_by_currency.sort(key=lambda x: x["currency"])
+
+    if len(totals_by_currency) == 0:
+        total_amount = 0.0
+    elif len(totals_by_currency) == 1:
+        total_amount = totals_by_currency[0]["amount"]
+    else:
+        total_amount = None
+
     priority_expr = case(
         (Statement.status == 'password_needed', 0),
         (Statement.status == 'parse_error', 1),
@@ -486,7 +528,13 @@ def list_statements(
                 "status_message": getattr(s, "status_message", None),
             }
         )
-    return {"statements": out, "total": total}
+    return {
+        "statements": out,
+        "total": total,
+        "totalAmountDue": total_amount,
+        "totalsByCurrency": totals_by_currency,
+        "mixedCurrency": len(totals_by_currency) > 1,
+    }
 
 
 @router.get("/processing-logs")
@@ -545,7 +593,7 @@ def delete_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[s
 
 class ReparseWithPasswordPayload(BaseModel):
     password: str
-
+    override_manual: bool = False
 
 @router.post("/{statement_id}/reparse-with-password")
 def reparse_with_password(
@@ -566,6 +614,17 @@ def reparse_with_password(
 
     stmt_source = getattr(stmt, "source", None) or "CC"
     preserved_orig = getattr(stmt, "original_upload_path", None)
+
+    # Fetch manual categories before delete
+    preserved_manual_categories = {}
+    if not payload.override_manual:
+        for tx in stmt.transactions:
+            if getattr(tx, "is_manually_categorized", 0) == 1:
+                key = f"{tx.date.isoformat()}_{tx.merchant}_{float(tx.amount):.2f}_{tx.type}"
+                if key not in preserved_manual_categories:
+                    preserved_manual_categories[key] = []
+                preserved_manual_categories[key].append(tx.category)
+
     db.delete(stmt)
     db.commit()
 
@@ -576,13 +635,18 @@ def reparse_with_password(
         source=stmt_source,
         original_upload_path=preserved_orig,
         reparse_mode=True,
+        preserved_manual_categories=preserved_manual_categories,
     )
     
     return result
 
 
 @router.post("/{statement_id}/reparse")
-def reparse_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def reparse_statement(
+    statement_id: str,
+    override_manual: bool = False,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """Reparse a statement from its stored file_path."""
     stmt = db.query(Statement).filter(Statement.id == statement_id).first()
     if not stmt:
@@ -602,6 +666,17 @@ def reparse_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[
     stmt_source = getattr(stmt, "source", None) or "CC"
     stmt_bank = stmt.bank
     preserved_orig = getattr(stmt, "original_upload_path", None)
+
+    # Fetch manual categories before delete
+    preserved_manual_categories = {}
+    if not override_manual:
+        for tx in stmt.transactions:
+            if getattr(tx, "is_manually_categorized", 0) == 1:
+                key = f"{tx.date.isoformat()}_{tx.merchant}_{float(tx.amount):.2f}_{tx.type}"
+                if key not in preserved_manual_categories:
+                    preserved_manual_categories[key] = []
+                preserved_manual_categories[key].append(tx.category)
+
     db.delete(stmt)
     db.commit()
 
@@ -612,6 +687,7 @@ def reparse_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[
         source=stmt_source,
         original_upload_path=preserved_orig,
         reparse_mode=True,
+        preserved_manual_categories=preserved_manual_categories,
     )
     
     return result

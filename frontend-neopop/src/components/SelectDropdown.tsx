@@ -89,6 +89,8 @@ export type SelectDropdownProps = {
   ariaLabel?: string;
   /** Fires on root `mousedown` (e.g. `stopPropagation` for nested clickable rows). */
   onRootMouseDown?: (e: React.MouseEvent) => void;
+  /** Custom trigger element. If provided, renders instead of NeoPOP Dropdown. */
+  customTrigger?: ReactNode;
 };
 
 const Root = styled.div<{ $disabled?: boolean }>`
@@ -169,6 +171,7 @@ export function SelectDropdown({
   menuMaxHeight = 280,
   ariaLabel,
   onRootMouseDown,
+  customTrigger,
 }: SelectDropdownProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -420,7 +423,13 @@ export function SelectDropdown({
         )}
       </div>
       <TriggerWrap>
-        <Dropdown {...dropdownProps} />
+        {customTrigger ? (
+          <div onClick={toggle} style={{ display: 'inline-block', width: '100%', cursor: disabled ? 'not-allowed' : 'pointer' }}>
+            {customTrigger}
+          </div>
+        ) : (
+          <Dropdown {...dropdownProps} />
+        )}
       </TriggerWrap>
       {menuMount === 'portal' && listbox ? createPortal(listbox, document.body) : listbox}
     </Root>

@@ -24,7 +24,7 @@ _TX_DATE_RE = re.compile(r"(\d{2}/\d{2}/\d{4})\|\s*\d{2}:\d{2}\s+")
 
 # Amount at end of line. Credit entries have '+' directly before the C (rupee symbol).
 # Debit: "C 49,071.00 l"   Credit: "+ C 2.00 l"
-_TX_AMOUNT_RE = re.compile(r"(\+\s+)?C\s*([\d,]+\.\d{2})\s*l?\s*$")
+_TX_AMOUNT_RE = re.compile(r"(\+\s+)?(?:[C₹]|Rs\.?)?\s*([\d,]+\.\d{2})\s*l?\s*$")
 
 _BILLING_PERIOD_RE = re.compile(
     r"Billing\s+Period\s+(\d{1,2}\s+\w{3},?\s+\d{4})\s*[-\u2013]\s*(\d{1,2}\s+\w{3},?\s+\d{4})",
@@ -47,12 +47,12 @@ _CARD_VARIANT_RE = re.compile(
 
 
 _TOTAL_DUE_RE = re.compile(
-    r"TOTAL\s+AMOUNT\s+DUE.*?C\s*([\d,]+(?:\.\d{2})?)",
+    r"TOTAL\s+AMOUNT\s+DUE.*?(?:[C₹]|Rs\.?)?\s*(-?[\d,]+(?:\.\d{2})?)\s*(Cr|Dr|CR|DR)?",
     re.DOTALL | re.IGNORECASE,
 )
 
 _CREDIT_LIMIT_RE = re.compile(
-    r"TOTAL\s+CREDIT\s+LIMIT.*?C\s*([\d,]+(?:\.\d{2})?)",
+    r"TOTAL\s+CREDIT\s+LIMIT.*?(?:[C₹]|Rs\.?)?\s*([\d,]+(?:\.\d{2})?)",
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -63,7 +63,7 @@ _LEGACY_TX_DATE_RE = re.compile(r"^(\d{2}/\d{2}/\d{4})\b")
 _LEGACY_TX_AMOUNT_RE = re.compile(r"([\d,]+\.\d{2})(\s*Cr)?\s*$", re.IGNORECASE)
 _LEGACY_CARD_NUM_RE = re.compile(r"Card\s+No[.:]?\s*([\dXx ]+)", re.IGNORECASE)
 _LEGACY_TOTAL_DUE_RE = re.compile(
-    r"Total\s+Dues\s+([\d,]+(?:\.\d{2})?)", re.IGNORECASE
+    r"Total\s+Dues\s+(-?[\d,]+(?:\.\d{2})?)\s*(Cr|Dr|CR|DR)?", re.IGNORECASE
 )
 _LEGACY_CREDIT_LIMIT_RE = re.compile(
     r"Credit\s+Limit\s+([\d,]+(?:\.\d{2})?)", re.IGNORECASE
@@ -157,7 +157,10 @@ class HDFCParser(BaseParser):
         m = _TOTAL_DUE_RE.search(text)
         if m:
             try:
-                return float(m.group(1).replace(",", ""))
+                val = float(m.group(1).replace(",", ""))
+                if m.group(1).startswith("-") or (m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                return val
             except ValueError:
                 pass
         return None
@@ -177,7 +180,7 @@ class HDFCParser(BaseParser):
             window = window[: cutoff.start()]
 
         amounts: List[float] = []
-        for am in re.finditer(r"C\s*([\d,]+(?:\.\d{2})?)", window):
+        for am in re.finditer(r"(?:[C₹]|Rs\.?)?\s*([\d,]+(?:\.\d{2})?)", window):
             try:
                 val = float(am.group(1).replace(",", ""))
                 if val > 0:
@@ -216,7 +219,10 @@ class HDFCParser(BaseParser):
         m = _LEGACY_TOTAL_DUE_RE.search(text)
         if m:
             try:
-                return float(m.group(1).replace(",", ""))
+                val = float(m.group(1).replace(",", ""))
+                if m.group(1).startswith("-") or (m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                return val
             except ValueError:
                 pass
         # Fallback: look for the summary row "DD/MM/YYYY AMOUNT AMOUNT" that follows

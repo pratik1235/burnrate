@@ -33,12 +33,12 @@ _CARD_RE = re.compile(r"[Xx]{2,4}\s*(\d{4})")
 
 # Next line is often "Rs 1,234.56 DR" — avoid DOTALL .*? which can skip to Minimum Amount Due.
 _TOTAL_DUE_RE = re.compile(
-    r"Total\s+Amount\s+Due\s*\n\s*(?:rs\.?|inr|[r₹])\s*([\d,]+\.\d{2})\s*(?:DR|CR)",
+    r"Total\s+Amount\s+Due\s*\n\s*(?:rs\.?|inr|[r₹])\s*(-?[\d,]+\.\d{2})\s*(DR|CR|Dr|Cr)?",
     re.IGNORECASE,
 )
 
 _MIN_DUE_RE = re.compile(
-    r"Minimum\s+Amount\s+Due\s*[\r\n]+\s*[r₹]?\s*([\d,]+\.\d{2})\s*(?:DR|CR)?",
+    r"Minimum\s+Amount\s+Due\s*[\r\n]+\s*[r₹]?\s*(-?[\d,]+\.\d{2})\s*(DR|CR|Dr|Cr)?",
     re.IGNORECASE,
 )
 
@@ -141,7 +141,10 @@ class IDFCFirstBankParser(BaseParser):
     def _extract_amount(text: str, pattern: re.Pattern) -> Optional[float]:
         for m in pattern.finditer(text):
             try:
-                return float(m.group(1).replace(",", ""))
+                val = float(m.group(1).replace(",", ""))
+                if m.group(1).startswith("-") or (len(m.groups()) > 1 and m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                return val
             except ValueError:
                 continue
         return None

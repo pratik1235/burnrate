@@ -5,7 +5,7 @@ import logging
 import os
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from typing import Callable, Dict, Optional, Type
+from typing import Callable, Dict, List, Optional, Type
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -219,6 +219,7 @@ def process_statement(
     source: str = "CC",
     original_upload_path: Optional[str] = None,
     reparse_mode: bool = False,
+    preserved_manual_categories: Optional[Dict[str, List[str]]] = None,
 ) -> Dict:
     """
     Process a statement file (PDF or CSV): unlock, parse, categorize, persist.
@@ -712,6 +713,13 @@ def process_statement(
                 category = pt.category if pt.category else categorize(
                     pt.merchant, db_session=db_session
                 )
+                is_manual = 0
+                if preserved_manual_categories:
+                    key = f"{pt.date.isoformat()}_{pt.merchant}_{float(pt.amount):.2f}_{pt.type}"
+                    if key in preserved_manual_categories and preserved_manual_categories[key]:
+                        category = preserved_manual_categories[key].pop(0)
+                        is_manual = 1
+
                 tx = Transaction(
                     statement_id=stmt.id,
                     date=pt.date,
@@ -725,6 +733,7 @@ def process_statement(
                     card_id=card_obj.id,
                     source=source,
                     currency=cur,
+                    is_manually_categorized=is_manual,
                 )
                 db_session.add(tx)
 
@@ -923,6 +932,13 @@ def _process_csv_statement(
     for pt in parsed.transactions:
         # Use parser-provided category hint when available; fall back to keyword matching.
         category = pt.category if pt.category else categorize(pt.merchant, db_session=db_session)
+        is_manual = 0
+        if preserved_manual_categories:
+            key = f"{pt.date.isoformat()}_{pt.merchant}_{float(pt.amount):.2f}_{pt.type}"
+            if key in preserved_manual_categories and preserved_manual_categories[key]:
+                category = preserved_manual_categories[key].pop(0)
+                is_manual = 1
+
         tx = Transaction(
             statement_id=statement.id,
             date=pt.date,
@@ -936,6 +952,7 @@ def _process_csv_statement(
             card_id=None,
             source=source,
             currency=cur,
+            is_manually_categorized=is_manual,
         )
         db_session.add(tx)
 

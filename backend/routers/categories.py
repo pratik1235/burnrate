@@ -76,16 +76,6 @@ def create_custom_category(
     db.commit()
     db.refresh(cat)
 
-    # Trigger recategorization after creating custom category
-    transactions = db.query(Transaction).all()
-    updated = 0
-    for txn in transactions:
-        new_cat = categorize(txn.merchant, db_session=db)
-        if new_cat != txn.category:
-            txn.category = new_cat
-            updated += 1
-    db.commit()
-
     return {
         "id": cat.id,
         "name": cat.name,
@@ -134,17 +124,6 @@ def update_category(
     db.commit()
     db.refresh(cat)
 
-    # If keywords changed (custom or prebuilt), trigger recategorization
-    if payload.keywords is not None:
-        transactions = db.query(Transaction).all()
-        updated = 0
-        for txn in transactions:
-            new_cat = categorize(txn.merchant, db_session=db)
-            if new_cat != txn.category:
-                txn.category = new_cat
-                updated += 1
-        db.commit()
-
     return {
         "id": cat.id,
         "name": cat.name,
@@ -169,15 +148,33 @@ def delete_custom_category(category_id: str, db: Session = Depends(get_db)) -> D
     return {"status": "ok"}
 
 
+class RecategorizePayload(BaseModel):
+    override_manual: bool = False
+
+
 @router.post("/recategorize")
-def recategorize_transactions(db: Session = Depends(get_db)) -> Dict[str, Any]:
+def recategorize_transactions(
+    payload: Optional[RecategorizePayload] = None, db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """Re-categorize all transactions based on current category definitions."""
+    override = payload.override_manual if payload else False
+    
     transactions = db.query(Transaction).all()
     updated = 0
     for txn in transactions:
+        is_manual = getattr(txn, "is_manually_categorized", 0) == 1
+        
+        if not override and is_manual:
+            continue
+            
         new_cat = categorize(txn.merchant, db_session=db)
+        
+        if override and is_manual:
+            txn.is_manually_categorized = 0
+            
         if new_cat != txn.category:
             txn.category = new_cat
+            txn.is_manually_categorized = 0
             updated += 1
     db.commit()
     return {"status": "ok", "updated": updated}

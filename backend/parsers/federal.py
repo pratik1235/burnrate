@@ -65,7 +65,7 @@ _CARD_VARIANT_RE = re.compile(
 )
 
 _TOTAL_DUE_RE = re.compile(
-    r"Total\s+(?:Payment|Amount)\s+Due.*?([\d,]+\.\d{2})",
+    r"Total\s+(?:Payment|Amount)\s+Due.*?(-?[\d,]+\.\d{2})\s*(Cr|Dr|CR|DR)?",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -177,7 +177,10 @@ class FederalBankParser(BaseParser):
         m = _TOTAL_DUE_RE.search(text)
         if m:
             try:
-                return float(m.group(1).replace(",", ""))
+                val = float(m.group(1).replace(",", ""))
+                if m.group(1).startswith("-") or (m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                return val
             except ValueError:
                 pass
         return None

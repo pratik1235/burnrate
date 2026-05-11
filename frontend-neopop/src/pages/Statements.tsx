@@ -26,7 +26,7 @@ import { BANK_CONFIG } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/Toast';
 import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
-import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, ChevronLeft, ChevronRight, ExternalLink, ChevronDown } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { CloseButton } from '@/components/CloseButton';
 import { paginateBounds } from '@/lib/pagination';
@@ -111,6 +111,13 @@ const ActionBar = styled.div`
   gap: 12px;
 `;
 
+const Header = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+`;
+
 const CompactSearchWrapper = styled.div`
   flex: 1;
   min-width: 200px;
@@ -126,7 +133,13 @@ const CompactSearchWrapper = styled.div`
   }
 `;
 
-const STATEMENTS_PAGE_SIZE = 12;
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10' },
+  { value: '20', label: '20' },
+  { value: '50', label: '50' },
+  { value: '100', label: '100' },
+  { value: '500', label: '500' },
+];
 
 /** Lift + soft shadow on hover for clickable (successfully parsed) statement rows. */
 const ClickableCardWrapper = styled.div`
@@ -363,20 +376,43 @@ function bankRowMeta(s: Statement) {
 
 export function Statements() {
   const navigate = useNavigate();
-  const { setFilters } = useFilters();
+  const { setFilters, filters } = useFilters();
   const { cards, refetch: refetchCards } = useCards();
   const [bankAccounts, setBankAccounts] = useState<{ id: string; bank: string; last4: string }[]>([]);
   const [statements, setStatements] = useState<Statement[]>([]);
   const [totalStatements, setTotalStatements] = useState(0);
+  const [totalAmountDue, setTotalAmountDue] = useState<number | null>(null);
+  const [totalsByCurrency, setTotalsByCurrency] = useState<{ currency: string; amount: number }[]>([]);
+  const [mixedCurrency, setMixedCurrency] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [passwordInputs, setPasswordInputs] = useState<Record<string, string>>({});
-  const [stmtFilters, setStmtFilters] = useState<BankStatementFilterValues>({ banks: [] });
+  const [stmtFilters, setStmtFilters] = useState<BankStatementFilterValues>(() => {
+    try {
+      const saved = localStorage.getItem('statementsFilters');
+      if (saved) return JSON.parse(saved) as BankStatementFilterValues;
+    } catch {
+      // ignore
+    }
+    return { banks: [] };
+  });
   const [filterOpen, setFilterOpen] = useState(false);
   const [availableBanks, setAvailableBanks] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchInputValue, setSearchInputValue] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      return localStorage.getItem('statementsSearchQuery') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [searchInputValue, setSearchInputValue] = useState(() => {
+    try {
+      return localStorage.getItem('statementsSearchQuery') || '';
+    } catch {
+      return '';
+    }
+  });
   const [searchClearKey, setSearchClearKey] = useState(0);
   const [searchTooltipVisible, setSearchTooltipVisible] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
@@ -397,6 +433,22 @@ export function Statements() {
       // ignore
     }
   }, [sortKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('statementsFilters', JSON.stringify(stmtFilters));
+    } catch {
+      // ignore
+    }
+  }, [stmtFilters]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('statementsSearchQuery', searchQuery);
+    } catch {
+      // ignore
+    }
+  }, [searchQuery]);
 
   const refreshBankSlugs = useCallback(async () => {
     try {
@@ -420,8 +472,8 @@ export function Statements() {
       if (stmtFilters.nonZeroTxnCount) params.nonZeroTxnCount = true;
       if (searchQuery.trim()) params.search = searchQuery.trim();
       
-      params.limit = STATEMENTS_PAGE_SIZE;
-      params.offset = pageIndex * STATEMENTS_PAGE_SIZE;
+      params.limit = filters.pageSize;
+      params.offset = pageIndex * filters.pageSize;
       
       if (sortKey === 'amount_due_desc') {
         params.sortBy = 'amount_due'; params.sortOrder = 'desc';
@@ -442,14 +494,20 @@ export function Statements() {
       const res = await getStatements(params);
       setStatements(res.statements);
       setTotalStatements(res.total);
+      setTotalAmountDue(res.totalAmountDue ?? null);
+      setTotalsByCurrency(res.totalsByCurrency ?? []);
+      setMixedCurrency(res.mixedCurrency ?? false);
     } catch {
       toast.error('Failed to load statements');
       setStatements([]);
       setTotalStatements(0);
+      setTotalAmountDue(null);
+      setTotalsByCurrency([]);
+      setMixedCurrency(false);
     } finally {
       setLoading(false);
     }
-  }, [stmtFilters, sortKey, pageIndex, searchQuery]);
+  }, [stmtFilters, sortKey, pageIndex, searchQuery, filters.pageSize]);
 
   useEffect(() => {
     refreshBankSlugs();
@@ -474,17 +532,25 @@ export function Statements() {
         const nb = s.bank.toLowerCase();
         const match = bankAccounts.find((a) => a.bank.toLowerCase() === nb && a.last4 === s.cardLast4);
         setFilters({
-          dateRange: { from, to },
           selectedCards: [],
           selectedBankAccounts: match ? [match.id] : [],
+          selectedCategories: [],
+          selectedTags: [],
+          dateRange: { from, to },
+          amountRange: {},
+          direction: 'all',
           source: 'BANK',
         });
       } else {
         const matchingCard = safeCardList.find((c) => c.bank === s.bank && c.last4 === s.cardLast4);
         setFilters({
-          dateRange: { from, to },
           selectedCards: matchingCard ? [matchingCard.id] : [],
           selectedBankAccounts: [],
+          selectedCategories: [],
+          selectedTags: [],
+          dateRange: { from, to },
+          amountRange: {},
+          direction: 'all',
           source: 'CC',
         });
       }
@@ -680,8 +746,8 @@ export function Statements() {
   );
 
   const pagination = useMemo(
-    () => paginateBounds(pageIndex, totalStatements, STATEMENTS_PAGE_SIZE),
-    [pageIndex, totalStatements],
+    () => paginateBounds(pageIndex, totalStatements, filters.pageSize),
+    [pageIndex, totalStatements, filters.pageSize],
   );
 
   const pageStatements = statements;
@@ -747,27 +813,32 @@ export function Statements() {
         </UploadRow>
 
         <ActionBar>
-          <ButtonWithIcon
-            icon={SlidersHorizontal}
-            variant={
-              stmtFilters.banks.length > 0 ||
-              stmtFilters.from ||
-              stmtFilters.to ||
-              stmtFilters.source ||
-              stmtFilters.parseFailuresOnly
-                ? 'secondary'
-                : 'primary'
-            }
-            kind="elevated"
-            size="small"
-            colorMode="dark"
-            onClick={() => setFilterOpen(true)}
-            justifyContent="center"
-            gap={6}
-          >
-            Filters
-            {filterActiveCount > 0 ? ` (${filterActiveCount})` : ''}
-          </ButtonWithIcon>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <ButtonWithIcon
+              icon={SlidersHorizontal}
+              variant={
+                stmtFilters.banks.length > 0 ||
+                stmtFilters.from ||
+                stmtFilters.to ||
+                stmtFilters.source ||
+                stmtFilters.parseFailuresOnly
+                  ? 'secondary'
+                  : 'primary'
+              }
+              kind="elevated"
+              size="small"
+              colorMode="dark"
+              onClick={() => setFilterOpen(true)}
+              justifyContent="center"
+              gap={6}
+            >
+              Filters
+              {filterActiveCount > 0 ? ` (${filterActiveCount})` : ''}
+            </ButtonWithIcon>
+            {filterActiveCount > 0 && (
+              <CloseButton onClick={() => setStmtFilters({ banks: [] })} variant="inline" />
+            )}
+          </div>
           <div
             style={{
               display: 'flex',
@@ -873,6 +944,29 @@ export function Statements() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Header>
+              <div>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
+                  {totalFiltered} statement{totalFiltered !== 1 ? 's' : ''}
+                </Typography>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {mixedCurrency && totalsByCurrency.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8 }}>
+                      <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                        {totalsByCurrency.map(t => formatCurrency(t.amount, t.currency)).join(' · ')}
+                      </Typography>
+                      <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.55)">
+                        total due (multiple currencies)
+                      </Typography>
+                    </div>
+                  ) : (
+                    <Typography fontType={FontType.BODY} fontSize={20} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                      {formatCurrency(totalAmountDue ?? 0)} total due
+                    </Typography>
+                  )}
+                </div>
+              </div>
+            </Header>
             <SortBar>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
@@ -890,7 +984,42 @@ export function Statements() {
                 <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
                   Page {pagination.displayPageIndex + 1} of {pagination.pageCount}
                   {' · '}
-                  {pageStatements.length === 1 ? '1 statement' : `${pageStatements.length} statements`} on this page
+                </Typography>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <SelectDropdown
+                    options={PAGE_SIZE_OPTIONS}
+                    value={String(filters.pageSize)}
+                    onChange={(v) => {
+                      setFilters({ pageSize: Number(v) });
+                      setPageIndex(0);
+                    }}
+                    colorMode="dark"
+                    menuMount="portal"
+                    customTrigger={
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="#ffffff">
+                          {filters.pageSize}
+                        </Typography>
+                        <ChevronDown size={12} color="rgba(255, 255, 255, 0.5)" />
+                      </div>
+                    }
+                  />
+                  <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
+                    statements on this page
+                  </Typography>
+                </div>
+                <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.45)">
                   {' · '}
                   {totalFiltered === 1 ? '1 total' : `${totalFiltered} total`}
                 </Typography>

@@ -127,6 +127,7 @@ class Transaction(Base):
     card_last4 = Column(String(4), nullable=True)
     source = Column(String(4), nullable=False, default="CC", server_default="CC")
     currency = Column(String(3), nullable=False, default="INR", server_default="INR")
+    is_manually_categorized = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     statement = relationship("Statement", back_populates="transactions")

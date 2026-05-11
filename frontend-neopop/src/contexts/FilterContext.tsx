@@ -20,6 +20,7 @@ export interface FilterState {
   amountRange: { min?: number; max?: number };
   direction: Direction;
   source: SourceFilter;
+  pageSize: number;
 }
 
 export interface FilterContextValue {
@@ -38,6 +39,7 @@ const defaultState: FilterState = {
   amountRange: {},
   direction: 'all',
   source: 'all',
+  pageSize: 20,
 };
 
 const FilterContext = createContext<FilterContextValue | null>(null);

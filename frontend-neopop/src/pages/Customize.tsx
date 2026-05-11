@@ -25,6 +25,7 @@ import {
   getGmailStatus,
   startGmailAuth,
   disconnectGmail,
+  triggerRecategorize,
 } from '@/lib/api';
 import type { Statement } from '@/lib/types';
 import type { CategoryResponse, TagDefinitionResponse, GmailStatusResponse } from '@/lib/api';
@@ -1230,6 +1231,7 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
   const [saving, setSaving] = useState(false);
   const [edits, setEdits] = useState<Record<string, { name?: string; keywords?: string; color?: string }>>({});
   const [pendingNewRows, setPendingNewRows] = useState<PendingNewCategory[]>([]);
+  const [recategorizeConfirmOpen, setRecategorizeConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -1285,7 +1287,6 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
           delete next[cat.id];
           return next;
         });
-        toast.success('Category updated');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Update failed');
       }
@@ -1303,7 +1304,6 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
         delete next[cat.id];
         return next;
       });
-      toast.success('Category updated. Recategorizing transactions...');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Update failed');
     }
@@ -1357,7 +1357,14 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
   const hasAnyEdits = categories.some((cat) => hasEdit(cat));
   const hasPendingCreates = pendingNewRows.some((r) => r.name.trim());
 
-  const handleSaveAll = async () => {
+  const handleUpdateAllClick = () => {
+    if (hasAnyEdits || hasPendingCreates) {
+      setRecategorizeConfirmOpen(true);
+    }
+  };
+
+  const executeSaveAll = async (overrideManual: boolean) => {
+    setRecategorizeConfirmOpen(false);
     setSaving(true);
     try {
       const pendingCreates = pendingNewRows.filter((r) => r.name.trim());
@@ -1384,11 +1391,6 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
           );
           const newCustomCount = customCount + created.length;
           setPendingNewRows(newCustomCount >= 20 ? [] : [newPendingCategoryRow()]);
-          toast.success(
-            created.length === 1
-              ? 'Category added. Recategorizing transactions...'
-              : `${created.length} categories added. Recategorizing transactions...`,
-          );
         } catch (err) {
           toast.error(err instanceof Error ? err.message : 'Failed to add category');
           return;
@@ -1399,6 +1401,15 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
       for (const cat of editedCats) {
         await handleUpdate(cat);
       }
+
+      const recatRes = await triggerRecategorize(overrideManual);
+      if (pendingCreates.length === 0 && editedCats.length === 0) {
+        toast.success(`Recategorized ${recatRes.updated} transactions.`);
+      } else {
+        toast.success(`Categories updated. Recategorized ${recatRes.updated} transactions.`);
+      }
+    } catch (e) {
+      toast.error('Failed to update categories');
     } finally {
       setSaving(false);
     }
@@ -1581,7 +1592,7 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
               kind="elevated"
               size="small"
               colorMode="dark"
-              onClick={handleSaveAll}
+              onClick={handleUpdateAllClick}
               disabled={loading || (!hasAnyEdits && !hasPendingCreates) || saving}
             >
               {saving ? 'Saving...' : 'Update All'}
@@ -1589,6 +1600,50 @@ export function DefineCategoriesModal({ open, onClose }: { open: boolean; onClos
           </div>
         </div>
       </ElevatedCard>
+      
+      {recategorizeConfirmOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={() => setRecategorizeConfirmOpen(false)} />
+          <ElevatedCard
+            backgroundColor={colorPalette.black[90]}
+            edgeColors={TRANSPARENT_ELEVATED_CARD_EDGES}
+            style={{
+              padding: 0,
+              position: 'relative',
+              width: '100%',
+              maxWidth: 480,
+              display: 'block',
+              backgroundColor: 'transparent',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <Typography fontType={FontType.BODY} fontSize={18} fontWeight={FontWeights.BOLD} color={mainColors.white}>
+                Override Manual Categories?
+              </Typography>
+            </div>
+            <div style={{ padding: '20px' }}>
+              <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.7)" style={{ lineHeight: '1.5' }}>
+                Do you want to override the manual category changes you have made to transactions?
+                <br /><br />
+                If <strong style={{ color: mainColors.white }}>Yes</strong>, all transactions will be recategorized based on the updated keywords.<br />
+                If <strong style={{ color: mainColors.white }}>No</strong>, manually overridden transactions will keep their current categories.
+              </Typography>
+            </div>
+            <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <Button variant="primary" kind="elevated" size="small" colorMode="dark" onClick={() => setRecategorizeConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="secondary" kind="elevated" size="small" colorMode="dark" onClick={() => executeSaveAll(false)}>
+                No, keep manual
+              </Button>
+              <Button variant="secondary" kind="elevated" size="small" colorMode="dark" onClick={() => executeSaveAll(true)} style={{ color: colorPalette.warning[500], borderColor: 'rgba(238,77,55,0.4)' }}>
+                Yes, override
+              </Button>
+            </div>
+          </ElevatedCard>
+        </div>
+      )}
     </ModalOverlay>
   );
 }

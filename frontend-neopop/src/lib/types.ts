@@ -27,6 +27,7 @@ export interface Transaction {
   /** ISO 4217 (e.g. INR, USD) */
   currency?: string;
   tags?: string[];
+  isManuallyCategorized?: number;
 }
 
 export interface Statement {

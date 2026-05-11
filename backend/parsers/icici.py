@@ -21,7 +21,7 @@ from backend.parsers.payment_due_date import extract_payment_due_date_from_text
 logger = logging.getLogger(__name__)
 
 _TX_LINE_RE = re.compile(
-    r"^(\d{2}/\d{2}/\d{4})\s+\d{8,}\s+(.+)\s+([\d,]+\.\d{2})\s*(CR)?\s*$",
+    r"(\d{2}/\d{2}/\d{4})\s+\d{8,}\s+(.+)\s+([\d,]+\.\d{2})\s*(CR)?\s*$",
     re.IGNORECASE,
 )
 
@@ -38,7 +38,7 @@ _STATEMENT_DATE_RE = re.compile(
 )
 
 _TOTAL_DUE_RE = re.compile(
-    r"Total\s+Amount\s+due\s*\n?\s*`([\d,]+(?:\.\d{2})?)",
+    r"Total\s+Amount\s+due\s*\n?\s*`(-?[\d,]+(?:\.\d{2})?)\s*(Cr|Dr|CR|DR)?",
     re.IGNORECASE,
 )
 
@@ -170,7 +170,10 @@ class ICICIParser(BaseParser):
         m = _TOTAL_DUE_RE.search(text)
         if m:
             try:
-                return float(m.group(1).replace(",", ""))
+                val = float(m.group(1).replace(",", ""))
+                if m.group(1).startswith("-") or (m.group(2) and m.group(2).lower() == "cr"):
+                    val = -abs(val)
+                return val
             except ValueError:
                 pass
         return None
@@ -219,7 +222,7 @@ class ICICIParser(BaseParser):
         return transactions
 
     def _parse_transaction_line(self, line: str) -> Optional[ParsedTransaction]:
-        m = _TX_LINE_RE.match(line)
+        m = _TX_LINE_RE.search(line)
         if not m:
             return None
 
