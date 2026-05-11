@@ -77,6 +77,7 @@ export async function submitSetup(data: SetupProfilePayload): Promise<Settings> 
 }
 
 export interface TransactionFilters {
+  statementIds?: string[];
   card?: string;
   cards?: string;
   bankAccounts?: string;
@@ -126,6 +127,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
         limit: filters.limit ?? 50,
         offset: filters.offset ?? 0,
       };
+      if (filters.statementIds?.length) params.statement_ids = filters.statementIds.join(',');
       if (filters.cards) params.cards = filters.cards;
       else if (filters.card) params.card = filters.card;
       if (filters.from) params.from = filters.from;
@@ -159,6 +161,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setLoading(false);
     }
   }, [
+    filters.statementIds,
     filters.card,
     filters.cards,
     filters.from,
@@ -187,6 +190,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
           limit: filters.limit ?? 50,
           offset: filters.offset ?? 0,
         };
+        if (filters.statementIds?.length) params.statement_ids = filters.statementIds.join(',');
         if (filters.cards) params.cards = filters.cards;
         else if (filters.card) params.card = filters.card;
         if (filters.from) params.from = filters.from;
@@ -225,6 +229,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     })();
     return () => { cancelled = true; };
   }, [
+    filters.statementIds,
     filters.card,
     filters.cards,
     filters.from,
@@ -247,6 +252,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
 }
 
 export interface AnalyticsFilters {
+  statementIds?: string[];
   from?: string;
   to?: string;
   cards?: string;
@@ -275,6 +281,7 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
     setError(null);
     try {
       const params = {
+        ...(filters.statementIds?.length ? { statement_ids: filters.statementIds.join(',') } : {}),
         ...(filters.from ? { from: filters.from } : {}),
         ...(filters.to ? { to: filters.to } : {}),
         ...(filters.cards ? { cards: filters.cards } : {}),
@@ -330,6 +337,7 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
       setLoading(false);
     }
   }, [
+    filters.statementIds,
     filters.from,
     filters.to,
     filters.cards,
@@ -410,6 +418,7 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
     })();
     return () => { cancelled = true; };
   }, [
+    filters.statementIds,
     filters.from,
     filters.to,
     filters.cards,

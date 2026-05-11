@@ -27,6 +27,7 @@ def _date_filter(q, from_date: Optional[date], to_date: Optional[date]):
 
 def _apply_filters(
     q,
+    statement_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
     amount_min: Optional[float] = None,
@@ -34,6 +35,8 @@ def _apply_filters(
     tags: Optional[List[str]] = None,
 ):
     """Apply common filters (card/source scoping is apply_source_account_filters)."""
+    if statement_ids:
+        q = q.filter(Transaction.statement_id.in_(statement_ids))
     if categories:
         q = q.filter(Transaction.category.in_(categories))
     if direction == "incoming":
@@ -54,6 +57,7 @@ def compute_net_spend_by_currency(
     db: Session,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    statement_ids: Optional[List[str]] = None,
     card_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
@@ -78,7 +82,7 @@ def compute_net_spend_by_currency(
     )
     q = _date_filter(q, from_date, to_date)
     q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
-    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
+    q = _apply_filters(q, statement_ids, categories, direction, amount_min, amount_max, tags)
     rows = q.group_by(Transaction.currency).all()
     out: List[Dict[str, Any]] = []
     for r in rows:
@@ -95,6 +99,7 @@ def compute_net_spend(
     to_date: Optional[date] = None,
     bank: Optional[str] = None,
     card_last4: Optional[str] = None,
+    statement_ids: Optional[List[str]] = None,
     card_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
@@ -128,7 +133,7 @@ def compute_net_spend(
     if card_last4:
         q = q.filter(Transaction.card_last4 == card_last4)
     q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
-    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
+    q = _apply_filters(q, statement_ids, categories, direction, amount_min, amount_max, tags)
     if currency:
         q = q.filter(Transaction.currency == currency.upper()[:3])
     raw = q.scalar() or 0.0
@@ -140,6 +145,7 @@ def get_summary(
     db: Session,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    statement_ids: Optional[List[str]] = None,
     card_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
@@ -154,6 +160,7 @@ def get_summary(
         db,
         from_date=from_date,
         to_date=to_date,
+        statement_ids=statement_ids,
         card_ids=card_ids,
         categories=categories,
         direction=direction,
@@ -188,7 +195,7 @@ def get_summary(
     )
     card_q = _date_filter(card_q, from_date, to_date)
     card_q = apply_source_account_filters(card_q, source, card_ids, bank_pairs or [])
-    card_q = _apply_filters(card_q, categories, direction, amount_min, amount_max, tags)
+    card_q = _apply_filters(card_q, statement_ids, categories, direction, amount_min, amount_max, tags)
     card_rows = card_q.group_by(Transaction.bank, Transaction.card_last4, Transaction.currency).all()
 
     return {
@@ -212,6 +219,7 @@ def get_category_breakdown(
     db: Session,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    statement_ids: Optional[List[str]] = None,
     card_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
@@ -237,7 +245,7 @@ def get_category_breakdown(
         q = q.filter(Transaction.type == "debit")
     q = _date_filter(q, from_date, to_date)
     q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
-    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
+    q = _apply_filters(q, statement_ids, categories, direction, amount_min, amount_max, tags)
     rows = q.group_by(Transaction.currency, Transaction.category).all()
 
     distinct_cur = {(r.currency or "INR").upper()[:3] for r in rows}
@@ -294,6 +302,7 @@ def get_monthly_trends(
     months: int = 12,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    statement_ids: Optional[List[str]] = None,
     card_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
@@ -324,7 +333,7 @@ def get_monthly_trends(
         .filter(Transaction.date <= end)
     )
     q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
-    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
+    q = _apply_filters(q, statement_ids, categories, direction, amount_min, amount_max, tags)
     rows = q.group_by(month_expr, Transaction.currency).order_by("month").all()
 
     distinct_cur = {(r.currency or "INR").upper()[:3] for r in rows}
@@ -365,6 +374,7 @@ def get_top_merchants(
     db: Session,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    statement_ids: Optional[List[str]] = None,
     card_ids: Optional[List[str]] = None,
     categories: Optional[List[str]] = None,
     direction: Optional[str] = None,
@@ -391,7 +401,7 @@ def get_top_merchants(
         q = q.filter(Transaction.type == "debit")
     q = _date_filter(q, from_date, to_date)
     q = apply_source_account_filters(q, source, card_ids, bank_pairs or [])
-    q = _apply_filters(q, categories, direction, amount_min, amount_max, tags)
+    q = _apply_filters(q, statement_ids, categories, direction, amount_min, amount_max, tags)
     rows = q.group_by(Transaction.currency, Transaction.merchant).all()
 
     distinct_cur = {(r.currency or "INR").upper()[:3] for r in rows}

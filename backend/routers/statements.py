@@ -395,6 +395,7 @@ def list_statements(
     ),
     from_date: Optional[date] = Query(None, alias="from", description="Filter by period overlap"),
     to_date: Optional[date] = Query(None, alias="to"),
+    statement_ids: Optional[str] = Query(None, description="Comma-separated statement IDs"),
     parse_failed_only: Optional[bool] = Query(
         None,
         description="When true, only statements that failed to parse (could not extract data).",
@@ -426,6 +427,10 @@ def list_statements(
         q = q.filter(
             or_(Statement.period_start.is_(None), Statement.period_start <= to_date)
         )
+    if statement_ids:
+        s_ids = [s.strip() for s in statement_ids.split(",") if s.strip()]
+        if s_ids:
+            q = q.filter(Statement.id.in_(s_ids))
     if parse_failed_only is True:
         q = q.filter(Statement.parse_failed == 1)
     if non_zero_txn_count is True:

@@ -154,6 +154,7 @@ const MilestoneFooter = styled.div`
 
 function countActiveFilters(filters: ReturnType<typeof useFilters>['filters']): number {
   let count = 0;
+  count += filters.statementIds?.length ?? 0;
   count += filters.selectedCards.length;
   count += filters.selectedBankAccounts.length;
   count += filters.selectedCategories.length;
@@ -302,6 +303,7 @@ function DashboardContent() {
   const activeCount = countActiveFilters(filters);
 
   const filterParams = {
+    statementIds: filters.statementIds,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
     bankAccounts:
       filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,

@@ -186,6 +186,7 @@ function AnalyticsContent() {
     merchantsByCurrency,
     loading,
   } = useAnalytics({
+    statementIds: filters.statementIds,
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
@@ -298,6 +299,7 @@ function AnalyticsContent() {
   })();
 
   const activeCount =
+    (filters.statementIds?.length ?? 0) +
     filters.selectedCards.length +
     filters.selectedBankAccounts.length +
     filters.selectedCategories.length +

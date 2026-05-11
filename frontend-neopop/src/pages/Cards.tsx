@@ -91,6 +91,7 @@ const FilterRow = styled.div`
 
 function countActiveFilters(filters: ReturnType<typeof useFilters>['filters']): number {
   let count = 0;
+  count += filters.statementIds?.length ?? 0;
   count += filters.selectedCards.length;
   count += filters.selectedCategories.length;
   count += filters.selectedTags.length;
@@ -108,6 +109,7 @@ export function Cards() {
   const [filterOpen, setFilterOpen] = useState(false);
   const { cards, loading, refetch: refetchCards } = useCards();
   const { summary } = useAnalytics({
+    statementIds: filters.statementIds,
     from: filters.dateRange.from,
     to: filters.dateRange.to,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,

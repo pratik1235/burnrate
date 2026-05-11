@@ -53,6 +53,7 @@ export interface SetupProfilePayload {
 }
 
 export interface GetTransactionsParams {
+  statement_ids?: string;
   card?: string;
   cards?: string;
   /** Comma-separated bank:last4 for BANK transactions */
@@ -357,6 +358,7 @@ interface StatementRaw {
 }
 
 export interface GetStatementsParams {
+  statement_ids?: string;
   source?: Source;
   /** Comma-separated bank slugs */
   banks?: string;
@@ -386,6 +388,7 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
   if (typeof params === 'string' || params === undefined) {
     if (params) q.source = params;
   } else {
+    if (params.statement_ids) q.statement_ids = params.statement_ids;
     if (params.source) q.source = params.source;
     if (params.banks) q.banks = params.banks;
     if (params.from) q.from = params.from;
@@ -549,6 +552,7 @@ export async function getStatementPeriods(params?: { from?: string; to?: string 
 }
 
 export interface AnalyticsParams {
+  statement_ids?: string;
   from?: string;
   to?: string;
   cards?: string;

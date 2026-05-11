@@ -171,6 +171,7 @@ function TransactionsContent() {
   }
 
   const { transactions, total, totalAmount, totalsByCurrency, mixedCurrency, loading } = useTransactions({
+    statementIds: filters.statementIds,
     cards: filters.selectedCards.length > 0 ? filters.selectedCards.join(',') : undefined,
     bankAccounts:
       filters.selectedBankAccounts.length > 0 ? filters.selectedBankAccounts.join(',') : undefined,
@@ -362,6 +363,7 @@ function TransactionsContent() {
   );
 
   const activeCount =
+    (filters.statementIds?.length ?? 0) +
     filters.selectedCards.length +
     filters.selectedBankAccounts.length +
     filters.selectedCategories.length +

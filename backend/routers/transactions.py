@@ -77,6 +77,7 @@ def list_transactions(
     sort_order: Optional[str] = Query("desc", description="asc or desc"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    statement_ids: Optional[str] = Query(None, description="Comma-separated statement IDs"),
 ) -> Dict[str, Any]:
     """Query transactions with filters. Returns {transactions: [...], total: N, totalAmount: F}."""
     q = db.query(Transaction)
@@ -91,6 +92,12 @@ def list_transactions(
     src = source.strip().upper() if source and source.strip() else None
     if src == "ALL":
         src = None
+
+    if statement_ids:
+        s_ids = [s.strip() for s in statement_ids.split(",") if s.strip()]
+        if s_ids:
+            q = q.filter(Transaction.statement_id.in_(s_ids))
+
     q = apply_source_account_filters(q, src, card_ids, bank_pairs)
     if from_date:
         q = q.filter(Transaction.date >= from_date)

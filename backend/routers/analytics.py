@@ -32,6 +32,7 @@ def _months_in_range(from_date: Optional[date], to_date: Optional[date]) -> int:
 
 
 def _parse_filter_params(
+    statement_ids: Optional[str] = None,
     cards: Optional[str] = None,
     categories: Optional[str] = None,
     direction: Optional[str] = None,
@@ -41,6 +42,7 @@ def _parse_filter_params(
     source: Optional[str] = None,
     bank_accounts: Optional[str] = None,
 ):
+    stmt_ids = [s.strip() for s in statement_ids.split(",") if s.strip()] if statement_ids else None
     card_ids = [c.strip() for c in cards.split(",") if c.strip()] if cards else None
     category_list = [c.strip() for c in categories.split(",") if c.strip()] if categories else None
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
@@ -48,7 +50,7 @@ def _parse_filter_params(
     if src == "ALL":
         src = None
     bank_pairs = parse_bank_accounts_param(bank_accounts)
-    return card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs
+    return stmt_ids, card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs
 
 
 @router.get("/summary")
@@ -56,6 +58,7 @@ def analytics_summary(
     db: Session = Depends(get_db),
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
+    statement_ids: Optional[str] = Query(None, description="Comma-separated statement IDs"),
     cards: Optional[str] = Query(None, description="Comma-separated card UUIDs"),
     categories: Optional[str] = Query(None, description="Comma-separated category slugs"),
     direction: Optional[str] = Query(None, description="incoming or outgoing"),
@@ -66,13 +69,14 @@ def analytics_summary(
     bank_accounts: Optional[str] = Query(None, description="Comma-separated bank:last4"),
 ) -> Dict[str, Any]:
     """Total spend, delta %, sparkline data, avg monthly spend."""
-    card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs = _parse_filter_params(
-        cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
+    stmt_ids, card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs = _parse_filter_params(
+        statement_ids, cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
     )
     summary = get_summary(
         db,
         from_date=from_date,
         to_date=to_date,
+        statement_ids=stmt_ids,
         card_ids=card_ids,
         categories=category_list,
         direction=direction,
@@ -104,6 +108,7 @@ def analytics_summary(
                 db,
                 this_month_start,
                 today,
+                statement_ids=stmt_ids,
                 card_ids=card_ids,
                 categories=category_list,
                 direction=direction,
@@ -121,6 +126,7 @@ def analytics_summary(
             db,
             prev_start,
             prev_end,
+            statement_ids=stmt_ids,
             card_ids=card_ids,
             categories=category_list,
             direction=direction,
@@ -139,6 +145,7 @@ def analytics_summary(
     trends_raw = get_monthly_trends(
         db,
         months=6,
+        statement_ids=stmt_ids,
         card_ids=card_ids,
         categories=category_list,
         direction=direction,
@@ -244,6 +251,7 @@ def analytics_categories(
     db: Session = Depends(get_db),
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
+    statement_ids: Optional[str] = Query(None, description="Comma-separated statement IDs"),
     cards: Optional[str] = Query(None, description="Comma-separated card UUIDs"),
     categories: Optional[str] = Query(None, description="Comma-separated category slugs"),
     direction: Optional[str] = Query(None, description="incoming or outgoing"),
@@ -254,13 +262,14 @@ def analytics_categories(
     bank_accounts: Optional[str] = Query(None),
 ) -> Dict[str, Any]:
     """Category breakdown."""
-    card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs = _parse_filter_params(
-        cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
+    stmt_ids, card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs = _parse_filter_params(
+        statement_ids, cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
     )
     result = get_category_breakdown(
         db,
         from_date=from_date,
         to_date=to_date,
+        statement_ids=stmt_ids,
         card_ids=card_ids,
         categories=category_list,
         direction=direction,
@@ -310,6 +319,7 @@ def analytics_trends(
     months: int = Query(12, ge=1, le=24),
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
+    statement_ids: Optional[str] = Query(None, description="Comma-separated statement IDs"),
     cards: Optional[str] = Query(None),
     categories: Optional[str] = Query(None),
     direction: Optional[str] = Query(None),
@@ -320,14 +330,15 @@ def analytics_trends(
     bank_accounts: Optional[str] = Query(None),
 ) -> Dict[str, Any]:
     """Monthly trends."""
-    card_ids, category_list, direction_parsed, amin, amax, tag_list, src, bank_pairs = _parse_filter_params(
-        cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
+    stmt_ids, card_ids, category_list, direction_parsed, amin, amax, tag_list, src, bank_pairs = _parse_filter_params(
+        statement_ids, cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
     )
     data = get_monthly_trends(
         db,
         months=months,
         from_date=from_date,
         to_date=to_date,
+        statement_ids=stmt_ids,
         card_ids=card_ids,
         categories=category_list,
         direction=direction_parsed,
@@ -360,6 +371,7 @@ def analytics_merchants(
     db: Session = Depends(get_db),
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
+    statement_ids: Optional[str] = Query(None, description="Comma-separated statement IDs"),
     cards: Optional[str] = Query(None, description="Comma-separated card UUIDs"),
     categories: Optional[str] = Query(None, description="Comma-separated category slugs"),
     direction: Optional[str] = Query(None, description="incoming or outgoing"),
@@ -371,13 +383,14 @@ def analytics_merchants(
     bank_accounts: Optional[str] = Query(None),
 ) -> Dict[str, Any]:
     """Top merchants by spend."""
-    card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs = _parse_filter_params(
-        cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
+    stmt_ids, card_ids, category_list, direction, amount_min, amount_max, tag_list, src, bank_pairs = _parse_filter_params(
+        statement_ids, cards, categories, direction, amount_min, amount_max, tags, source, bank_accounts
     )
     data = get_top_merchants(
         db,
         from_date=from_date,
         to_date=to_date,
+        statement_ids=stmt_ids,
         card_ids=card_ids,
         categories=category_list,
         direction=direction,

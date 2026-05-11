@@ -464,6 +464,7 @@ export function Statements() {
     setLoading(true);
     try {
       const params: GetStatementsParams = {};
+    if (stmtFilters.statementIds && stmtFilters.statementIds.length > 0) params.statement_ids = stmtFilters.statementIds.join(',');
       if (stmtFilters.banks.length > 0) params.banks = stmtFilters.banks.join(',');
       if (stmtFilters.from) params.from = stmtFilters.from;
       if (stmtFilters.to) params.to = stmtFilters.to;
@@ -525,38 +526,20 @@ export function Statements() {
 
   const openTransactionsForStatement = useCallback(
     (s: Statement) => {
-      const from = s.periodStart || undefined;
-      const to = s.periodEnd || undefined;
-      const safeCardList = Array.isArray(cards) ? cards : [];
-      if (s.source === 'BANK') {
-        const nb = s.bank.toLowerCase();
-        const match = bankAccounts.find((a) => a.bank.toLowerCase() === nb && a.last4 === s.cardLast4);
-        setFilters({
-          selectedCards: [],
-          selectedBankAccounts: match ? [match.id] : [],
-          selectedCategories: [],
-          selectedTags: [],
-          dateRange: { from, to },
-          amountRange: {},
-          direction: 'all',
-          source: 'BANK',
-        });
-      } else {
-        const matchingCard = safeCardList.find((c) => c.bank === s.bank && c.last4 === s.cardLast4);
-        setFilters({
-          selectedCards: matchingCard ? [matchingCard.id] : [],
-          selectedBankAccounts: [],
-          selectedCategories: [],
-          selectedTags: [],
-          dateRange: { from, to },
-          amountRange: {},
-          direction: 'all',
-          source: 'CC',
-        });
-      }
+      setFilters({
+        statementIds: [s.id],
+        selectedCards: [],
+        selectedBankAccounts: [],
+        selectedCategories: [],
+        selectedTags: [],
+        dateRange: {},
+        amountRange: {},
+        direction: 'all',
+        source: 'all',
+      });
       navigate('/transactions');
     },
-    [bankAccounts, cards, navigate, setFilters],
+    [navigate, setFilters],
   );
 
   const fmt = (d: string) => {
@@ -764,6 +747,7 @@ export function Statements() {
   }, [pagination.displayPageIndex, pageIndex]);
 
   const filterActiveCount =
+    (stmtFilters.statementIds?.length ?? 0) +
     stmtFilters.banks.length +
     (stmtFilters.from ? 1 : 0) +
     (stmtFilters.to ? 1 : 0) +

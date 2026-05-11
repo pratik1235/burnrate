@@ -34,6 +34,7 @@ def _parse_comma_list(val: Optional[str]) -> Optional[List[str]]:
 
 def _parse_filters(args: Dict[str, Any]) -> Dict[str, Any]:
     card_ids = _parse_comma_list(args.get("cards"))
+    statement_ids = _parse_comma_list(args.get("statement_ids"))
     categories = _parse_comma_list(args.get("categories"))
     tags = _parse_comma_list(args.get("tags"))
     source = args.get("source")
@@ -45,6 +46,7 @@ def _parse_filters(args: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "from_date": _parse_date(args.get("from_date")),
         "to_date": _parse_date(args.get("to_date")),
+        "statement_ids": statement_ids,
         "card_ids": card_ids,
         "categories": categories,
         "direction": args.get("direction"),
@@ -69,8 +71,13 @@ def _exec_query_transactions(args: Dict[str, Any], db: Session) -> Any:
         q, filters["source"], filters["card_ids"], filters["bank_pairs"] or [],
     )
     q = _apply_filters(
-        q, filters["categories"], filters["direction"],
-        filters["amount_min"], filters["amount_max"], filters["tags"],
+        q, 
+        statement_ids=filters.get("statement_ids"),
+        categories=filters["categories"], 
+        direction=filters["direction"],
+        amount_min=filters["amount_min"], 
+        amount_max=filters["amount_max"], 
+        tags=filters["tags"],
     )
     if search:
         escaped_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

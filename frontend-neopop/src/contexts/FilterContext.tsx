@@ -11,6 +11,7 @@ export type Direction = 'all' | 'incoming' | 'outgoing';
 export type SourceFilter = 'all' | 'CC' | 'BANK';
 
 export interface FilterState {
+  statementIds: string[];
   selectedCards: string[];
   /** BANK account keys `bank:last4` from GET /transactions/bank-accounts */
   selectedBankAccounts: string[];
@@ -31,6 +32,7 @@ export interface FilterContextValue {
 }
 
 const defaultState: FilterState = {
+  statementIds: [],
   selectedCards: [],
   selectedBankAccounts: [],
   selectedCategories: [],
@@ -60,6 +62,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
   const hasActiveFilters = useMemo(() => {
     return (
+      filters.statementIds.length > 0 ||
       filters.selectedCards.length > 0 ||
       filters.selectedBankAccounts.length > 0 ||
       filters.selectedCategories.length > 0 ||

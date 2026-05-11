@@ -15,6 +15,7 @@ import { getAllCategories, getTagDefinitions, getBankAccountKeys } from '@/lib/a
 import type { Source } from '@/lib/types';
 
 export interface BankStatementFilterValues {
+  statementIds?: string[];
   banks: string[];
   from?: string;
   to?: string;
@@ -61,6 +62,7 @@ export function FilterModal({
   const [localMin, setLocalMin] = useState('');
   const [localMax, setLocalMax] = useState('');
   const [localStmtBanks, setLocalStmtBanks] = useState<string[]>([]);
+  const [localStatementIds, setLocalStatementIds] = useState('');
   const [localStmtFrom, setLocalStmtFrom] = useState('');
   const [localStmtTo, setLocalStmtTo] = useState('');
   const [localStmtSource, setLocalStmtSource] = useState<'all' | Source>('all');
@@ -99,6 +101,7 @@ export function FilterModal({
   useEffect(() => {
     if (!open) return;
     if (variant === 'bankStatements') {
+      setLocalStatementIds(bankStatementFilters?.statementIds?.join(', ') ?? '');
       setLocalStmtBanks(bankStatementFilters?.banks ?? []);
       setLocalStmtFrom(bankStatementFilters?.from ?? '');
       setLocalStmtTo(bankStatementFilters?.to ?? '');
@@ -107,6 +110,7 @@ export function FilterModal({
       setLocalStmtNonZeroTxnCount(!!bankStatementFilters?.nonZeroTxnCount);
       return;
     }
+    setLocalStatementIds(filters.statementIds?.join(', ') ?? '');
     setLocalCards(filters.selectedCards);
     setLocalBankAccounts(filters.selectedBankAccounts ?? []);
     setLocalCategories(filters.selectedCategories);
@@ -158,8 +162,14 @@ export function FilterModal({
   };
 
   const handleApply = () => {
+    const parsedStatementIds = localStatementIds
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
     if (variant === 'bankStatements') {
       onApplyBankStatements?.({
+        statementIds: parsedStatementIds.length > 0 ? parsedStatementIds : undefined,
         banks: localStmtBanks,
         from: localStmtFrom || undefined,
         to: localStmtTo || undefined,
@@ -171,6 +181,7 @@ export function FilterModal({
       return;
     }
     setFilters({
+      statementIds: parsedStatementIds,
       selectedCards: localCards,
       selectedBankAccounts: localBankAccounts,
       selectedCategories: localCategories,
@@ -190,8 +201,9 @@ export function FilterModal({
   };
 
   const handleClearAll = () => {
+    setLocalStatementIds('');
     if (variant === 'bankStatements') {
-      onApplyBankStatements?.({ banks: [], from: undefined, to: undefined, source: undefined, parseFailuresOnly: undefined, nonZeroTxnCount: undefined });
+      onApplyBankStatements?.({ banks: [], from: undefined, to: undefined, source: undefined, parseFailuresOnly: undefined, nonZeroTxnCount: undefined, statementIds: undefined });
       setLocalStmtBanks([]);
       setLocalStmtFrom('');
       setLocalStmtTo('');
@@ -400,6 +412,20 @@ export function FilterModal({
                 opacity: 1;
               }
             `}</style>
+
+            <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)" style={{ marginBottom: 10 }}>
+              Statement IDs
+            </Typography>
+            <div style={{ marginBottom: 20 }}>
+              <InputField
+                colorMode="dark"
+                type="text"
+                placeholder="Comma-separated statement IDs"
+                value={localStatementIds}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLocalStatementIds(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
           </div>
           <div
             style={{
@@ -492,6 +518,7 @@ export function FilterModal({
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 20 }}>
+
           <Typography
             fontType={FontType.BODY}
             fontSize={12}
@@ -716,6 +743,26 @@ export function FilterModal({
               </div>
             </>
           )}
+
+          <Typography
+            fontType={FontType.BODY}
+            fontSize={12}
+            fontWeight={FontWeights.MEDIUM}
+            color="rgba(255,255,255,0.5)"
+            style={{ marginBottom: 10 }}
+          >
+            Statement IDs
+          </Typography>
+          <div style={{ marginBottom: 20 }}>
+            <InputField
+              colorMode="dark"
+              type="text"
+              placeholder="Comma-separated statement IDs"
+              value={localStatementIds}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLocalStatementIds(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
         </div>
 
         <div
