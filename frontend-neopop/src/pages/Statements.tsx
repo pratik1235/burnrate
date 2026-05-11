@@ -1234,32 +1234,38 @@ export function Statements() {
                       }}
                       style={{ cursor: 'pointer', borderRadius: 12 }}
                     >
-                      <Row style={statementBodyRowStyle}>
+                      <Row style={{ ...statementBodyRowStyle, pointerEvents: 'none' }}>
                         <Column style={statementLeftColStyle}>
-                          <Row style={statementTitleRowStyle}>
-                            <Typography
-                              as="span"
-                              fontType={FontType.BODY}
-                              fontSize={10}
-                              fontWeight={FontWeights.BOLD}
-                              color={sourceLabel === 'BANK' ? colorPalette.info[500] : colorPalette.rss[500]}
-                              style={{
-                                padding: '1px 6px',
-                                borderRadius: 4,
-                                background: sourceLabel === 'BANK' ? 'rgba(59,130,246,0.15)' : 'rgba(255,135,68,0.15)',
-                              }}
-                            >
-                              {sourceLabel}
-                            </Typography>
-                            <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
-                              {bankConfig.name}
-                              {s.cardLast4 ? ` …${s.cardLast4}` : ''}
-                            </Typography>
-                          </Row>
-                          {periodLine(s)}
-                          {transactionCountLine(s.transactionCount)}
+                          <div style={{ pointerEvents: 'auto', cursor: 'text', width: 'fit-content' }} onClick={(e) => e.stopPropagation()}>
+                            <Row style={statementTitleRowStyle}>
+                              <Typography
+                                as="span"
+                                fontType={FontType.BODY}
+                                fontSize={10}
+                                fontWeight={FontWeights.BOLD}
+                                color={sourceLabel === 'BANK' ? colorPalette.info[500] : colorPalette.rss[500]}
+                                style={{
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  background: sourceLabel === 'BANK' ? 'rgba(59,130,246,0.15)' : 'rgba(255,135,68,0.15)',
+                                }}
+                              >
+                                {sourceLabel}
+                              </Typography>
+                              <Typography fontType={FontType.BODY} fontSize={14} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
+                                {bankConfig.name}
+                                {s.cardLast4 ? ` …${s.cardLast4}` : ''}
+                              </Typography>
+                            </Row>
+                          </div>
+                          <div style={{ pointerEvents: 'auto', cursor: 'text', width: 'fit-content' }} onClick={(e) => e.stopPropagation()}>
+                            {periodLine(s)}
+                          </div>
+                          <div style={{ pointerEvents: 'auto', cursor: 'text', width: 'fit-content' }} onClick={(e) => e.stopPropagation()}>
+                            {transactionCountLine(s.transactionCount)}
+                          </div>
                         </Column>
-                        <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center', padding: '12px 14px' }}>
+                        <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center', padding: '12px 14px', pointerEvents: 'auto' }}>
                           <ActionIconButton
                             onClick={(e: MouseEvent) => {
                               e.stopPropagation();
@@ -1284,7 +1290,7 @@ export function Statements() {
                         </Row>
                         <Column style={{ ...statementRightColStyle, alignItems: 'flex-end', justifyContent: 'flex-start', flex: '1 1 260px', minWidth: 120 }}>
                           {s.totalAmountDue != null && (
-                            <div style={{ textAlign: 'right', marginTop: -9 }}>
+                            <div style={{ textAlign: 'right', marginTop: -9, pointerEvents: 'auto', cursor: 'text' }} onClick={(e) => e.stopPropagation()}>
                               <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.MEDIUM} color="rgba(255,255,255,0.5)">
                                 Amount Due
                               </Typography>
@@ -1293,7 +1299,9 @@ export function Statements() {
                               </Typography>
                             </div>
                           )}
-                          {statementPathLine(s, handleOpenFile)}
+                          <div style={{ pointerEvents: 'auto', cursor: 'text' }} onClick={(e) => e.stopPropagation()}>
+                            {statementPathLine(s, handleOpenFile)}
+                          </div>
                         </Column>
                       </Row>
                     </div>
