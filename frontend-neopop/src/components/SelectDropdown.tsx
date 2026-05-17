@@ -196,12 +196,18 @@ export function SelectDropdown({
     const el = rootRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
+    
+    // Estimate menu height to handle collision
+    const estimatedHeight = typeof menuMaxHeight === 'number' ? menuMaxHeight : 300;
+    // Check if it overflows the bottom of the window
+    const overflowsBottom = r.bottom + menuOffset + estimatedHeight > window.innerHeight;
+    
     setPortalBox({
-      top: r.bottom + menuOffset,
+      top: overflowsBottom ? Math.max(10, r.top - menuOffset - estimatedHeight) : r.bottom + menuOffset,
       left: r.left,
       width: Math.max(r.width, 140),
     });
-  }, [menuOffset]);
+  }, [menuOffset, menuMaxHeight]);
 
   useLayoutEffect(() => {
     if (!open || menuMount !== 'portal') return;

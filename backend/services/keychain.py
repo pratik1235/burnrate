@@ -5,11 +5,67 @@ import keyring
 logger = logging.getLogger(__name__)
 
 SERVICE_NAME_STATEMENTS = "burnrate_statements"
+"""OS keychain service for per-file statement PDF passwords (content hash)."""
+
+SERVICE_NAME_STATEMENT_BANK = "burnrate_statement_bank_pdf"
+"""OS keychain service for the last known PDF password per bank (user-provided unlocks)."""
+
 SERVICE_NAME_LLM = "burnrate_llm"
 SERVICE_NAME_AWS = "burnrate_aws"
 
 # Backwards compatibility alias
 SERVICE_NAME = SERVICE_NAME_STATEMENTS
+
+
+def normalize_bank_key(bank: Optional[str]) -> Optional[str]:
+    """Normalize bank name for keychain storage and lookup (lowercase, stripped)."""
+    if not bank:
+        return None
+    s = bank.strip().lower()
+    return s if s else None
+
+
+def save_bank_statement_password(bank: str, password: str) -> None:
+    """
+    Store a user-provided statement PDF password keyed by bank.
+
+    Used after a successful manual unlock so "Open statement" can decrypt
+    other PDFs from the same bank without re-prompting.
+    """
+    bk = normalize_bank_key(bank)
+    if not bk or bk == "unknown" or not password:
+        return
+    try:
+        keyring.set_password(SERVICE_NAME_STATEMENT_BANK, bk, password)
+        logger.debug("Saved statement PDF password to keychain for bank=%s", bk)
+    except Exception as e:
+        logger.warning("Failed to save bank statement password for bank=%s: %s", bk, e)
+
+
+def get_bank_statement_password(bank: str) -> Optional[str]:
+    """Retrieve the stored PDF password for a bank, if any."""
+    bk = normalize_bank_key(bank)
+    if not bk or bk == "unknown":
+        return None
+    try:
+        return keyring.get_password(SERVICE_NAME_STATEMENT_BANK, bk)
+    except Exception as e:
+        logger.warning("Failed to get bank statement password for bank=%s: %s", bk, e)
+        return None
+
+
+def delete_bank_statement_password(bank: str) -> None:
+    """Remove the stored PDF password for a bank."""
+    bk = normalize_bank_key(bank)
+    if not bk:
+        return
+    try:
+        keyring.delete_password(SERVICE_NAME_STATEMENT_BANK, bk)
+        logger.debug("Deleted bank statement password for bank=%s", bk)
+    except keyring.errors.PasswordDeleteError:
+        pass
+    except Exception as e:
+        logger.warning("Failed to delete bank statement password for bank=%s: %s", bk, e)
 
 
 def save_statement_password(file_hash: str, password: str) -> None:

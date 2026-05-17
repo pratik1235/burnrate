@@ -105,6 +105,7 @@ class Statement(Base):
     imported_at = Column(DateTime, default=datetime.utcnow)
     currency = Column(String(3), nullable=False, default="INR", server_default="INR")
     payment_due_date = Column(Date, nullable=True)
+    note = Column(Text, nullable=True)
 
     transactions = relationship("Transaction", back_populates="statement", cascade="all, delete-orphan")
 

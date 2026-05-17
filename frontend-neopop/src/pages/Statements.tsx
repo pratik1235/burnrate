@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, type ChangeEvent, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, useLayoutEffect, useRef, type ChangeEvent, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { StatUpload } from '@/components/StatUpload';
@@ -20,16 +21,18 @@ import {
   uploadStatement,
   uploadStatementsBulk,
   retryWithPassword,
+  patchStatementNote,
 } from '@/lib/api';
 import type { Statement } from '@/lib/types';
 import { BANK_CONFIG } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/Toast';
 import { notifyBulkUploadToasts, syntheticBulkUploadFailure } from '@/lib/bulkUploadSummary';
-import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, ChevronLeft, ChevronRight, ExternalLink, ChevronDown } from 'lucide-react';
+import { Trash2, RefreshCw, AlertTriangle, Lock, SlidersHorizontal, ChevronLeft, ChevronRight, ExternalLink, ChevronDown, StickyNote } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { CloseButton } from '@/components/CloseButton';
 import { paginateBounds } from '@/lib/pagination';
+import { getStatementsScrollY, setStatementsScrollY } from '@/lib/statementsScrollMemory';
 import styled from 'styled-components';
 import { SelectableElevatedCard, DEFAULT_ELEVATED_CARD_EDGE_COLORS } from '@/components/SelectableElevatedCard';
 
@@ -232,6 +235,58 @@ const ActionIconButton = styled.button<{ $danger?: boolean }>`
   }
 `;
 
+const NoteIconButton = styled(ActionIconButton)<{ $active: boolean }>`
+  opacity: ${(p) => (p.$active ? 1 : 0.42)};
+  border-color: ${(p) => (p.$active ? 'rgba(255, 135, 68, 0.42)' : 'rgba(255, 255, 255, 0.09)')};
+  color: ${(p) => (p.$active ? colorPalette.rss[500] : 'rgba(255, 255, 255, 0.58)')};
+  &:hover:not(:disabled) {
+    opacity: 1;
+    border-color: ${(p) => (p.$active ? 'rgba(255, 135, 68, 0.55)' : 'rgba(255, 255, 255, 0.26)')};
+  }
+  &:active:not(:disabled) {
+    transform: translateY(1px) scale(0.98);
+  }
+`;
+
+const NotePopoverSurface = styled.div`
+  position: fixed;
+  z-index: 3200;
+  width: min(320px, calc(100vw - 24px));
+  padding: 12px 14px 14px;
+  border-radius: 12px;
+  background: ${colorPalette.black[100]};
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 16px 48px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+`;
+
+const NoteTextArea = styled.textarea`
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  resize: vertical;
+  outline: none;
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+  }
+  &:focus {
+    border-color: rgba(255, 135, 68, 0.55);
+    box-shadow: 0 0 0 1px rgba(255, 135, 68, 0.2);
+  }
+`;
+
 const PathDisplay = styled.span`
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
   font-size: 11px;
@@ -374,19 +429,74 @@ function bankRowMeta(s: Statement) {
   return cfg;
 }
 
+function statementIdCentered(id: string) {
+  return (
+    <Typography
+      fontType={FontType.BODY}
+      fontSize={11}
+      fontWeight={FontWeights.MEDIUM}
+      color="rgba(255,255,255,0.38)"
+      style={{
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
+        textAlign: 'center',
+        letterSpacing: 0.02,
+        maxWidth: 220,
+        wordBreak: 'break-all',
+        lineHeight: 1.3,
+      }}
+    >
+      {id}
+    </Typography>
+  );
+}
+
 export function Statements() {
   const navigate = useNavigate();
   const { setFilters, filters } = useFilters();
-  const { cards, refetch: refetchCards } = useCards();
-  const [bankAccounts, setBankAccounts] = useState<{ id: string; bank: string; last4: string }[]>([]);
+  const { refetch: refetchCards } = useCards();
+  const [, setBankAccounts] = useState<{ id: string; bank: string; last4: string }[]>([]);
   const [statements, setStatements] = useState<Statement[]>([]);
   const [totalStatements, setTotalStatements] = useState(0);
   const [totalAmountDue, setTotalAmountDue] = useState<number | null>(null);
   const [totalsByCurrency, setTotalsByCurrency] = useState<{ currency: string; amount: number }[]>([]);
   const [mixedCurrency, setMixedCurrency] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
+  const hasRestoredScroll = useRef(false);
+  const lastScrollY = useRef(0);
+
+  // Track scroll position continuously to avoid reading clamped values on unmount
+  useEffect(() => {
+    const handleScroll = () => {
+      lastScrollY.current = window.scrollY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (hasRestoredScroll.current) {
+        setStatementsScrollY(lastScrollY.current);
+      }
+    };
+  }, []);
+
+  // Restore scroll position once loading is done
+  useLayoutEffect(() => {
+    if (!loading && !hasRestoredScroll.current) {
+      const savedY = getStatementsScrollY();
+      window.scrollTo({ top: savedY, behavior: 'auto' });
+      lastScrollY.current = savedY;
+      hasRestoredScroll.current = true;
+    }
+  }, [loading]);
+
   const [actioning, setActioning] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const noteAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const notePopoverSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const [notePopoverStatementId, setNotePopoverStatementId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [notePopoverCoords, setNotePopoverCoords] = useState({ top: 0, left: 0 });
+  const [patchingNoteStatementId, setPatchingNoteStatementId] = useState<string | null>(null);
   const [passwordInputs, setPasswordInputs] = useState<Record<string, string>>({});
   const [stmtFilters, setStmtFilters] = useState<BankStatementFilterValues>(() => {
     try {
@@ -715,6 +825,81 @@ export function Statements() {
       toast.error('Failed to open file');
     }
   };
+
+  const closeNotePopover = useCallback(() => {
+    setNotePopoverStatementId(null);
+    setNoteDraft('');
+  }, []);
+
+  const updateNotePopoverPosition = useCallback(() => {
+    const el = noteAnchorRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const panelHalf = Math.min(160, (Math.min(320, typeof window !== 'undefined' ? window.innerWidth - 24 : 320)) / 2);
+    let left = r.left + r.width / 2;
+    const margin = 12;
+    left = Math.max(panelHalf + margin, Math.min(left, (typeof window !== 'undefined' ? window.innerWidth : left) - panelHalf - margin));
+    setNotePopoverCoords({ top: r.bottom + 8, left });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!notePopoverStatementId) return;
+    updateNotePopoverPosition();
+  }, [notePopoverStatementId, updateNotePopoverPosition]);
+
+  useEffect(() => {
+    if (!notePopoverStatementId) return;
+    const onResize = () => updateNotePopoverPosition();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
+    };
+  }, [notePopoverStatementId, updateNotePopoverPosition]);
+
+  useEffect(() => {
+    if (!notePopoverStatementId) return;
+    const onPointerDown = (ev: globalThis.MouseEvent) => {
+      const t = ev.target as Node;
+      if (notePopoverSurfaceRef.current?.contains(t)) return;
+      if (noteAnchorRef.current?.contains(t)) return;
+      closeNotePopover();
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [notePopoverStatementId, closeNotePopover]);
+
+  useEffect(() => {
+    if (!notePopoverStatementId) return;
+    const onKey = (ev: globalThis.KeyboardEvent) => {
+      if (ev.key === 'Escape') closeNotePopover();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [notePopoverStatementId, closeNotePopover]);
+
+  const openStatementNotePopover = useCallback((e: MouseEvent, s: Statement) => {
+    e.stopPropagation();
+    setNotePopoverStatementId(s.id);
+    setNoteDraft(s.note ?? '');
+  }, []);
+
+  const handleSaveStatementNote = useCallback(async () => {
+    if (!notePopoverStatementId) return;
+    const id = notePopoverStatementId;
+    setPatchingNoteStatementId(id);
+    try {
+      const { note } = await patchStatementNote(id, noteDraft);
+      setStatements((prev) => prev.map((x) => (x.id === id ? { ...x, note } : x)));
+      toast.success('Note saved');
+      closeNotePopover();
+    } catch {
+      toast.error('Could not save note');
+    } finally {
+      setPatchingNoteStatementId(null);
+    }
+  }, [notePopoverStatementId, noteDraft, closeNotePopover]);
 
   const periodLine = (s: Statement) => (
     <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
@@ -1092,7 +1277,7 @@ export function Statements() {
                           onChange={(e: ChangeEvent<HTMLInputElement>) =>
                             setPasswordInputs((prev) => ({ ...prev, [s.id]: e.target.value }))
                           }
-                          onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
+                          onKeyDown={(e: ReactKeyboardEvent<HTMLInputElement>) =>
                             e.key === 'Enter' && handlePasswordSubmit(s.id)
                           }
                           style={{
@@ -1108,26 +1293,44 @@ export function Statements() {
                         />
                       </Column>
                       <Column style={statementRightColPasswordStyle}>
-                        <Row style={{ ...statementButtonRowStyle, justifyContent: 'flex-end', gap: 12 }}>
-                          <ActionIconButton
-                            onClick={() => void removeStatementWithoutConfirm(s.id)}
-                            disabled={!!actioning}
-                            $danger
-                            title="Remove"
-                          >
-                            <Trash2 size={14} />
-                          </ActionIconButton>
-                          <Button
-                            variant="primary"
-                            kind="elevated"
-                            size="small"
-                            colorMode="dark"
-                            onClick={() => handlePasswordSubmit(s.id)}
-                            disabled={!!actioning || !(passwordInputs[s.id] ?? '').trim()}
-                          >
-                            Unlock
-                          </Button>
-                        </Row>
+                        <Column style={{ alignItems: 'center', gap: 6, width: '100%' }}>
+                          {statementIdCentered(s.id)}
+                          <Row style={{ ...statementButtonRowStyle, justifyContent: 'center', gap: 10 }}>
+                            <NoteIconButton
+                              type="button"
+                              aria-label={
+                                (s.note ?? '').trim()
+                                  ? 'Edit statement note'
+                                  : 'Add a note to this statement'
+                              }
+                              title={(s.note ?? '').trim() ? 'Edit note' : 'Add a note'}
+                              $active={(s.note ?? '').trim().length > 0}
+                              disabled={!!actioning}
+                              ref={notePopoverStatementId === s.id ? noteAnchorRef : undefined}
+                              onClick={(e: MouseEvent) => openStatementNotePopover(e, s)}
+                            >
+                              <StickyNote size={14} strokeWidth={2} aria-hidden />
+                            </NoteIconButton>
+                            <ActionIconButton
+                              onClick={() => void removeStatementWithoutConfirm(s.id)}
+                              disabled={!!actioning}
+                              $danger
+                              title="Remove"
+                            >
+                              <Trash2 size={14} />
+                            </ActionIconButton>
+                            <Button
+                              variant="primary"
+                              kind="elevated"
+                              size="small"
+                              colorMode="dark"
+                              onClick={() => handlePasswordSubmit(s.id)}
+                              disabled={!!actioning || !(passwordInputs[s.id] ?? '').trim()}
+                            >
+                              Unlock
+                            </Button>
+                          </Row>
+                        </Column>
                         {statementPathLine(s, handleOpenFile)}
                       </Column>
                     </Row>
@@ -1181,23 +1384,47 @@ export function Statements() {
                             'Could not extract data from this file. Try reparsing or remove and re-upload.'}
                         </Typography>
                       </Column>
-                      <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center', padding: '12px 14px' }}>
-                        <ActionIconButton
-                          onClick={() => handleReparse(s.id)}
-                          disabled={!!actioning}
-                          title="Retry"
-                        >
-                          <RefreshCw size={14} />
-                        </ActionIconButton>
-                        <ActionIconButton
-                          onClick={() => void removeStatementWithoutConfirm(s.id)}
-                          disabled={!!actioning}
-                          $danger
-                          title="Remove"
-                        >
-                          <Trash2 size={14} />
-                        </ActionIconButton>
-                      </Row>
+                      <Column style={{ alignItems: 'center', gap: 6, padding: '12px 14px' }}>
+                        {statementIdCentered(s.id)}
+                        <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                          <NoteIconButton
+                            type="button"
+                            aria-label={
+                              (s.note ?? '').trim()
+                                ? 'Edit statement note'
+                                : 'Add a note to this statement'
+                            }
+                            title={(s.note ?? '').trim() ? 'Edit note' : 'Add a note'}
+                            $active={(s.note ?? '').trim().length > 0}
+                            disabled={!!actioning}
+                            ref={notePopoverStatementId === s.id ? noteAnchorRef : undefined}
+                            onClick={(e: MouseEvent) => openStatementNotePopover(e, s)}
+                          >
+                            <StickyNote size={14} strokeWidth={2} aria-hidden />
+                          </NoteIconButton>
+                          <ActionIconButton
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              void handleReparse(s.id);
+                            }}
+                            disabled={!!actioning}
+                            title="Retry"
+                          >
+                            <RefreshCw size={14} />
+                          </ActionIconButton>
+                          <ActionIconButton
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              void removeStatementWithoutConfirm(s.id);
+                            }}
+                            disabled={!!actioning}
+                            $danger
+                            title="Remove"
+                          >
+                            <Trash2 size={14} />
+                          </ActionIconButton>
+                        </Row>
+                      </Column>
                       <Column style={{ ...statementRightColStyle, alignItems: 'flex-end', justifyContent: 'flex-end', flex: '1 1 260px', minWidth: 120 }}>
                         {statementPathLine(s, handleOpenFile)}
                       </Column>
@@ -1249,29 +1476,47 @@ export function Statements() {
                             {transactionCountLine(s.transactionCount)}
                           </div>
                         </Column>
-                        <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center', padding: '12px 14px', pointerEvents: 'auto' }}>
-                          <ActionIconButton
-                            onClick={(e: MouseEvent) => {
-                              e.stopPropagation();
-                              void handleReparse(s.id);
-                            }}
-                            disabled={!!actioning}
-                            title="Refresh statement"
-                          >
-                            <RefreshCw size={14} />
-                          </ActionIconButton>
-                          <ActionIconButton
-                            onClick={(e: MouseEvent) => {
-                              e.stopPropagation();
-                              setConfirmDeleteId(s.id);
-                            }}
-                            disabled={!!actioning}
-                            $danger
-                            title="Remove statement"
-                          >
-                            <Trash2 size={14} />
-                          </ActionIconButton>
-                        </Row>
+                        <Column style={{ alignItems: 'center', gap: 6, padding: '12px 14px', pointerEvents: 'auto' }}>
+                          {statementIdCentered(s.id)}
+                          <Row style={{ gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                            <NoteIconButton
+                              type="button"
+                              aria-label={
+                                (s.note ?? '').trim()
+                                  ? 'Edit statement note'
+                                  : 'Add a note to this statement'
+                              }
+                              title={(s.note ?? '').trim() ? 'Edit note' : 'Add a note'}
+                              $active={(s.note ?? '').trim().length > 0}
+                              disabled={!!actioning}
+                              ref={notePopoverStatementId === s.id ? noteAnchorRef : undefined}
+                              onClick={(e: MouseEvent) => openStatementNotePopover(e, s)}
+                            >
+                              <StickyNote size={14} strokeWidth={2} aria-hidden />
+                            </NoteIconButton>
+                            <ActionIconButton
+                              onClick={(e: MouseEvent) => {
+                                e.stopPropagation();
+                                void handleReparse(s.id);
+                              }}
+                              disabled={!!actioning}
+                              title="Refresh statement"
+                            >
+                              <RefreshCw size={14} />
+                            </ActionIconButton>
+                            <ActionIconButton
+                              onClick={(e: MouseEvent) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(s.id);
+                              }}
+                              disabled={!!actioning}
+                              $danger
+                              title="Remove statement"
+                            >
+                              <Trash2 size={14} />
+                            </ActionIconButton>
+                          </Row>
+                        </Column>
                         <Column style={{ ...statementRightColStyle, alignItems: 'flex-end', justifyContent: 'flex-start', flex: '1 1 260px', minWidth: 120 }}>
                           {s.totalAmountDue != null && (
                             <div style={{ textAlign: 'right', marginTop: -9, pointerEvents: 'auto', cursor: 'text' }} onClick={(e) => e.stopPropagation()}>
@@ -1302,6 +1547,60 @@ export function Statements() {
           </div>
         )}
       </Content>
+      {notePopoverStatementId !== null &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <NotePopoverSurface
+            ref={notePopoverSurfaceRef}
+            role="dialog"
+            aria-label="Statement note"
+            style={{
+              top: notePopoverCoords.top,
+              left: notePopoverCoords.left,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <Typography
+              fontType={FontType.BODY}
+              fontSize={11}
+              fontWeight={FontWeights.SEMI_BOLD}
+              color="rgba(255,255,255,0.55)"
+              style={{ marginBottom: 8, display: 'block' }}
+            >
+              Statement note
+            </Typography>
+            <NoteTextArea
+              placeholder="Add a note to this statement"
+              value={noteDraft}
+              maxLength={10_000}
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNoteDraft(e.target.value)}
+              aria-label="Add a note to this statement"
+            />
+            <Row style={{ gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <Button
+                variant="secondary"
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={() => closeNotePopover()}
+                disabled={patchingNoteStatementId !== null}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                kind="elevated"
+                size="small"
+                colorMode="dark"
+                onClick={() => void handleSaveStatementNote()}
+                disabled={patchingNoteStatementId !== null}
+              >
+                Save
+              </Button>
+            </Row>
+          </NotePopoverSurface>,
+          document.body,
+        )}
       <ConfirmModal
         open={confirmDeleteId !== null}
         title="Delete Statement"

@@ -65,8 +65,10 @@ const TagBtn = styled.div`
 
   /* Reduce trigger height by ~20% — NeoPOP DropdownContainer is a div with 10px vertical padding */
   [class*="DropdownContainer"] {
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
   }
 `;
 
@@ -252,41 +254,6 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
               ))}
             </div>
           )}
-          <TagBtn style={{ position: 'relative' }}>
-            <SelectDropdown
-              selectionMode="multi"
-              options={tagOptions}
-              selectedValues={tags}
-              onSelectedValuesChange={handleTagSelectionChange}
-              maxSelected={3}
-              staticTriggerLabel="Tag Transaction"
-              placeholder="Tag Transaction"
-              menuMount="portal"
-              menuMinWidth={140}
-              menuMaxHeight={200}
-              
-              menuOffset={4}
-              menuBackgroundColor={colorPalette.popBlack[300]}
-              colorConfig={{
-                border: 'rgba(255,255,255,0.15)',
-                text: 'rgba(255,255,255,0.5)',
-                chevron: 'rgba(255,255,255,0.5)',
-              }}
-              emptyMenuContent={
-                <Typography
-                  fontType={FontType.BODY}
-                  fontSize={12}
-                  fontWeight={FontWeights.REGULAR}
-                  color="rgba(255,255,255,0.5)"
-                  style={{ maxWidth: 180, lineHeight: '1.4' }}
-                >
-                  You need to define tags on the Customize page first in order to use them.
-                </Typography>
-              }
-              onRootMouseDown={(e) => e.stopPropagation()}
-              ariaLabel="Tag transaction"
-            />
-          </TagBtn>
         </div>
 
         {/* Category row */}
@@ -339,6 +306,41 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
           <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
             {bankConfig.name} {transaction.cardLast4 ? `...${transaction.cardLast4}` : ''}
           </Typography> 
+          <TagBtn style={{ position: 'relative' }}>
+            <SelectDropdown
+              selectionMode="multi"
+              options={tagOptions}
+              selectedValues={tags}
+              onSelectedValuesChange={handleTagSelectionChange}
+              maxSelected={3}
+              staticTriggerLabel="Tag Transaction"
+              placeholder="Tag Transaction"
+              menuMount="portal"
+              menuMinWidth={120}
+              menuMaxHeight={190}
+              
+              menuOffset={4}
+              menuBackgroundColor={colorPalette.popBlack[300]}
+              colorConfig={{
+                border: 'rgba(255,255,255,0.15)',
+                text: 'rgba(255,255,255,0.5)',
+                chevron: 'rgba(255,255,255,0.5)',
+              }}
+              emptyMenuContent={
+                <Typography
+                  fontType={FontType.BODY}
+                  fontSize={12}
+                  fontWeight={FontWeights.REGULAR}
+                  color="rgba(255,255,255,0.5)"
+                  style={{ maxWidth: 180, lineHeight: '1.4' }}
+                >
+                  You need to define tags on the Customize page first in order to use them.
+                </Typography>
+              }
+              onRootMouseDown={(e) => e.stopPropagation()}
+              ariaLabel="Tag transaction"
+            />
+          </TagBtn>
           {isCcPayment && (
             <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
               Not included in spends

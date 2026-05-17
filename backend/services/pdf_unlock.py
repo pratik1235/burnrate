@@ -1,6 +1,8 @@
 """PDF unlock service using pikepdf."""
 
 import logging
+import os
+import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -51,6 +53,50 @@ def _validate_pdf_path(pdf_path: str, allowed_roots: Tuple[Path, ...]) -> bool:
         return _path_is_under_any_root(resolved, allowed_roots)
     except (OSError, RuntimeError):
         return False
+
+
+def schedule_temp_file_cleanup(path: str, delay_seconds: float = 300.0) -> None:
+    """Delete ``path`` after ``delay_seconds`` (default 5 minutes). Best-effort."""
+
+    def _remove() -> None:
+        try:
+            if path and os.path.isfile(path):
+                os.unlink(path)
+        except OSError:
+            pass
+
+    timer = threading.Timer(delay_seconds, _remove)
+    timer.daemon = True
+    timer.start()
+
+
+def password_candidates_for_statement_pdf(
+    file_hash: Optional[str],
+    bank: Optional[str],
+) -> List[str]:
+    """
+    Ordered unique list of passwords when opening an encrypted statement:
+
+    hash-scoped secret first (matches this PDF), then bank-scoped secret.
+    """
+    from backend.services.keychain import (
+        get_bank_statement_password,
+        get_statement_password,
+    )
+
+    passwords: List[str] = []
+    seen: set[str] = set()
+
+    def add(pwd: Optional[str]) -> None:
+        if pwd and pwd not in seen:
+            seen.add(pwd)
+            passwords.append(pwd)
+
+    if file_hash:
+        add(get_statement_password(file_hash))
+    add(get_bank_statement_password(bank or ""))
+    return passwords
+
 
 def generate_passwords(
     bank: str,
@@ -185,6 +231,43 @@ def generate_passwords(
     return passwords
 
 
+def unlock_pdf_with_password(
+    pdf_path: str,
+    passwords: List[str],
+    *,
+    allowed_roots: Tuple[Path, ...],
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Try each password with pikepdf. On success, save decrypted copy
+    to a temporary file and return (path, successful_password).
+    The caller is responsible for deleting the temp file when done.
+    Returns (None, None) if all passwords fail.
+    """
+    import tempfile
+
+    import pikepdf
+
+    if not _validate_pdf_path(pdf_path, allowed_roots):
+        return None, None
+
+    for pwd in passwords:
+        try:
+            with pikepdf.open(pdf_path, password=pwd) as pdf:
+                tmp = tempfile.NamedTemporaryFile(
+                    suffix=".pdf", prefix="burnrate_unlocked_", delete=False,
+                )
+                pdf.save(tmp.name)
+                tmp.close()
+                return tmp.name, pwd
+        except pikepdf.PasswordError:
+            continue
+        except Exception:
+            logger.debug("Unlock attempt failed for password candidate")
+            continue
+
+    return None, None
+
+
 def unlock_pdf(
     pdf_path: str,
     passwords: List[str],
@@ -197,29 +280,8 @@ def unlock_pdf(
     for deleting the temp file when done.
     Returns None if all passwords fail.
     """
-    import tempfile
-
-    import pikepdf
-
-    if not _validate_pdf_path(pdf_path, allowed_roots):
-        return None
-
-    for pwd in passwords:
-        try:
-            with pikepdf.open(pdf_path, password=pwd) as pdf:
-                tmp = tempfile.NamedTemporaryFile(
-                    suffix=".pdf", prefix="burnrate_unlocked_", delete=False,
-                )
-                pdf.save(tmp.name)
-                tmp.close()
-                return tmp.name
-        except pikepdf.PasswordError:
-            continue
-        except Exception:
-            logger.debug("Unlock attempt failed for password candidate")
-            continue
-
-    return None
+    path, _ = unlock_pdf_with_password(pdf_path, passwords, allowed_roots=allowed_roots)
+    return path
 
 
 def is_encrypted(pdf_path: str, *, allowed_roots: Tuple[Path, ...]) -> bool:

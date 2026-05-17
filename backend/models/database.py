@@ -88,6 +88,7 @@ def _run_migrations(engine_ref) -> None:
         ("settings", "payment_reminder_last_auto_shown", "VARCHAR(10)"),
         ("statements", "parse_failed", "INTEGER NOT NULL DEFAULT 0"),
         ("transactions", "is_manually_categorized", "INTEGER NOT NULL DEFAULT 0"),
+        ("statements", "note", "TEXT"),
     ]
 
     with engine_ref.connect() as conn:

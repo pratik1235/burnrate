@@ -58,6 +58,8 @@ export interface Statement {
   statusMessage?: string | null;
   /** 1 when the file could not be parsed (same as status parse_error); from API for filtering. */
   parseFailed?: number;
+  /** User-entered note attached to this statement. */
+  note?: string | null;
 }
 
 export interface CategoryBreakdown {

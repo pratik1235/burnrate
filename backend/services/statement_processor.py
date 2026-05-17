@@ -288,6 +288,7 @@ def process_statement(
                 db_session=db_session,
                 original_upload_path=original_upload_path,
                 reparse_mode=reparse_mode,
+                preserved_manual_categories=preserved_manual_categories,
             )
 
         # ---------- PDF processing (existing logic) ----------
@@ -301,13 +302,17 @@ def process_statement(
             unlocked = unlock_pdf(pdf_path, [manual_password], allowed_roots=roots)
             if unlocked:
                 working_path = unlocked
-                from backend.services.keychain import save_statement_password
+                from backend.services.keychain import (
+                    save_bank_statement_password,
+                    save_statement_password,
+                )
                 save_statement_password(file_hash, manual_password)
                 if not bank:
                     from backend.parsers.detector import detect_bank
                     detected = detect_bank(working_path)
                     if detected and detected in SUPPORTED_BANKS:
                         bank = detected
+                save_bank_statement_password(bank or "", manual_password)
             else:
                 if reparse_mode:
                     db_session.rollback()
@@ -336,6 +341,7 @@ def process_statement(
                             bank = detected
             
             if not unlocked and profile:
+                from backend.services.pdf_unlock import unlock_pdf_with_password
                 if bank:
                     passwords = generate_passwords(
                         bank=bank,
@@ -345,9 +351,13 @@ def process_statement(
                         card_last4s=card_last4s,
                         dob_year=profile.dob_year or "",
                     )
-                    unlocked = unlock_pdf(pdf_path, passwords, allowed_roots=roots)
-                    if unlocked:
-                        working_path = unlocked
+                    unlocked_path, successful_pwd = unlock_pdf_with_password(pdf_path, passwords, allowed_roots=roots)
+                    if unlocked_path and successful_pwd:
+                        working_path = unlocked_path
+                        unlocked = unlocked_path
+                        from backend.services.keychain import save_bank_statement_password, save_statement_password
+                        save_statement_password(file_hash, successful_pwd)
+                        save_bank_statement_password(bank, successful_pwd)
                     else:
                         if reparse_mode:
                             db_session.rollback()
@@ -371,11 +381,15 @@ def process_statement(
                             card_last4s=try_card_last4s,
                             dob_year=profile.dob_year or "",
                         )
-                        unlocked = unlock_pdf(pdf_path, passwords, allowed_roots=roots)
-                        if unlocked:
+                        unlocked_path, successful_pwd = unlock_pdf_with_password(pdf_path, passwords, allowed_roots=roots)
+                        if unlocked_path and successful_pwd:
                             bank = try_bank
-                            working_path = unlocked
+                            working_path = unlocked_path
+                            unlocked = unlocked_path
                             logger.info("Unlocked with bank=%s passwords", try_bank)
+                            from backend.services.keychain import save_bank_statement_password, save_statement_password
+                            save_statement_password(file_hash, successful_pwd)
+                            save_bank_statement_password(bank, successful_pwd)
                             break
 
                     if not unlocked:
@@ -813,6 +827,7 @@ def _process_csv_statement(
     db_session: Session,
     original_upload_path: Optional[str] = None,
     reparse_mode: bool = False,
+    preserved_manual_categories: Optional[dict] = None,
 ) -> Dict:
     """Process a CSV bank statement: detect bank, parse, categorize, persist."""
     if not bank:

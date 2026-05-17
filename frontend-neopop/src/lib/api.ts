@@ -355,6 +355,7 @@ interface StatementRaw {
   original_upload_path?: string | null;
   status_message?: string | null;
   parse_failed?: number | null;
+  note?: string | null;
 }
 
 export interface GetStatementsParams {
@@ -433,8 +434,22 @@ export async function getStatements(params?: Source | GetStatementsParams): Prom
     originalUploadPath: s.original_upload_path ?? null,
     statusMessage: s.status_message ?? null,
     parseFailed: s.parse_failed ?? 0,
+    note: s.note ?? null,
   })),
   };
+}
+
+/** Persist a statement note (`null`/empty clears the note). PATCH `/statements/:id/note`. */
+export async function patchStatementNote(
+  statementId: string,
+  note: string | null,
+): Promise<{ note: string | null }> {
+  const trimmed = note?.trim() ?? '';
+  const { data } = await api.patch<{ status: string; id: string; note: string | null }>(
+    `/statements/${statementId}/note`,
+    { note: trimmed === '' ? null : trimmed },
+  );
+  return { note: data.note ?? null };
 }
 
 export async function retryWithPassword(

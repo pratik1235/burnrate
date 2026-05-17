@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB per file
+STATEMENT_NOTE_MAX_CHARS = 10_000
 
 from backend.models.database import SessionLocal, UPLOADS_DIR, get_db
 from backend.models.models import ProcessingLog, Statement, Transaction
@@ -531,6 +532,7 @@ def list_statements(
                 "display_path": statement_display_path(fp, orig),
                 "original_upload_path": orig,
                 "status_message": getattr(s, "status_message", None),
+                "note": getattr(s, "note", None),
             }
         )
     return {
@@ -574,6 +576,46 @@ def acknowledge_log(log_id: str, db: Session = Depends(get_db)) -> Dict[str, str
         log.acknowledged = 1
         db.commit()
     return {"status": "ok"}
+
+
+class StatementNoteUpdatePayload(BaseModel):
+    """Body for PATCH /statements/{id}/note (``note`` is required; null clears)."""
+
+    note: Optional[str]
+
+
+@router.patch("/{statement_id}/note")
+def patch_statement_note(
+    statement_id: str,
+    payload: StatementNoteUpdatePayload,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Set or clear a user-visible note attached to this statement."""
+    stmt = db.query(Statement).filter(Statement.id == statement_id).first()
+    if not stmt:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    raw = payload.note
+    if raw is None:
+        normalized: Optional[str] = None
+    else:
+        trimmed = raw.strip()
+        normalized = trimmed if trimmed else None
+        if normalized is not None and len(normalized) > STATEMENT_NOTE_MAX_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Note must be at most {STATEMENT_NOTE_MAX_CHARS} characters",
+            )
+
+    stmt.note = normalized
+    db.add(stmt)
+    db.commit()
+
+    return {
+        "status": "ok",
+        "id": stmt.id,
+        "note": stmt.note,
+    }
 
 
 @router.delete("/{statement_id}")
@@ -630,11 +672,15 @@ def reparse_with_password(
                     preserved_manual_categories[key] = []
                 preserved_manual_categories[key].append(tx.category)
 
+    stmt_bank = (stmt.bank or "").strip().lower()
+    stmt_bank_arg = stmt_bank if stmt_bank and stmt_bank != "unknown" else None
+
     db.delete(stmt)
     db.commit()
 
     result = process_statement(
         pdf_path=file_path,
+        bank=stmt_bank_arg,
         db_session=db,
         manual_password=payload.password,
         source=stmt_source,
@@ -705,26 +751,48 @@ def open_statement_file(statement_id: str, db: Session = Depends(get_db)) -> Dic
     if not stmt:
         raise HTTPException(status_code=404, detail="Statement not found")
 
-    file_path = getattr(stmt, "original_upload_path", None) or stmt.file_path
+    file_path = getattr(stmt, "original_upload_path", None)
+    if not file_path or not os.path.isfile(file_path):
+        file_path = stmt.file_path
     if not file_path or not os.path.isfile(file_path):
         raise HTTPException(status_code=400, detail="File not found on disk")
 
-    from backend.services.pdf_unlock import _validate_pdf_path, allowed_roots_for_statements
-    if not _validate_pdf_path(file_path, allowed_roots_for_statements(db)):
+    from backend.services.pdf_unlock import (
+        _validate_pdf_path,
+        allowed_roots_for_statements,
+        is_encrypted,
+        password_candidates_for_statement_pdf,
+        schedule_temp_file_cleanup,
+        unlock_pdf,
+    )
+
+    roots = allowed_roots_for_statements(db)
+    if not _validate_pdf_path(file_path, roots):
         raise HTTPException(status_code=400, detail="File path is not within allowed directories")
 
     ext = _get_file_ext(file_path)
     if ext not in {".pdf", ".xls", ".xlsx", ".csv", ".txt"}:
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
+    open_path = file_path
+    if ext == ".pdf" and is_encrypted(file_path, allowed_roots=roots):
+        pwd_list = password_candidates_for_statement_pdf(
+            getattr(stmt, "file_hash", None),
+            getattr(stmt, "bank", None),
+        )
+        decrypted = unlock_pdf(file_path, pwd_list, allowed_roots=roots)
+        if decrypted:
+            schedule_temp_file_cleanup(decrypted, delay_seconds=300.0)
+            open_path = decrypted
+
     try:
         if platform.system() == "Darwin":
-            subprocess.run(["open", file_path], check=True)
+            subprocess.run(["open", open_path], check=True)
         elif platform.system() == "Windows":
-            os.startfile(file_path)
+            os.startfile(open_path)
         else:
-            subprocess.run(["xdg-open", file_path], check=True)
+            subprocess.run(["xdg-open", open_path], check=True)
         return {"status": "ok", "message": "File opened"}
-    except Exception as e:
-        logger.exception("Failed to open file: %s", file_path)
-        raise HTTPException(status_code=500, detail=f"Failed to open file: {str(e)}")
+    except Exception:
+        logger.exception("Failed to open statement file")
+        raise HTTPException(status_code=500, detail="Failed to open file")
