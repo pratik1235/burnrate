@@ -289,7 +289,7 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
               <CategoryBadge
                 $bgColor={`${catColor}30`}
                 $color={catColor}
-                title={isCcPayment ? 'Credit card payments are not included in spends calculation' : undefined}
+                title={isCcPayment ? 'Credit card statement repayments are not included in spends calculation' : undefined}
               >
                 <Typography
                   as="span"
@@ -303,9 +303,16 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
               </CategoryBadge>
             }
           />
+          
           <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
             {bankConfig.name} {transaction.cardLast4 ? `...${transaction.cardLast4}` : ''}
           </Typography> 
+          
+          {isCcPayment && (
+            <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
+              Not included in spends
+            </Typography>
+          )}
           <TagBtn style={{ position: 'relative' }}>
             <SelectDropdown
               selectionMode="multi"
@@ -341,11 +348,6 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
               ariaLabel="Tag transaction"
             />
           </TagBtn>
-          {isCcPayment && (
-            <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
-              Not included in spends
-            </Typography>
-          )}
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>

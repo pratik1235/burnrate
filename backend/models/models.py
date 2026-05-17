@@ -18,6 +18,7 @@ from sqlalchemy.orm import relationship
 
 from backend.models.database import Base
 
+MAX_TAG_LENGTH = 12
 
 def generate_uuid() -> str:
     """Generate a UUID4 string for primary keys."""
@@ -165,10 +166,11 @@ class TransactionTag(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     transaction_id = Column(String(36), ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False)
-    tag = Column(String(12), nullable=False)
+    tag_id = Column(String(36), ForeignKey("tag_definitions.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     transaction = relationship("Transaction", back_populates="tags")
+    tag_def = relationship("TagDefinition")
 
 
 class CategoryDefinition(Base):
@@ -192,7 +194,7 @@ class TagDefinition(Base):
     __tablename__ = "tag_definitions"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    name = Column(String(12), nullable=False, unique=True)
+    name = Column(String(MAX_TAG_LENGTH), nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

@@ -135,6 +135,42 @@ def _run_migrations(engine_ref) -> None:
                 except Exception as e:
                     print(f"Warning: Could not create unique index uq_card_bank_last4: {e}")
 
+        if "transaction_tags" in inspector.get_table_names():
+            existing_cols = {c["name"] for c in inspector.get_columns("transaction_tags")}
+            if "tag" in existing_cols:
+                try:
+                    conn.execute(text('''
+                        INSERT OR IGNORE INTO tag_definitions (id, name, created_at)
+                        SELECT lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6))), tag, CURRENT_TIMESTAMP 
+                        FROM transaction_tags 
+                        GROUP BY tag
+                    '''))
+                    
+                    conn.execute(text('''
+                        CREATE TABLE transaction_tags_new (
+                            id VARCHAR(36) NOT NULL,
+                            transaction_id VARCHAR(36) NOT NULL,
+                            tag_id VARCHAR(36) NOT NULL,
+                            created_at DATETIME,
+                            PRIMARY KEY (id),
+                            FOREIGN KEY(transaction_id) REFERENCES transactions (id) ON DELETE CASCADE,
+                            FOREIGN KEY(tag_id) REFERENCES tag_definitions (id) ON DELETE CASCADE
+                        )
+                    '''))
+                    
+                    conn.execute(text('''
+                        INSERT INTO transaction_tags_new (id, transaction_id, tag_id, created_at)
+                        SELECT tt.id, tt.transaction_id, td.id, tt.created_at
+                        FROM transaction_tags tt
+                        JOIN tag_definitions td ON tt.tag = td.name
+                    '''))
+                    
+                    conn.execute(text("DROP TABLE transaction_tags"))
+                    conn.execute(text("ALTER TABLE transaction_tags_new RENAME TO transaction_tags"))
+                    conn.commit()
+                except Exception as e:
+                    print(f"Warning: Could not migrate transaction_tags to use tag_id: {e}")
+
 
 def init_db() -> None:
     """Create all tables and ensure data directory exists."""

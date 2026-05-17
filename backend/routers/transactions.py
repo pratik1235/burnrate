@@ -10,7 +10,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 from backend.models.database import get_db
-from backend.models.models import CategoryDefinition, Transaction, TransactionTag
+from backend.models.models import MAX_TAG_LENGTH, CategoryDefinition, TagDefinition, Transaction, TransactionTag
 from backend.services.transaction_query import apply_source_account_filters, parse_bank_accounts_param
 
 
@@ -120,7 +120,8 @@ def list_transactions(
         if tag_names:
             tag_subquery = (
                 db.query(TransactionTag.transaction_id)
-                .filter(TransactionTag.tag.in_(tag_names))
+                .join(TagDefinition, TransactionTag.tag_id == TagDefinition.id)
+                .filter(TagDefinition.name.in_(tag_names))
                 .distinct()
             )
             q = q.filter(Transaction.id.in_(tag_subquery))
@@ -187,7 +188,7 @@ def list_transactions(
             q = q.order_by(Transaction.date.desc(), Transaction.id.desc())
 
     rows = (
-        q.options(joinedload(Transaction.tags))
+        q.options(joinedload(Transaction.tags).joinedload(TransactionTag.tag_def))
         .offset(offset)
         .limit(limit)
         .all()
@@ -209,7 +210,7 @@ def list_transactions(
                 "cardId": r.card_id,
                 "source": getattr(r, "source", None) or "CC",
                 "currency": (getattr(r, "currency", None) or "INR").upper()[:3],
-                "tags": [t.tag for t in r.tags],
+                "tags": [t.tag_def.name for t in r.tags if t.tag_def],
                 "isManuallyCategorized": getattr(r, "is_manually_categorized", 0),
             }
             for r in rows
@@ -228,7 +229,8 @@ def get_transaction_tags(
 ) -> Dict[str, List[str]]:
     """Return tags for a transaction."""
     tags = (
-        db.query(TransactionTag.tag)
+        db.query(TagDefinition.name)
+        .join(TransactionTag, TransactionTag.tag_id == TagDefinition.id)
         .filter(TransactionTag.transaction_id == transaction_id)
         .all()
     )
@@ -241,13 +243,13 @@ def update_transaction_tags(
     payload: UpdateTagsPayload,
     db: Session = Depends(get_db),
 ) -> Dict[str, List[str]]:
-    """Replace tags for a transaction. Max 3 tags, each max 10 chars."""
+    """Replace tags for a transaction. Max 3 tags, bounded by max length."""
     if len(payload.tags) > 3:
         raise HTTPException(status_code=400, detail="Maximum 3 tags allowed")
     validated = []
     for t in payload.tags:
-        tag = str(t).strip()[:10]
-        if tag and len(tag) <= 10:
+        tag = str(t).strip()[:MAX_TAG_LENGTH]
+        if tag and len(tag) <= MAX_TAG_LENGTH:
             validated.append(tag)
     if len(validated) > 3:
         validated = validated[:3]
@@ -255,8 +257,13 @@ def update_transaction_tags(
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
     db.query(TransactionTag).filter(TransactionTag.transaction_id == transaction_id).delete()
-    for tag in validated:
-        db.add(TransactionTag(transaction_id=transaction_id, tag=tag))
+    for tag_name in validated:
+        tag_def = db.query(TagDefinition).filter(TagDefinition.name == tag_name).first()
+        if not tag_def:
+            tag_def = TagDefinition(name=tag_name)
+            db.add(tag_def)
+            db.flush()
+        db.add(TransactionTag(transaction_id=transaction_id, tag_id=tag_def.id))
     db.commit()
     return {"tags": validated}
 
