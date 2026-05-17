@@ -10,14 +10,15 @@ Burnrate is a personal finance app that keeps imported **statements and transact
 
 ## Features
 
-- **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, IndusInd, Kotak, Standard Chartered, YES, AU, RBL
+- **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, IndusInd, Kotak, Standard Chartered, YES, AU, RBL, Federal Scapia
 - **Auto-import** — Drop credit card statement PDFs or set up a watch folder for automatic processing
 - **Bank account statements (CSV)** — Import savings/current account CSVs from major Indian banks (HDFC, ICICI, SBI, Axis, plus a generic auto-detect parser). Statements and transactions carry a **CC** vs **BANK** source so you can filter and review them separately. Credit card bill payments on bank statements are excluded from spend totals so they are not double-counted with card-side payments.
-- **Statements hub** — Browse imported statements (card and bank), filter by bank and period, and manage uploads from one place
+- **Statements hub** — Browse imported statements (card and bank), filter by bank and period, and manage uploads from one place, plus built-in payment reminders.
+- **LLM Insights & Reminders** — Get AI-powered insights on your spending using cloud providers (Local LLM(OLLAMA), Anthropic, OpenAI, AWS Bedrock) with secure keychain credential storage.
 - **Offers & benefits** — Offers are fetched from public bank and aggregator pages, normalized, cached locally, and shown in a searchable catalog. Highlight offers that match your cards, hide noise, add your own manual offers, and refresh on demand. Always verify details with your issuer before relying on an offer.
 - **Spending milestones** — Track progress toward fee waivers, bonus points, lounge access, and other card benefits. Set custom goals or sync predefined milestones from bank definitions. Filter by card and see how much more you need to spend to reach each milestone.
 - **Gmail statement autosync (optional)** — Opt in to read-only Gmail OAuth (PKCE). Matching statement attachments (PDF, CSV, XLS/XLSX) are saved to your watch folder or default uploads and processed like manual drops. Configure OAuth in the backend; connect from **Customize** and monitor sync from the navbar.
-- **Smart categorization** — Transactions auto-categorized with customizable categories and keywords
+- **Smart & Manual categorization** — Transactions auto-categorized with customizable categories and keywords. Support for manual inline category editing that persists across reparsing.
 - **Rich analytics** — Spend trends, category breakdowns, merchant insights, credit utilization
 - **Multi-card and multi-source filtering** — Filter transactions and metrics by cards, **bank accounts** (bank + last 4), **source** (credit card / bank / all), categories, date range, amount, direction, and tags
 - **Multiple Views** — Analyze transactions per statement, consolidate across multiple cards, or apply flexible filters for any custom combination
@@ -52,8 +53,8 @@ Then open http://localhost:8000 in your browser.
 ### Docker
 
 ```bash
-docker pull pratik1235/burnrate:v0.3.2
-docker run -p 8000:8000 -v burnrate_data:/data pratik1235/burnrate:v0.3.2
+docker pull pratik1235/burnrate:v0.4.0
+docker run -p 8000:8000 -v burnrate_data:/data pratik1235/burnrate:v0.4.0
 ```
 
 ### macOS — Homebrew
