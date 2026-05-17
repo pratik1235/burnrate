@@ -166,7 +166,7 @@ class IDFCFirstBankParser(BaseParser):
         if date_col is None or amt_col is None:
             return []
 
-        for row in data_rows:
+        for row_idx, row in enumerate(data_rows):
             if not row or len(row) <= max(date_col, amt_col):
                 continue
             dates = [x.strip() for x in row[date_col].split("\n") if x.strip()]
@@ -188,6 +188,7 @@ class IDFCFirstBankParser(BaseParser):
                 )
                 self._process_and_append_tx(
                     parsed_date, desc, amounts_raw[i], seen, out,
+                    source_idx=("table", row_idx, i),
                 )
 
         return out
@@ -246,7 +247,7 @@ class IDFCFirstBankParser(BaseParser):
     ) -> List[ParsedTransaction]:
         seen: set = set()
         out: List[ParsedTransaction] = []
-        for line in lines:
+        for line_idx, line in enumerate(lines):
             m = _TX_TEXT_LINE_RE.match(line.strip())
             if not m:
                 continue
@@ -255,7 +256,10 @@ class IDFCFirstBankParser(BaseParser):
                 continue
             desc = m.group(2).strip()
             amount_str = f"{m.group(3)} {m.group(4)}".upper()
-            self._process_and_append_tx(parsed_date, desc, amount_str, seen, out)
+            self._process_and_append_tx(
+                parsed_date, desc, amount_str, seen, out,
+                source_idx=("text", line_idx),
+            )
         return out
 
     def _process_and_append_tx(
@@ -265,6 +269,7 @@ class IDFCFirstBankParser(BaseParser):
         amount_str: str,
         seen: set,
         transactions: list,
+        source_idx=None,
     ) -> None:
         amount_str = amount_str.strip().upper()
         is_credit = amount_str.endswith("CR")
@@ -285,7 +290,9 @@ class IDFCFirstBankParser(BaseParser):
             type="credit" if is_credit else "debit",
             description=description,
         )
-        key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type)
+        # Include the source position so that two genuinely identical
+        # transactions on different rows are not treated as duplicates.
+        key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type, source_idx)
         if key not in seen:
             seen.add(key)
             transactions.append(tx)

@@ -373,7 +373,7 @@ class IndianBankParser(BaseParser):
 
         # --- Text-based extraction (most reliable for this format) ---
         in_tx_section = False
-        for raw_line in lines:
+        for text_line_idx, raw_line in enumerate(lines):
             line = raw_line.strip()
             if not line:
                 continue
@@ -394,11 +394,11 @@ class IndianBankParser(BaseParser):
                 green_amount_keys=green_amount_keys,
             )
             if tx:
-                if self._add_unique(tx, seen, transactions):
+                if self._add_unique(tx, seen, transactions, source_idx=("text", text_line_idx)):
                     seen_date_amount.add((tx.date.isoformat(), tx.amount))
 
         # --- Table-based extraction (supplement; catches rows text misses) ---
-        for row in table_rows:
+        for row_idx, row in enumerate(table_rows):
             tx = self._parse_table_row(
                 row, ref_year, period_start, period_end,
                 green_amount_keys=green_amount_keys,
@@ -413,7 +413,7 @@ class IndianBankParser(BaseParser):
                         tx.date, tx.merchant, tx.amount,
                     )
                     continue
-                self._add_unique(tx, seen, transactions)
+                self._add_unique(tx, seen, transactions, source_idx=("table", row_idx))
 
         return transactions
 
@@ -422,9 +422,12 @@ class IndianBankParser(BaseParser):
         tx: ParsedTransaction,
         seen: set,
         out: List[ParsedTransaction],
+        source_idx=None,
     ) -> bool:
         """Add *tx* to *out* if not already seen.  Returns True if added."""
-        key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type)
+        # Include the source position so that two genuinely identical
+        # transactions on different rows are not treated as duplicates.
+        key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type, source_idx)
         if key not in seen:
             seen.add(key)
             out.append(tx)

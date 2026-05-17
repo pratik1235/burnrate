@@ -121,26 +121,29 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_gmail_startup_sync, name="gmail-startup-sync", daemon=True).start()
 
     # Offer sync background loop
-    def _offer_sync_loop() -> None:
-        import time
+    async def _offer_sync_loop() -> None:
+        import asyncio
 
         from backend.config import OFFER_SYNC_ENABLED, OFFER_SYNC_INTERVAL
 
-        time.sleep(5)  # let app fully start
+        await asyncio.sleep(5)  # let app fully start
         while True:
             if OFFER_SYNC_ENABLED:
-                session = SessionLocal()
-                try:
-                    from backend.services.offer_fetcher import sync_offers
-                    sync_offers(session)
-                    logger.info("Offer sync completed")
-                except Exception:
-                    logger.exception("Offer sync failed")
-                finally:
-                    session.close()
-            time.sleep(OFFER_SYNC_INTERVAL)
+                def _do_sync():
+                    session = SessionLocal()
+                    try:
+                        from backend.services.offer_fetcher import sync_offers
+                        sync_offers(session)
+                        logger.info("Offer sync completed")
+                    except Exception:
+                        logger.exception("Offer sync failed")
+                    finally:
+                        session.close()
+                await asyncio.to_thread(_do_sync)
+            await asyncio.sleep(OFFER_SYNC_INTERVAL)
 
-    threading.Thread(target=_offer_sync_loop, name="offer-sync", daemon=True).start()
+    import asyncio
+    asyncio.create_task(_offer_sync_loop(), name="offer-sync")
 
     # Milestone sync background loop
     def _milestone_sync_loop() -> None:

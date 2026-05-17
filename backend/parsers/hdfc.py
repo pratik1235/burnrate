@@ -317,7 +317,12 @@ class HDFCParser(BaseParser):
         self, lines: List[str]
     ) -> List[ParsedTransaction]:
         transactions: List[ParsedTransaction] = []
-        seen: set = set()
+        # Dedup on the full raw line string rather than parsed (date, merchant,
+        # amount, type). HDFC lines include a timestamp (HH:MM:SS) that makes
+        # every genuine transaction unique; the same line appearing from both
+        # extract_text() and extract_tables() is an exact byte-for-byte
+        # duplicate and is correctly filtered by seen_raw.
+        seen_raw: set = set()
 
         cleaned: List[str] = []
         for raw in lines:
@@ -327,17 +332,18 @@ class HDFCParser(BaseParser):
                 continue
             line = re.sub(r"\(cid:\d+\)", " ", line)
             line = re.sub(r"\s+", " ", line).strip()
+            # Strip pdfplumber 'null' artifact that can precede a date when a
+            # null/transparent PDF color object is rendered as literal text.
+            line = re.sub(r"^null(?=\d)", "", line)
             cleaned.append(line)
 
         for line in cleaned:
-            if not line:
+            if not line or line in seen_raw:
                 continue
+            seen_raw.add(line)  # mark processed regardless of parse result
             tx = self._parse_legacy_transaction_line(line)
             if tx:
-                key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type)
-                if key not in seen:
-                    seen.add(key)
-                    transactions.append(tx)
+                transactions.append(tx)
 
         return transactions
 
@@ -446,7 +452,12 @@ class HDFCParser(BaseParser):
 
     def _extract_transactions(self, lines: List[str]) -> List[ParsedTransaction]:
         transactions: List[ParsedTransaction] = []
-        seen: set = set()
+        # Dedup on the full raw line string rather than parsed (date, merchant,
+        # amount, type). HDFC new-format lines include a timestamp (HH:MM) that
+        # makes every genuine transaction unique; the same line appearing from
+        # both extract_text() and extract_tables() is an exact duplicate and is
+        # correctly filtered by seen_raw.
+        seen_raw: set = set()
 
         # Normalize all lines once
         cleaned: List[str] = []
@@ -457,18 +468,19 @@ class HDFCParser(BaseParser):
                 continue
             line = re.sub(r"\(cid:\d+\)", " ", line)
             line = re.sub(r"\s+", " ", line).strip()
+            # Strip pdfplumber 'null' artifact that can precede a date when a
+            # null/transparent PDF color object is rendered as literal text.
+            line = re.sub(r"^null(?=\d)", "", line)
             cleaned.append(line)
 
         # --- Pass 1: standard single-line transactions (original logic) ---
         for line in cleaned:
-            if not line:
+            if not line or line in seen_raw:
                 continue
+            seen_raw.add(line)  # mark processed regardless of parse result
             tx = self._parse_transaction_line(line)
             if tx:
-                key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type)
-                if key not in seen:
-                    seen.add(key)
-                    transactions.append(tx)
+                transactions.append(tx)
 
         # --- Pass 2: multi-line transactions (e.g. UPI RuPay CC payments) ---
         # Some HDFC card statements (e.g. RuPay cards) put the description

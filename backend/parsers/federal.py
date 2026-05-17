@@ -211,7 +211,7 @@ class FederalBankParser(BaseParser):
         transactions: List[ParsedTransaction] = []
         seen: set = set()
 
-        for raw_line in lines:
+        for line_idx, raw_line in enumerate(lines):
             line = raw_line.strip()
             if not line:
                 continue
@@ -220,7 +220,9 @@ class FederalBankParser(BaseParser):
 
             tx = self._parse_transaction_line(line)
             if tx:
-                key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type)
+                # Include the source line index so that two genuinely identical
+                # transactions on different rows are not treated as duplicates.
+                key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type, line_idx)
                 if key not in seen:
                     seen.add(key)
                     transactions.append(tx)
