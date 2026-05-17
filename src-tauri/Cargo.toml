@@ -1,6 +1,6 @@
 [package]
 name = "burnrate"
-version = "0.3.2"
+version = "0.4.0"
 description = "Privacy-first, local-only credit card spend analytics"
 authors = ["Pratik Prakash"]
 edition = "2021"
