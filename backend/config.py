@@ -12,13 +12,13 @@ from typing import Dict, List
 # Offer & Milestone sync configuration
 # ---------------------------------------------------------------------------
 OFFER_SYNC_INTERVAL = 6 * 60 * 60  # 6 hours in seconds
-OFFER_SYNC_ENABLED = os.getenv("OFFER_SYNC_ENABLED", "true").lower() == "true"
+OFFER_SYNC_ENABLED = os.getenv("OFFER_SYNC_ENABLED", "false").lower() == "true"
 OFFER_REQUEST_TIMEOUT = 30  # seconds
 OFFER_REQUEST_DELAY = 1.0  # seconds between requests to same domain
 OFFER_MAX_RETRIES = 2
 
 MILESTONE_SYNC_INTERVAL = 24 * 60 * 60  # 24 hours
-MILESTONE_SYNC_ENABLED = os.getenv("MILESTONE_SYNC_ENABLED", "true").lower() == "true"
+MILESTONE_SYNC_ENABLED = os.getenv("MILESTONE_SYNC_ENABLED", "false").lower() == "true"
 
 OFFER_PROVIDERS: Dict[str, Dict] = {
     # Direct bank scrapers disabled: these sites are JS-rendered and return no offer data via plain HTTP

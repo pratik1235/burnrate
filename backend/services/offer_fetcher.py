@@ -587,12 +587,12 @@ ALL_PROVIDERS: List[BaseOfferProvider] = [
 ]
 
 
-def sync_offers(db: Session) -> dict:
+def sync_offers(db: Session, force: bool = False) -> dict:
     """Run a full offer sync cycle across all enabled providers.
 
     Returns a summary dict with counts per provider.
     """
-    if not OFFER_SYNC_ENABLED:
+    if not OFFER_SYNC_ENABLED and not force:
         return {"status": "disabled"}
 
     client = httpx.Client(

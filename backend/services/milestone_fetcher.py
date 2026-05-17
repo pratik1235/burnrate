@@ -371,9 +371,9 @@ ALL_MILESTONE_PROVIDERS: List[BaseMilestoneProvider] = [
 ]
 
 
-def sync_milestone_definitions(db: Session) -> dict:
+def sync_milestone_definitions(db: Session, force: bool = False) -> dict:
     """Run a milestone definition sync cycle."""
-    if not MILESTONE_SYNC_ENABLED:
+    if not MILESTONE_SYNC_ENABLED and not force:
         return {"status": "disabled"}
 
     # Get user's card template_ids for targeted scraping

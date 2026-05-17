@@ -565,6 +565,9 @@ class IndianBankParser(BaseParser):
         # Map the PDF's 'Repayments' category to the app's 'CC Bill Payment' slug
         parser_category = "cc_payment" if category.lower() in {"repayment", "repayments"} else None
 
+        if any(kw in full_desc.lower() for kw in ["paid via upi", "paid via upi bbps"]):
+            parser_category = "cc_payment"
+
         return ParsedTransaction(
             date=parsed_date,
             merchant=clean,
@@ -633,6 +636,8 @@ class IndianBankParser(BaseParser):
         if is_emi:
             parser_category = "emi"
         elif detected_cat.lower() in {"repayment", "repayments"}:
+            parser_category = "cc_payment"
+        elif any(kw in desc_lower for kw in ["paid via upi", "paid via upi bbps"]):
             parser_category = "cc_payment"
 
         merchant = self._clean_merchant(raw_desc, category=detected_cat)

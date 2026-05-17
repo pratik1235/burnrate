@@ -249,11 +249,16 @@ class ICICIParser(BaseParser):
         merchant = self._clean_merchant(merchant)
         tx_type = "credit" if is_credit else "debit"
 
+        parser_category = None
+        if "bbps payment received" in raw_desc.lower():
+            parser_category = "cc_payment"
+
         return ParsedTransaction(
             date=parsed_date,
             merchant=merchant,
             amount=amount,
             type=tx_type,
+            category=parser_category,
             description=raw_desc,
         )
 

@@ -244,7 +244,7 @@ def trigger_sync(db: Session = Depends(get_db)) -> Dict[str, Any]:
     def _run():
         session = SessionLocal()
         try:
-            sync_milestone_definitions(session)
+            sync_milestone_definitions(session, force=True)
         except Exception:
             pass
         finally:

@@ -535,12 +535,15 @@ class ScapiaFederalParser(BaseParser):
         # Map 'Payment' category label → cc_payment app category slug
         parser_category: Optional[str] = "cc_payment" if is_payment_category else None
 
+        if "billpayment" in merchant.lower():
+            parser_category = "cc_payment"
+
         return ParsedTransaction(
             date=tx_date,
             merchant=merchant,
             amount=amount,
             type=tx_type,
-            description=merchant,
+            description=" ".join(merchant_words),
             category=parser_category,
             card_network=card_network,
         )

@@ -259,11 +259,16 @@ class FederalBankParser(BaseParser):
         tx_type = "credit" if is_credit else "debit"
         merchant = self._clean_merchant(raw_desc.strip())
 
+        parser_category = None
+        if "billpayment" in raw_desc.lower():
+            parser_category = "cc_payment"
+
         return ParsedTransaction(
             date=parsed_date,
             merchant=merchant,
             amount=amount,
             type=tx_type,
+            category=parser_category,
             description=raw_desc.strip(),
         )
 

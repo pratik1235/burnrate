@@ -399,6 +399,15 @@ class HDFCParser(BaseParser):
         is_emi = detect_emi_transaction(desc_part, desc_part)
         parser_category = "emi" if is_emi else None
 
+        desc_lower = desc_part.lower()
+        if any(kw in desc_lower for kw in [
+            "bppy cc payment",
+            "credit card paymentnet banking",
+            "netbanking transfer",
+            "tele transfer credit",
+        ]):
+            parser_category = "cc_payment"
+
         return ParsedTransaction(
             date=parsed_date,
             merchant=merchant,
@@ -581,6 +590,15 @@ class HDFCParser(BaseParser):
         # Detect EMI transactions
         is_emi = detect_emi_transaction(desc_raw, desc_raw)
         parser_category = "emi" if is_emi else None
+
+        desc_lower = desc_raw.lower()
+        if any(kw in desc_lower for kw in [
+            "bppy cc payment",
+            "credit card paymentnet banking",
+            "netbanking transfer",
+            "tele transfer credit",
+        ]):
+            parser_category = "cc_payment"
 
         return ParsedTransaction(
             date=parsed_date,

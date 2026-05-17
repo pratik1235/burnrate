@@ -222,11 +222,22 @@ class AxisParser(BaseParser):
         tx_type = "credit" if is_credit else "debit"
         merchant = self._clean_merchant(raw_desc)
 
+        parser_category = None
+        desc_lower = raw_desc.lower()
+        if any(kw in desc_lower for kw in [
+            "upi payment received",
+            "imps payment",
+            "online payment",
+            "bbps payment received"
+        ]):
+            parser_category = "cc_payment"
+
         return ParsedTransaction(
             date=parsed_date,
             merchant=merchant,
             amount=amount,
             type=tx_type,
+            category=parser_category,
             description=raw_desc,
         )
 
