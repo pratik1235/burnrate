@@ -10,11 +10,17 @@ LAST4_AXIS = "5631"
 LAST4_ICICI = "7820"
 LAST4_EXTRA = "3192"
 LAST4_IDFC_SYNTH = "1847"
+# SBI Card fixture: card number shows only last 2 digits ("XXXX XXXX XXXX XX20").
+# The parser extracts "20" (raw visible digits). The statement_processor resolves
+# the full registered card via suffix match when processing real statements.
+LAST4_SBI_SYNTH = "20"  # partial — only 2 digits visible in the statement
+LAST4_SBI_REGISTERED = "1320"  # what a user would register (ends with the visible "20")
 
 HDFC_STATEMENT = f"hdfc_{LAST4_HDFC}_2026-02.pdf"
 AXIS_STATEMENT = f"axis_{LAST4_AXIS}.pdf"
 ICICI_STATEMENT = f"icici_{LAST4_ICICI}.pdf"
 IDFC_SYNTHETIC_PDF = f"idfc_{LAST4_IDFC_SYNTH}_synthetic.pdf"
+SBI_SYNTHETIC_PDF = "sbi_xx20_synthetic.pdf"
 
 
 def card_last4s_for_pdf_unlock() -> list[str]:

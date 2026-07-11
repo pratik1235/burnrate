@@ -209,6 +209,47 @@ def generate_passwords(
             if last4 and len(str(last4)) >= 4:
                 _add(n4u + str(last4)[-4:])
 
+    elif bank.lower() == "sbi":
+        # ---------------------------------------------------------------
+        # Official SBI Card e-Statement password format (documented):
+        #   DOB in DDMMYYYY  +  last 4 digits of card
+        #   Example: DOB 01.04.1980, card last4 1234 → "010419801234"
+        #   Source: SBI Card "NEW PASSWORD CONFIGURATION FOR E-STATEMENT"
+        #
+        # card_last4s contains the REGISTERED full 4-digit values from the
+        # user profile — NOT the partial 2-digit value from the masked PDF.
+        # ---------------------------------------------------------------
+        for last4 in card_last4s or []:
+            l4 = str(last4)[-4:] if last4 and len(str(last4)) >= 4 else None
+            if l4:
+                # Primary: DDMMYYYY + last4  (official documented format)
+                _add(ddmmyyyy + l4)
+                # Fallback 1: DDMMYY + last4  (6-digit year variant)
+                _add(ddmmyy + l4)
+
+        # Fallback 2: pure DDMMYYYY (accounts for cases where card digits
+        # were not required by an older statement version)
+        _add(ddmmyyyy)
+        _add(ddmmyy)
+
+        # Fallback 3: name-based patterns seen on some older SBI statements
+        n4u = name4.upper()
+        n4l = name4.lower()
+        fnu = first_name.upper()
+        fnl = first_name.lower()
+        _add(n4u + ddmm)
+        _add(fnu + ddmm)
+        _add(n4l + ddmm)
+        _add(fnl + ddmm)
+        _add(n4u + ddmmyyyy)
+        _add(fnu + ddmmyyyy)
+        # Last resort: name + card_last4 combinations
+        for last4 in card_last4s or []:
+            l4 = str(last4)[-4:] if last4 and len(str(last4)) >= 4 else None
+            if l4:
+                _add(n4u + l4)
+                _add(n4l + l4)
+
     else:
         # Generic password patterns for other banks
         n4u = name4.upper()

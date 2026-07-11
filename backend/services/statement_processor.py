@@ -43,6 +43,7 @@ def _get_parsers() -> Dict[str, Type]:
     from backend.parsers.icici import ICICIParser
     from backend.parsers.idfc_first import IDFCFirstBankParser
     from backend.parsers.indian_bank import IndianBankParser
+    from backend.parsers.sbi import SBICardParser
 
     return {
         "hdfc": HDFCParser,
@@ -52,6 +53,7 @@ def _get_parsers() -> Dict[str, Type]:
         "federal_scapia": ScapiaFederalParser,
         "indian_bank": IndianBankParser,
         "idfc_first": IDFCFirstBankParser,
+        "sbi": SBICardParser,
     }
 
 
@@ -74,7 +76,7 @@ SUPPORTED_BANKS = [
     "hdfc", "icici", "axis", "sbi", "amex", "idfc_first",
     "indusind", "kotak", "sc", "yes", "au", "rbl",
     "federal", "federal_scapia", "indian_bank",
-]
+]  # Note: "sbi" was already present; SBICardParser is now registered in _get_parsers()
 
 
 def _compute_hash(file_path: str) -> str:
@@ -471,7 +473,7 @@ def process_statement(
         card_id = None  # only used for single-card fallback below
 
         if card_last4:
-            # Single-card or combined-card (primary is known)
+            # Single-card or combined-card (primary is known).
             # For combined statements card_last4_secondary is also set —
             # the per-card loop below handles both cards; no early return here.
             card = db_session.query(Card).filter(
@@ -479,8 +481,70 @@ def process_statement(
             ).first()
             if card:
                 card_id = card.id
+            elif bank == "sbi" and len(card_last4) < 4:
+                # SBI-specific: statements often show only the last 2 digits of
+                # the card number (e.g. "XXXX XXXX XXXX XX20"). The parser returns
+                # the visible digits as-is ("20"). An exact match on "20" would
+                # never find a card registered as "1234", so we fall back to a
+                # suffix match. This block is intentionally SBI-only and does NOT
+                # affect any other bank's card-matching logic.
+                sbi_suffix_matches = [
+                    c for c in registered_cards
+                    if c.last4.endswith(card_last4)
+                ]
+                if len(sbi_suffix_matches) == 1:
+                    card = sbi_suffix_matches[0]
+                    card_id = card.id
+                    # Promote card_last4 to the full registered 4-digit value so
+                    # Statement and Transaction rows store the correct last4.
+                    original_partial = card_last4
+                    card_last4 = card.last4
+                    logger.info(
+                        "SBI partial card match: visible='...%s' resolved to registered card ...%s",
+                        original_partial, card_last4,
+                    )
+                elif len(sbi_suffix_matches) > 1:
+                    # Ambiguous — multiple registered SBI cards share the same suffix.
+                    logger.warning(
+                        "SBI partial card match ambiguous: suffix='%s' matches %d cards — "
+                        "cannot determine which card this statement belongs to",
+                        card_last4, len(sbi_suffix_matches),
+                    )
+                    if not card_last4_secondary:
+                        return {
+                            "status": "card_not_found",
+                            "message": (
+                                f"Could not determine which SBI card this statement belongs to: "
+                                f"multiple registered cards share the suffix \u2026{card_last4}. "
+                                f"Please check your registered cards in Settings."
+                            ),
+                            "count": 0,
+                            "period": None,
+                            "bank": bank,
+                            "card_last4": card_last4,
+                        }
+                else:
+                    # No suffix match — card is not registered.
+                    if not card_last4_secondary:
+                        logger.warning(
+                            "Skipping statement — SBI card with suffix ...%s is not registered",
+                            card_last4,
+                        )
+                        return {
+                            "status": "card_not_found",
+                            "message": (
+                                f"Statement belongs to an SBI card ending \u2026{card_last4} "
+                                f"which has not been added yet. "
+                                f"Add this card in Settings to process these statements."
+                            ),
+                            "count": 0,
+                            "period": None,
+                            "bank": bank,
+                            "card_last4": card_last4,
+                        }
             elif not card_last4_secondary:
-                # Single-card statement but the card is not registered
+                # Single-card statement (non-SBI or SBI with full 4-digit last4)
+                # but the card is not registered.
                 logger.warning(
                     "Skipping statement — card %s ...%s is not registered",
                     bank, card_last4,
