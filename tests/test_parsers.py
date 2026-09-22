@@ -310,6 +310,22 @@ class TestSBICardParser:
         assert len(refunds) == 1
         assert refunds[0].type == "credit"
 
+    def test_refund_not_cc_payment(self):
+        """Refunds must NOT be classified as cc_payment.
+
+        cc_payment rows are excluded from net-spend analytics:
+            sum(debits) - sum(credits) WHERE category != 'cc_payment'
+        A merchant refund (e.g. Flipkart cancellation) is NOT a bill payment —
+        it must offset the user's spend. Classifying it as cc_payment would make
+        the refund invisible in analytics, inflating the apparent net spend.
+        """
+        refunds = [tx for tx in self.result.transactions if "REFUND" in tx.description.upper()]
+        assert len(refunds) == 1
+        assert refunds[0].category != "cc_payment", (
+            "Refund transactions must not be tagged cc_payment; "
+            "they should appear in net-spend calculations as merchant credits."
+        )
+
     def test_no_zero_amounts(self):
         for tx in self.result.transactions:
             assert tx.amount > 0

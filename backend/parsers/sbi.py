@@ -130,11 +130,10 @@ class SBICardParser(BaseParser):
                 text = page.extract_text() or ""
                 full_text += text + "\n"
                 all_lines.extend(text.split("\n"))
-                for table in page.extract_tables():
-                    for row in table:
-                        for cell in (row or []):
-                            if cell:
-                                all_lines.extend(str(cell).split("\n"))
+                # NOTE: extract_tables() is intentionally omitted here.
+                # SBI Card statements render transactions cleanly via extract_text().
+                # Adding table cells to all_lines would duplicate every transaction
+                # row that pdfplumber also extracts as flowing text.
 
         period_start, period_end = self._extract_period(full_text)
         card_last4 = self._extract_card_last4(full_text)
@@ -265,7 +264,7 @@ class SBICardParser(BaseParser):
         transactions: List[ParsedTransaction] = []
         seen: set = set()
 
-        for line_idx, raw_line in enumerate(lines):
+        for raw_line in lines:
             line = raw_line.strip()
             if not line:
                 continue
@@ -279,7 +278,10 @@ class SBICardParser(BaseParser):
 
             tx = self._parse_transaction_line(line)
             if tx:
-                key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type, line_idx)
+                # Deduplicate by semantic content; line_idx is intentionally excluded
+                # so that the same transaction appearing from both extract_text() and
+                # any other source is collapsed into one entry.
+                key = (tx.date.isoformat(), tx.merchant, tx.amount, tx.type)
                 if key not in seen:
                     seen.add(key)
                     transactions.append(tx)
@@ -320,10 +322,14 @@ def _build_transaction(
     tx_type = "credit" if is_credit else "debit"
     merchant = _clean_merchant(raw_desc.strip())
 
-    # Heuristic: classify known payment-received lines as cc_payment
+    # Heuristic: classify known bill-payment lines as cc_payment.
+    # cc_payment rows are excluded from net-spend analytics:
+    #   sum(debits) - sum(credits) WHERE category != 'cc_payment'
+    # Refunds are merchant-level credits (e.g. Flipkart cancellation), NOT bill
+    # payments — including them here would make refunds invisible in analytics.
     parser_category: Optional[str] = None
     desc_lower = raw_desc.lower()
-    if any(kw in desc_lower for kw in ("payment received", "payment credited", "refund")):
+    if any(kw in desc_lower for kw in ("payment received", "payment credited")):
         parser_category = "cc_payment"
 
     return ParsedTransaction(
