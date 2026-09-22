@@ -46,19 +46,6 @@ def _detect_bank_from_filename(filename: str) -> Optional[str]:
         return "indian_bank"
     if "406229" in lower:
         return "indian_bank"
-
-    # SBI Card statements are downloaded with a purely numeric filename —
-    # no bank keyword and no masked card number:
-    #   Format: <reference_id>_<DDMMYYYY>.pdf
-    #   Example: 8813129404745270_17012026.pdf
-    # The reference_id is an internal SBI number, NOT the card number,
-    # so no card last4 can be inferred from the filename.
-    # We detect this pattern here so the PDF does not need to be opened
-    # just for bank identification.
-    stem = lower.rsplit(".", 1)[0]  # strip extension to avoid matching the dot
-    if re.fullmatch(r"\d{8,16}_\d{8}", stem):
-        return "sbi"
-
     return None
 
 
@@ -121,27 +108,19 @@ def detect_bank(pdf_path: str) -> Optional[str]:
     if bank:
         return bank
 
-    # Try card BIN prefixes from masked card numbers in filename.
-    # BIN patterns look like "4386XXXX4219" (4 digits, X-mask, 2-4 digits).
-    # SBI Card filenames are purely numeric (e.g. "8813129404745270_17012026.pdf")
-    # and contain no masking characters, so they can never match this regex.
-    # The guard below makes that intent explicit and prevents any future regex
-    # change from accidentally extracting fake card digits from an SBI reference ID.
-    sbi_numeric_stem = filename.lower().rsplit(".", 1)[0]
-    is_sbi_numeric_filename = bool(re.fullmatch(r"\d{8,16}_\d{8}", sbi_numeric_stem))
-    if not is_sbi_numeric_filename:
-        bin_match = re.search(r"(\d{4})[xX*]+\d{2,4}", filename.lower())
-        if bin_match:
-            first4 = bin_match.group(1)
-            hdfc_bins = {"5522", "4386", "4567", "5241", "4543", "5254", "4213"}
-            icici_bins = {"4568", "5243", "4998", "5236", "4389", "4315", "4998", "5270", "4329"}
-            axis_bins = {"4108", "4178", "5269", "4021", "4717"}
-            if first4 in hdfc_bins:
-                return "hdfc"
-            if first4 in icici_bins:
-                return "icici"
-            if first4 in axis_bins:
-                return "axis"
+    # Try card BIN prefixes from masked card numbers in filename
+    bin_match = re.search(r"(\d{4})[xX*]+\d{2,4}", filename.lower())
+    if bin_match:
+        first4 = bin_match.group(1)
+        hdfc_bins = {"5522", "4386", "4567", "5241", "4543", "5254", "4213"}
+        icici_bins = {"4568", "5243", "4998", "5236", "4389", "4315", "4998", "5270", "4329"}
+        axis_bins = {"4108", "4178", "5269", "4021", "4717"}
+        if first4 in hdfc_bins:
+            return "hdfc"
+        if first4 in icici_bins:
+            return "icici"
+        if first4 in axis_bins:
+            return "axis"
 
     # Open PDF and extract first page text
     try:
