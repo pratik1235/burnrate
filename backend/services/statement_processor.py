@@ -481,7 +481,7 @@ def process_statement(
             ).first()
             if card:
                 card_id = card.id
-            elif bank == "sbi" and len(card_last4) < 4:
+            elif bank == "sbi" and card_last4 and len(card_last4) < 4:
                 # SBI-specific: statements often show only the last 2 digits of
                 # the card number (e.g. "XXXX XXXX XXXX XX20"). The parser returns
                 # the visible digits as-is ("20"). An exact match on "20" would

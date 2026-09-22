@@ -56,7 +56,11 @@ def _detect_bank_from_filename(filename: str) -> Optional[str]:
     # We detect this pattern here so the PDF does not need to be opened
     # just for bank identification.
     stem = lower.rsplit(".", 1)[0]  # strip extension to avoid matching the dot
-    if re.fullmatch(r"\d{8,16}_\d{8}", stem):
+    # SBI numeric filenames: <reference_id>_<DDMMYYYY>.pdf
+    # OR any filename containing 'sbi'. The numeric-only branch is tightened to
+    # \d{10,16} (observed SBI reference IDs are always >=10 digits) to reduce
+    # false-positive matches on coincidentally numeric filenames from other apps.
+    if "sbi" in stem or re.fullmatch(r"\d{10,16}_\d{8}", stem):
         return "sbi"
 
     return None
@@ -128,7 +132,10 @@ def detect_bank(pdf_path: str) -> Optional[str]:
     # The guard below makes that intent explicit and prevents any future regex
     # change from accidentally extracting fake card digits from an SBI reference ID.
     sbi_numeric_stem = filename.lower().rsplit(".", 1)[0]
-    is_sbi_numeric_filename = bool(re.fullmatch(r"\d{8,16}_\d{8}", sbi_numeric_stem))
+    is_sbi_numeric_filename = (
+        "sbi" in sbi_numeric_stem
+        or bool(re.fullmatch(r"\d{10,16}_\d{8}", sbi_numeric_stem))
+    )
     if not is_sbi_numeric_filename:
         bin_match = re.search(r"(\d{4})[xX*]+\d{2,4}", filename.lower())
         if bin_match:
