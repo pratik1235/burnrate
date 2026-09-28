@@ -10,6 +10,7 @@ class Burnrate < Formula
 
   depends_on "expat"
   depends_on "node" => :build
+  depends_on "pkg-config" => :build
   depends_on "python@3.13"
   depends_on "qpdf"
 
@@ -28,6 +29,7 @@ class Burnrate < Formula
     system "python3.13", "-m", "pip",
            "--python=#{libexec}/bin/python",
            "install", "--no-cache-dir",
+           "--no-binary=pikepdf",
            "-r", buildpath/"requirements.txt"
 
     cd "frontend-neopop" do
