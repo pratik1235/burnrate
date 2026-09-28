@@ -29,6 +29,10 @@ class UpdateCategoryPayload(BaseModel):
     category: str
 
 
+class UpdateKeywordPayload(BaseModel):
+    keyword: str
+
+
 @router.get("/bank-accounts")
 def list_bank_account_keys(
     db: Session = Depends(get_db),
@@ -114,6 +118,7 @@ def list_transactions(
         q = q.filter(
             Transaction.merchant.ilike(f"%{escaped}%", escape="\\")
             | Transaction.description.ilike(f"%{escaped}%", escape="\\")
+            | Transaction.txn_keyword.ilike(f"%{escaped}%", escape="\\")
         )
     if tags:
         tag_names = [t.strip() for t in tags.split(",") if t.strip()]
@@ -201,6 +206,7 @@ def list_transactions(
                 "statementId": r.statement_id,
                 "date": r.date.isoformat() if r.date else None,
                 "merchant": r.merchant,
+                "txn_keyword": getattr(r, "txn_keyword", None),
                 "amount": r.amount,
                 "type": r.type,
                 "category": r.category,
@@ -295,4 +301,28 @@ def update_transaction_category(
         "id": txn.id,
         "category": txn.category,
         "isManuallyCategorized": txn.is_manually_categorized
+    }
+
+
+@router.put("/{transaction_id}/keyword")
+def update_transaction_keyword(
+    transaction_id: str,
+    payload: UpdateKeywordPayload,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update transaction keyword manually."""
+    txn = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    keyword = payload.keyword.strip()
+    if len(keyword) > 10:
+        raise HTTPException(status_code=400, detail="Keyword max length is 10")
+        
+    txn.txn_keyword = keyword if keyword else None
+    db.commit()
+    
+    return {
+        "id": txn.id,
+        "txn_keyword": txn.txn_keyword
     }

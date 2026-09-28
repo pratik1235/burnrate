@@ -120,6 +120,7 @@ class Transaction(Base):
     statement_id = Column(String(36), ForeignKey("statements.id", ondelete="CASCADE"), nullable=False)
     date = Column(Date, nullable=False)
     merchant = Column(String(512), nullable=False)
+    txn_keyword = Column(String(10), nullable=True)
     amount = Column(Float, nullable=False)
     type = Column(String(20), nullable=False)  # 'debit' or 'credit'
     category = Column(String(50), nullable=False)

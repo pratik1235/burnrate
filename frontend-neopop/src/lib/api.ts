@@ -646,6 +646,11 @@ export async function updateTransactionCategory(transactionId: string, category:
   return data;
 }
 
+export async function updateTransactionKeyword(transactionId: string, keyword: string): Promise<{ id: string; txn_keyword: string | null }> {
+  const { data } = await api.put<{ id: string; txn_keyword: string | null }>(`/transactions/${transactionId}/keyword`, { keyword });
+  return data;
+}
+
 export async function deleteStatement(statementId: string): Promise<{ status: string; message: string }> {
   const { data } = await api.delete<{ status: string; message: string }>(`/statements/${statementId}`);
   _bankAccountsCachePromise = null;

@@ -6,7 +6,7 @@ import styled from 'styled-components';
 import { formatCurrency } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
 import { CATEGORY_CONFIG, BANK_CONFIG } from '@/lib/types';
-import { updateTransactionTags, updateTransactionCategory, getAllCategories, getTagDefinitions } from '@/lib/api';
+import { updateTransactionTags, updateTransactionCategory, getAllCategories, getTagDefinitions, updateTransactionKeyword } from '@/lib/api';
 import { SelectDropdown, type SelectDropdownOption } from '@/components/SelectDropdown';
 import {
   UtensilsCrossed,
@@ -104,6 +104,19 @@ const RowContainer = styled.div<{ $isCcPayment: boolean; $isExcluded: boolean }>
   }
 `;
 
+const SmallInputWrapper = styled.div`
+  & input {
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+    height: 24px !important;
+    min-height: 24px !important;
+  }
+  & > div {
+    padding: 0 !important;
+    min-height: 24px !important;
+  }
+`;
+
 interface TransactionRowProps {
   transaction: Transaction;
   className?: string;
@@ -117,6 +130,10 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
   const [catMap, setCatMap] = useState<Record<string, { name: string; color: string; icon: string }>>({});
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [localCategory, setLocalCategory] = useState<string>(transaction.category);
+  const [txnKeyword, setTxnKeyword] = useState<string>(transaction.txn_keyword ?? '');
+  const [isHovered, setIsHovered] = useState(false);
+  const [isEditingKeyword, setIsEditingKeyword] = useState(false);
+  const [keywordInput, setKeywordInput] = useState(transaction.txn_keyword ?? '');
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +158,46 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
   useEffect(() => {
     setLocalCategory(transaction.category);
   }, [transaction.id, transaction.category]);
+
+  useEffect(() => {
+    setTxnKeyword(transaction.txn_keyword ?? '');
+    setKeywordInput(transaction.txn_keyword ?? '');
+  }, [transaction.id, transaction.txn_keyword]);
+
+  useEffect(() => {
+    if (isEditingKeyword) {
+      // Find the input within this specific row's wrapper and focus it without scrolling
+      const input = document.querySelector(`#txn-kw-wrapper-${transaction.id} input`) as HTMLInputElement;
+      if (input) {
+        input.focus({ preventScroll: true });
+      }
+    }
+  }, [isEditingKeyword, transaction.id]);
+
+  const handleKeywordSubmit = useCallback(async () => {
+    if (keywordInput === txnKeyword) {
+      setIsEditingKeyword(false);
+      return;
+    }
+    try {
+      const resp = await updateTransactionKeyword(transaction.id, keywordInput);
+      setTxnKeyword(resp.txn_keyword ?? '');
+      setKeywordInput(resp.txn_keyword ?? '');
+    } catch (e) {
+      setKeywordInput(txnKeyword);
+    } finally {
+      setIsEditingKeyword(false);
+    }
+  }, [keywordInput, txnKeyword, transaction.id]);
+
+  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleKeywordSubmit();
+    } else if (e.key === 'Escape') {
+      setKeywordInput(txnKeyword);
+      setIsEditingKeyword(false);
+    }
+  };
 
   const tagOptions = useMemo<SelectDropdownOption[]>(
     () => availableTags.map((name) => ({ value: name, label: name })),
@@ -230,16 +287,71 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
       </div>
 
       <div style={{ flex: 1, minWidth: 0, overflow: 'visible' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <Typography
-            fontType={FontType.BODY}
-            fontSize={14}
-            fontWeight={FontWeights.SEMI_BOLD}
-            color={mainColors.white}
-            style={{ overflow: 'visible', marginRight: '10em', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: '10.5em', maxWidth: 'calc(100% - 35em)', flex: 1 }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+          <div
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}
           >
-            {transaction.merchant}
-          </Typography>
+            <Typography
+              fontType={FontType.BODY}
+              fontSize={14}
+              fontWeight={FontWeights.SEMI_BOLD}
+              color={mainColors.white}
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1, maxWidth: 'calc(100% - 10px)' }}
+            >
+              {transaction.merchant}
+              {txnKeyword && !isEditingKeyword && (
+                <span>&nbsp;&nbsp;-&nbsp;&nbsp;{txnKeyword}</span>
+              )}
+            </Typography>
+
+            <div style={{ display: 'flex', flexShrink: 0, marginLeft: '2ch', height: '24px' }}>
+              {isEditingKeyword ? (
+                <SmallInputWrapper id={`txn-kw-wrapper-${transaction.id}`} style={{ width: '120px', borderBottom: `1px solid ${colorPalette.black[50]}` }}>
+                  <input
+                    value={keywordInput}
+                    onChange={(e: any) => setKeywordInput(e.target.value)}
+                    onBlur={handleKeywordSubmit}
+                    onKeyDown={handleKeywordKeyDown}
+                    placeholder="Keyword..."
+                    maxLength={10}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: mainColors.white,
+                      caretColor: mainColors.white,
+                      width: '100%',
+                    }}
+                  />
+                </SmallInputWrapper>
+              ) : (
+                isHovered && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsEditingKeyword(true); }}
+                    style={{
+                      // use colors from color pallete defined in the burnrate code
+                      background: colorPalette.popBlack[300],
+                      border: `1px solid ${colorPalette.black[50]}`,
+                      borderRadius: "4px",
+                      color: mainColors.white,
+                      fontSize: "11px",
+                      padding: "2px 6px",
+                      cursor: "pointer",
+                      height: "24px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {txnKeyword ? 'Edit keyword' : 'Add keyword'}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
 
           {tags.length > 0 && (
             <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', overflow: 'hidden', flexShrink: 0 }}>
@@ -258,8 +370,8 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
 
         {/* Category row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-          
-          
+
+
           <Typography
             as="span"
             fontType={FontType.BODY}
@@ -303,11 +415,11 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
               </CategoryBadge>
             }
           />
-          
+
           <Typography fontType={FontType.BODY} fontSize={12} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
             {bankConfig.name} {transaction.cardLast4 ? `...${transaction.cardLast4}` : ''}
-          </Typography> 
-          
+          </Typography>
+
           {isCcPayment && (
             <Typography fontType={FontType.BODY} fontSize={11} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.35)">
               Not included in spends
@@ -325,7 +437,7 @@ export function TransactionRow({ transaction, className, exclusionMode, isExclud
               menuMount="portal"
               menuMinWidth={120}
               menuMaxHeight={190}
-              
+
               menuOffset={4}
               menuBackgroundColor={colorPalette.popBlack[300]}
               colorConfig={{

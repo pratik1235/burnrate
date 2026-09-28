@@ -17,6 +17,7 @@ export interface Transaction {
   id: string;
   date: string;
   merchant: string;
+  txn_keyword?: string | null;
   amount: number;
   type: 'debit' | 'credit';
   category: Category;

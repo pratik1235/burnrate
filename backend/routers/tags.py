@@ -48,7 +48,7 @@ def delete_tag_definition(tag_id: str, db: Session = Depends(get_db)) -> Dict[st
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
     # First delete all transaction tags using this name (cascade)
-    db.query(TransactionTag).filter(TransactionTag.tag == tag.name).delete(synchronize_session=False)
+    db.query(TransactionTag).filter(TransactionTag.tag_id == tag.id).delete(synchronize_session=False)
 
     db.delete(tag)
     db.commit()

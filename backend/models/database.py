@@ -89,6 +89,7 @@ def _run_migrations(engine_ref) -> None:
         ("statements", "parse_failed", "INTEGER NOT NULL DEFAULT 0"),
         ("transactions", "is_manually_categorized", "INTEGER NOT NULL DEFAULT 0"),
         ("statements", "note", "TEXT"),
+        ("transactions", "txn_keyword", "VARCHAR(10)"),
     ]
 
     with engine_ref.connect() as conn:
