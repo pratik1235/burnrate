@@ -988,3 +988,8 @@ export async function importData(file: File, password?: string): Promise<{status
   });
   return data;
 }
+
+export async function submitFeedback(text: string): Promise<{ status: string }> {
+  const { data } = await api.post<{ status: string }>('/feedback', { text });
+  return data;
+}

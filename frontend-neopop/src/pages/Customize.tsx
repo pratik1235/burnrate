@@ -39,6 +39,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { InsightsSettingsModal } from '@/components/InsightsSettingsModal';
 import { PaymentRemindersModal } from '@/components/PaymentRemindersModal';
 import { DataManagementModal } from '@/components/DataManagementModal';
+import { FeedbackModal } from '@/components/FeedbackModal';
 import styled from 'styled-components';
 
 const PageLayout = styled.div`
@@ -1771,6 +1772,7 @@ export function Customize() {
   const [insightsModalOpen, setInsightsModalOpen] = useState(false);
   const [paymentRemindersModalOpen, setPaymentRemindersModalOpen] = useState(false);
   const [dataModalOpen, setDataModalOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
   useEffect(() => {
     const g = searchParams.get('gmail');
@@ -1860,13 +1862,13 @@ export function Customize() {
             </Typography>
           </FeatureCard>
 
-          <FeatureCard onClick={() => window.open('https://github.com/pratik1235/burnrate/issues/new', '_blank')}>
+          <FeatureCard onClick={() => setFeedbackModalOpen(true)}>
             <MessageSquarePlus size={24} color={colorPalette.rss[500]} />
             <Typography fontType={FontType.BODY} fontSize={16} fontWeight={FontWeights.SEMI_BOLD} color={mainColors.white}>
               Feedback / Bugs / Feature Request
             </Typography>
             <Typography fontType={FontType.BODY} fontSize={13} fontWeight={FontWeights.REGULAR} color="rgba(255,255,255,0.5)">
-              Report a bug or suggest a feature on GitHub.
+              Report a bug or suggest a feature.
             </Typography>
           </FeatureCard>
         </CardsGrid>
@@ -1878,6 +1880,7 @@ export function Customize() {
         <InsightsSettingsModal open={insightsModalOpen} onClose={() => setInsightsModalOpen(false)} />
         <PaymentRemindersModal open={paymentRemindersModalOpen} onClose={() => setPaymentRemindersModalOpen(false)} />
         <DataManagementModal open={dataModalOpen} onClose={() => setDataModalOpen(false)} />
+        <FeedbackModal open={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
       </Content>
     </PageLayout>
   );

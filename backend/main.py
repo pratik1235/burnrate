@@ -25,7 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.models.database import SessionLocal, init_db
 from backend.models.models import CategoryDefinition, Settings
-from backend.routers import analytics, cards, categories, data, due_reminders, gmail, insights, milestones, offers, settings, statements, tags, transactions
+from backend.routers import analytics, cards, categories, data, due_reminders, feedback, gmail, insights, milestones, offers, settings, statements, tags, transactions
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +242,8 @@ app.include_router(offers.router, prefix="/api")
 app.include_router(milestones.router, prefix="/api")
 app.include_router(insights.router, prefix="/api")
 app.include_router(data.router, prefix="/api")
+app.include_router(feedback.router, prefix="/api")
+
 _project_root_for_static = Path(__file__).resolve().parent.parent
 _static_candidates = [
     os.environ.get("BURNRATE_STATIC_DIR", ""),
