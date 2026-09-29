@@ -163,215 +163,215 @@ jobs:
           name: Burnrate-macOS-arm64
           path: src-tauri/target/release/bundle/dmg/*.dmg
 
-  # ------------------------------------------------------------------
-  # macOS Intel (x86_64): Tauri app → .dmg
-  # ------------------------------------------------------------------
-  build-macos-intel:
-    runs-on: macos-15-intel
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend-neopop/package-lock.json
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt pyinstaller
-
-      - name: Force pure-Python charset_normalizer
-        run: |
-          pip uninstall -y charset-normalizer || true
-          pip install charset-normalizer --no-binary :all:
-
-      - name: Guard against charset_normalizer mypyc artifacts (macOS sidecar)
-        run: |
-          python - <<'PY'
-          import pathlib
-          import charset_normalizer
-          root = pathlib.Path(charset_normalizer.__file__).resolve().parent
-          bad = [p for p in root.rglob("*") if "__mypyc" in p.name]
-          if bad:
-              print("::error::Regression: mypyc artifacts under charset_normalizer")
-              for p in bad:
-                  print(p)
-              raise SystemExit(1)
-          print("OK: no mypyc artifacts under charset_normalizer")
-          PY
-
-      - name: Install frontend dependencies
-        working-directory: frontend-neopop
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend-neopop
-        run: npm run build
-
-      - name: Generate app icons from SVG
-        run: |
-          bash scripts/generate-icons.sh
-
-      - name: Build Python sidecar
-        env:
-          PYTHONPATH: .
-        run: |
-          TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
-          pyinstaller \
-            --name burnrate-server \
-            --onefile \
-            --noconfirm \
-            --paths . \
-            --hidden-import uvicorn.logging \
-            --hidden-import uvicorn.loops \
-            --hidden-import uvicorn.loops.auto \
-            --hidden-import uvicorn.protocols \
-            --hidden-import uvicorn.protocols.http \
-            --hidden-import uvicorn.protocols.http.auto \
-            --hidden-import uvicorn.protocols.websockets \
-            --hidden-import uvicorn.protocols.websockets.auto \
-            --hidden-import uvicorn.lifespan \
-            --hidden-import uvicorn.lifespan.on \
-            --collect-all backend \
-            --collect-all pdfplumber \
-            --collect-all charset_normalizer \
-            scripts/launch.py
-          mkdir -p src-tauri/binaries
-          cp "dist/burnrate-server" "src-tauri/binaries/burnrate-server-${TRIPLE}"
-          codesign --force --sign - "src-tauri/binaries/burnrate-server-${TRIPLE}"
-
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2"
-
-      - name: Build Tauri app
-        run: CI=false cargo tauri build
-
-      - name: Prepare DMG for distribution
-        run: |
-          DMG_PATH=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
-          if [ -n "$DMG_PATH" ]; then
-            codesign --remove-signature "$DMG_PATH" 2>/dev/null || true
-            xattr -cr "$DMG_PATH" 2>/dev/null || true
-          fi
-
-      - name: Upload .dmg artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Burnrate-macOS-x86_64
-          path: src-tauri/target/release/bundle/dmg/*.dmg
-
-  # ------------------------------------------------------------------
-  # Windows: PyInstaller + Inno Setup → .exe installer
-  # ------------------------------------------------------------------
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend-neopop/package-lock.json
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt pyinstaller
-
-      - name: Install frontend dependencies
-        working-directory: frontend-neopop
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend-neopop
-        run: npm run build
-
-      - name: Generate app icons from SVG
-        run: |
-          cd frontend-neopop
-          npm install --save-dev @resvg/resvg-js
-          node ../scripts/generate-icons.mjs
-
-      - name: Force pure-Python charset_normalizer
-        shell: bash
-        run: |
-          pip uninstall -y charset-normalizer || true
-          pip install charset-normalizer --no-binary :all:
-
-      - name: Build Windows executable
-        env:
-          PYTHONPATH: .
-        run: |
-          pyinstaller `
-            --name Burnrate `
-            --onedir `
-            --noconfirm `
-            --icon "src-tauri/icons/icon.ico" `
-            --add-data "frontend-neopop/dist;static" `
-            --paths . `
-            --hidden-import uvicorn.logging `
-            --hidden-import uvicorn.loops `
-            --hidden-import uvicorn.loops.auto `
-            --hidden-import uvicorn.protocols `
-            --hidden-import uvicorn.protocols.http `
-            --hidden-import uvicorn.protocols.http.auto `
-            --hidden-import uvicorn.protocols.websockets `
-            --hidden-import uvicorn.protocols.websockets.auto `
-            --hidden-import uvicorn.lifespan `
-            --hidden-import uvicorn.lifespan.on `
-            --collect-all backend `
-            --collect-all pdfplumber `
-            --collect-all charset_normalizer `
-            scripts/launch.py
-
-      - name: Guard against charset_normalizer __mypyc in bundle
-        shell: pwsh
-        run: |
-          $found = Get-ChildItem -Path dist/Burnrate -Recurse -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -eq '__mypyc' -and $_.FullName -like '*charset_normalizer*' }
-          if ($found) {
-            Write-Host "::error::Regression: __mypyc under charset_normalizer in frozen bundle"
-            $found | ForEach-Object { Write-Host $_.FullName }
-            exit 1
-          }
-
-      - name: Copy icon into dist for installer
-        run: Copy-Item "src-tauri/icons/icon.ico" "dist/Burnrate/icon.ico"
-
-      - name: Install Inno Setup
-        run: choco install innosetup -y --no-progress
-
-      - name: Build Inno Setup installer
-        shell: cmd
-        run: |
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" scripts\burnrate.iss
-
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Burnrate-Windows
-          path: dist/Burnrate-Setup.exe
-
+#   # ------------------------------------------------------------------
+#   # macOS Intel (x86_64): Tauri app → .dmg
+#   # ------------------------------------------------------------------
+#   build-macos-intel:
+#     runs-on: macos-15-intel
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - name: Install Rust
+#         uses: dtolnay/rust-toolchain@stable
+#
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 20
+#           cache: npm
+#           cache-dependency-path: frontend-neopop/package-lock.json
+#
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.12'
+#
+#       - name: Install Python dependencies
+#         run: pip install -r requirements.txt pyinstaller
+#
+#       - name: Force pure-Python charset_normalizer
+#         run: |
+#           pip uninstall -y charset-normalizer || true
+#           pip install charset-normalizer --no-binary :all:
+#
+#       - name: Guard against charset_normalizer mypyc artifacts (macOS sidecar)
+#         run: |
+#           python - <<'PY'
+#           import pathlib
+#           import charset_normalizer
+#           root = pathlib.Path(charset_normalizer.__file__).resolve().parent
+#           bad = [p for p in root.rglob("*") if "__mypyc" in p.name]
+#           if bad:
+#               print("::error::Regression: mypyc artifacts under charset_normalizer")
+#               for p in bad:
+#                   print(p)
+#               raise SystemExit(1)
+#           print("OK: no mypyc artifacts under charset_normalizer")
+#           PY
+#
+#       - name: Install frontend dependencies
+#         working-directory: frontend-neopop
+#         run: npm ci
+#
+#       - name: Build frontend
+#         working-directory: frontend-neopop
+#         run: npm run build
+#
+#       - name: Generate app icons from SVG
+#         run: |
+#           bash scripts/generate-icons.sh
+#
+#       - name: Build Python sidecar
+#         env:
+#           PYTHONPATH: .
+#         run: |
+#           TRIPLE=$(rustc -vV | grep host | awk '{print $2}')
+#           pyinstaller \
+#             --name burnrate-server \
+#             --onefile \
+#             --noconfirm \
+#             --paths . \
+#             --hidden-import uvicorn.logging \
+#             --hidden-import uvicorn.loops \
+#             --hidden-import uvicorn.loops.auto \
+#             --hidden-import uvicorn.protocols \
+#             --hidden-import uvicorn.protocols.http \
+#             --hidden-import uvicorn.protocols.http.auto \
+#             --hidden-import uvicorn.protocols.websockets \
+#             --hidden-import uvicorn.protocols.websockets.auto \
+#             --hidden-import uvicorn.lifespan \
+#             --hidden-import uvicorn.lifespan.on \
+#             --collect-all backend \
+#             --collect-all pdfplumber \
+#             --collect-all charset_normalizer \
+#             scripts/launch.py
+#           mkdir -p src-tauri/binaries
+#           cp "dist/burnrate-server" "src-tauri/binaries/burnrate-server-${TRIPLE}"
+#           codesign --force --sign - "src-tauri/binaries/burnrate-server-${TRIPLE}"
+#
+#       - name: Install Tauri CLI
+#         run: cargo install tauri-cli --version "^2"
+#
+#       - name: Build Tauri app
+#         run: CI=false cargo tauri build
+#
+#       - name: Prepare DMG for distribution
+#         run: |
+#           DMG_PATH=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+#           if [ -n "$DMG_PATH" ]; then
+#             codesign --remove-signature "$DMG_PATH" 2>/dev/null || true
+#             xattr -cr "$DMG_PATH" 2>/dev/null || true
+#           fi
+#
+#       - name: Upload .dmg artifact
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: Burnrate-macOS-x86_64
+#           path: src-tauri/target/release/bundle/dmg/*.dmg
+#
+#   # ------------------------------------------------------------------
+#   # Windows: PyInstaller + Inno Setup → .exe installer
+#   # ------------------------------------------------------------------
+#   build-windows:
+#     runs-on: windows-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 20
+#           cache: npm
+#           cache-dependency-path: frontend-neopop/package-lock.json
+#
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.12'
+#
+#       - name: Install Python dependencies
+#         run: pip install -r requirements.txt pyinstaller
+#
+#       - name: Install frontend dependencies
+#         working-directory: frontend-neopop
+#         run: npm ci
+#
+#       - name: Build frontend
+#         working-directory: frontend-neopop
+#         run: npm run build
+#
+#       - name: Generate app icons from SVG
+#         run: |
+#           cd frontend-neopop
+#           npm install --save-dev @resvg/resvg-js
+#           node ../scripts/generate-icons.mjs
+#
+#       - name: Force pure-Python charset_normalizer
+#         shell: bash
+#         run: |
+#           pip uninstall -y charset-normalizer || true
+#           pip install charset-normalizer --no-binary :all:
+#
+#       - name: Build Windows executable
+#         env:
+#           PYTHONPATH: .
+#         run: |
+#           pyinstaller `
+#             --name Burnrate `
+#             --onedir `
+#             --noconfirm `
+#             --icon "src-tauri/icons/icon.ico" `
+#             --add-data "frontend-neopop/dist;static" `
+#             --paths . `
+#             --hidden-import uvicorn.logging `
+#             --hidden-import uvicorn.loops `
+#             --hidden-import uvicorn.loops.auto `
+#             --hidden-import uvicorn.protocols `
+#             --hidden-import uvicorn.protocols.http `
+#             --hidden-import uvicorn.protocols.http.auto `
+#             --hidden-import uvicorn.protocols.websockets `
+#             --hidden-import uvicorn.protocols.websockets.auto `
+#             --hidden-import uvicorn.lifespan `
+#             --hidden-import uvicorn.lifespan.on `
+#             --collect-all backend `
+#             --collect-all pdfplumber `
+#             --collect-all charset_normalizer `
+#             scripts/launch.py
+#
+#       - name: Guard against charset_normalizer __mypyc in bundle
+#         shell: pwsh
+#         run: |
+#           $found = Get-ChildItem -Path dist/Burnrate -Recurse -Directory -ErrorAction SilentlyContinue |
+#             Where-Object { $_.Name -eq '__mypyc' -and $_.FullName -like '*charset_normalizer*' }
+#           if ($found) {
+#             Write-Host "::error::Regression: __mypyc under charset_normalizer in frozen bundle"
+#             $found | ForEach-Object { Write-Host $_.FullName }
+#             exit 1
+#           }
+#
+#       - name: Copy icon into dist for installer
+#         run: Copy-Item "src-tauri/icons/icon.ico" "dist/Burnrate/icon.ico"
+#
+#       - name: Install Inno Setup
+#         run: choco install innosetup -y --no-progress
+#
+#       - name: Build Inno Setup installer
+#         shell: cmd
+#         run: |
+#           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" scripts\burnrate.iss
+#
+#       - name: Upload installer artifact
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: Burnrate-Windows
+#           path: dist/Burnrate-Setup.exe
+#
   # ------------------------------------------------------------------
   # GitHub Release: collect artifacts and publish
   # ------------------------------------------------------------------
   release:
-    needs: [build-macos-arm, build-macos-intel, build-windows]
-    if: always() && (needs.build-macos-arm.result == 'success' || needs.build-macos-intel.result == 'success' || needs.build-windows.result == 'success')
+    needs: [build-macos-arm] #, build-macos-intel, build-windows]
+    if: always() && (needs.build-macos-arm.result == 'success') # || needs.build-macos-intel.result == 'success' || needs.build-windows.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -383,28 +383,28 @@ jobs:
           name: Burnrate-macOS-arm64
           path: artifacts/macos-arm64
 
-      - name: Download macOS Intel artifact
-        if: needs.build-macos-intel.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: Burnrate-macOS-x86_64
-          path: artifacts/macos-x86_64
-
-      - name: Download Windows artifact
-        if: needs.build-windows.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: Burnrate-Windows
-          path: artifacts/windows
+#       - name: Download macOS Intel artifact
+#         if: needs.build-macos-intel.result == 'success'
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: Burnrate-macOS-x86_64
+#           path: artifacts/macos-x86_64
+#
+#       - name: Download Windows artifact
+#         if: needs.build-windows.result == 'success'
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: Burnrate-Windows
+#           path: artifacts/windows
 
       - name: Rename artifacts for clarity
         run: |
           for f in artifacts/macos-arm64/*.dmg; do
             [ -f "$f" ] && mv "$f" "artifacts/macos-arm64/Burnrate_aarch64.dmg" || true
           done
-          for f in artifacts/macos-x86_64/*.dmg; do
-            [ -f "$f" ] && mv "$f" "artifacts/macos-x86_64/Burnrate_x86_64.dmg" || true
-          done
+#           for f in artifacts/macos-x86_64/*.dmg; do
+#             [ -f "$f" ] && mv "$f" "artifacts/macos-x86_64/Burnrate_x86_64.dmg" || true
+#           done
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -413,8 +413,8 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             artifacts/macos-arm64/*.dmg
-            artifacts/macos-x86_64/*.dmg
-            artifacts/windows/*.exe
+#             artifacts/macos-x86_64/*.dmg
+#             artifacts/windows/*.exe
 
       - name: Update Homebrew Formula
         env:
