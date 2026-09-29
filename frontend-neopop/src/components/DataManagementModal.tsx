@@ -131,7 +131,29 @@ export function DataManagementModal({ open, onClose }: { open: boolean; onClose:
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
+
+
+            <ButtonWithIcon
+              icon={Upload}
+              iconSize={16}
+              variant="primary"
+              kind="elevated"
+              colorMode="dark"
+              onClick={handleImportClick}
+              disabled={importing}
+              style={{
+                marginTop: 8,
+                background: 'none',
+                border: 'none',
+                alignSelf: 'flex-start',
+                maxWidth: 180,
+              }}
+              justifyContent="center"
+              gap={8}
+            >
+              {importing ? 'Importing...' : 'Import Backup'}
+            </ButtonWithIcon>
 
             <ButtonWithIcon
               icon={Download}
@@ -154,26 +176,6 @@ export function DataManagementModal({ open, onClose }: { open: boolean; onClose:
               {exporting ? 'Exporting...' : 'Export Backup'}
             </ButtonWithIcon>
 
-            <ButtonWithIcon
-              icon={Upload}
-              iconSize={16}
-              variant="primary"
-              kind="elevated"
-              colorMode="dark"
-              onClick={handleImportClick}
-              disabled={importing}
-              style={{
-                marginTop: 8,
-                background: 'none',
-                border: 'none',
-                alignSelf: 'flex-start',
-                maxWidth: 180,
-              }}
-              justifyContent="center"
-              gap={8}
-            >
-              {importing ? 'Importing...' : 'Import Backup'}
-            </ButtonWithIcon>
 
             <input
               type="file"
