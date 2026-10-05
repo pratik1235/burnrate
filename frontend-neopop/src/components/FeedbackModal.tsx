@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Typography, Row, Button, HorizontalSpacer } from '@cred/neopop-web/lib/components';
+import { useState } from 'react';
+import { Typography, Button } from '@cred/neopop-web/lib/components';
 import { SelectableElevatedCard as ElevatedCard, TRANSPARENT_ELEVATED_CARD_EDGES } from '@/components/SelectableElevatedCard';
 import { FontType, FontWeights } from '@cred/neopop-web/lib/components/Typography/types';
 import { colorPalette, mainColors } from '@cred/neopop-web/lib/primitives';
