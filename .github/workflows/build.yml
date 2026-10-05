@@ -144,6 +144,9 @@ jobs:
         run: |
           bash scripts/generate-icons.sh
 
+      - name: Inject Secrets into Production Env
+        run: echo "FORMSPREE_URL=${{ secrets.FORMSPREE_URL }}" >> .env.production
+
       - name: Build Python sidecar
         env:
           PYTHONPATH: .
@@ -153,6 +156,7 @@ jobs:
             --name burnrate-server \
             --onefile \
             --noconfirm \
+            --add-data ".env.production:." \
             --paths . \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.loops \
@@ -254,6 +258,9 @@ jobs:
           pip uninstall -y charset-normalizer || true
           pip install charset-normalizer --no-binary :all:
 
+      - name: Inject Secrets into Production Env
+        run: echo "FORMSPREE_URL=${{ secrets.FORMSPREE_URL }}" >> .env.production
+
       - name: Build Windows executable
         env:
           PYTHONPATH: .
@@ -264,6 +271,7 @@ jobs:
             --noconfirm `
             --icon "src-tauri/icons/icon.ico" `
             --add-data "frontend-neopop/dist;static" `
+            --add-data ".env.production;." `
             --paths . `
             --hidden-import uvicorn.logging `
             --hidden-import uvicorn.loops `
@@ -323,6 +331,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Inject Secrets into Production Env
+        run: echo "FORMSPREE_URL=${{ secrets.FORMSPREE_URL }}" >> .env.production
 
       - name: Build Docker image
         uses: docker/build-push-action@v6

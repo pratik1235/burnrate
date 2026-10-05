@@ -26,7 +26,7 @@ Burnrate is a personal finance app that keeps imported **statements and transact
 - **Data Export/Import** — Securely export and import your complete database with AES ZIP encryption.
 - **CSV export** — Export filtered transactions for external analysis
 - **Statement management** — Reparse or remove imported statements. Burnrate can automatically unlock most statement PDFs by generating common password combinations based on your profile. If it can't, you only enter the password once—it is securely stored in the encrypted local database for seamless future access.
-- **User Feedback** — Submit in-app feedback to report bugs or request features.
+- **User Feedback** — Submit in-app feedback to report bugs or request features. The submission is securely proxied through the backend to protect your API endpoints (e.g., Formspree) from spam.
 - **Google Apps Script** — Alternative workflow: auto-download statements from Gmail into a folder the app watches ([`apps-script/`](apps-script/))
 
 ## Privacy First
@@ -96,7 +96,9 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cd ..
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+
+# Configuration is automatically loaded from .env.development
+python backend/main.py
 
 # Frontend (in a separate terminal)
 cd frontend-neopop
@@ -111,6 +113,14 @@ Open http://localhost:5173 in your browser.
 1. Complete the setup wizard (name, DOB, cards)
 2. Set a watch folder or import files (credit card statement PDFs, bank account CSVs)
 3. Explore your spend analytics — use **Customize** for bank CSV imports or optional Gmail autosync; use **Offers** in the nav for card benefits
+
+## Configuration
+
+Burnrate securely manages its configuration via `.env` files using `pydantic-settings`.
+- **Local Development**: Values are loaded from `.env.development`.
+- **Production Builds**: Values are loaded from `.env.production`. For packaged apps (macOS DMG, Windows EXE) and Docker images, these environments are locked to `production` and secrets (like `FORMSPREE_URL`) are injected securely at build-time by the CI pipeline.
+
+You can customize properties such as the server port (`BURNRATE_PORT`), LLM provider URLs, AWS regions, and OAuth configurations by simply modifying your local `.env.development` file.
 
 ## Screenshots
 

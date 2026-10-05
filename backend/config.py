@@ -1,7 +1,55 @@
 """Bank configurations: password formats, email patterns, merchant categories, sync settings."""
 
 import os
+import sys
+from pathlib import Path
 from typing import Dict, List
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if getattr(sys, "frozen", False):
+    _base_dir = Path(sys._MEIPASS)
+else:
+    _base_dir = Path(__file__).resolve().parent.parent
+
+_env_name = os.environ.get("BURNRATE_ENV", "development")
+_env_file_path = os.environ.get("BURNRATE_ENV_FILE", str(_base_dir / f".env.{_env_name}"))
+
+class Settings(BaseSettings):
+    burnrate_env: str = "development"
+    burnrate_data_dir: str | None = None
+    burnrate_static_dir: str = ""
+    burnrate_port: int = 8000
+    burnrate_homebrew: str | None = None
+    
+    offer_sync_enabled: bool = False
+    milestone_sync_enabled: bool = False
+
+    burnrate_llm_provider: str = "ollama"
+    burnrate_llm_ollama_url: str = "http://localhost:11434"
+    burnrate_llm_ollama_model: str = "llama3.1"
+    burnrate_anthropic_api_key: str | None = None
+    burnrate_openai_api_key: str | None = None
+    burnrate_aws_access_key_id: str | None = None
+    burnrate_aws_secret_access_key: str | None = None
+    burnrate_aws_region: str = "us-east-1"
+    
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
+    burnrate_oauth_redirect_allowed_hosts: str = ""
+    gmail_oauth_redirect_uri: str = "http://127.0.0.1:8000/api/gmail/oauth/callback"
+    gmail_oauth_success_redirect: str | None = None
+    gmail_oauth_error_redirect: str | None = None
+    burnrate_oauth_fernet_key: str | None = None
+    
+    formspree_url: str | None = None
+
+    model_config = SettingsConfigDict(
+        env_file=_env_file_path,
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+settings = Settings()
 
 # Bank password format hints (for documentation)
 # HDFC: UPPERCASE first 4 letters of name + DDMM (DOB) OR UPPERCASE first 4 + last 4 digits of card
@@ -12,13 +60,13 @@ from typing import Dict, List
 # Offer & Milestone sync configuration
 # ---------------------------------------------------------------------------
 OFFER_SYNC_INTERVAL = 6 * 60 * 60  # 6 hours in seconds
-OFFER_SYNC_ENABLED = os.getenv("OFFER_SYNC_ENABLED", "false").lower() == "true"
+OFFER_SYNC_ENABLED = settings.offer_sync_enabled
 OFFER_REQUEST_TIMEOUT = 30  # seconds
 OFFER_REQUEST_DELAY = 1.0  # seconds between requests to same domain
 OFFER_MAX_RETRIES = 2
 
 MILESTONE_SYNC_INTERVAL = 24 * 60 * 60  # 24 hours
-MILESTONE_SYNC_ENABLED = os.getenv("MILESTONE_SYNC_ENABLED", "false").lower() == "true"
+MILESTONE_SYNC_ENABLED = settings.milestone_sync_enabled
 
 OFFER_PROVIDERS: Dict[str, Dict] = {
     # Direct bank scrapers disabled: these sites are JS-rendered and return no offer data via plain HTTP
@@ -136,27 +184,27 @@ MERCHANT_CATEGORIES: Dict[str, List[str]] = {
 # ---------------------------------------------------------------------------
 # LLM Insights configuration
 # ---------------------------------------------------------------------------
-LLM_PROVIDER = os.getenv("BURNRATE_LLM_PROVIDER", "ollama")
-LLM_OLLAMA_BASE_URL = os.getenv("BURNRATE_LLM_OLLAMA_URL", "http://localhost:11434")
-LLM_OLLAMA_MODEL = os.getenv("BURNRATE_LLM_OLLAMA_MODEL", "llama3.1")
+LLM_PROVIDER = settings.burnrate_llm_provider
+LLM_OLLAMA_BASE_URL = settings.burnrate_llm_ollama_url
+LLM_OLLAMA_MODEL = settings.burnrate_llm_ollama_model
 LLM_MAX_TOOL_ITERATIONS = 5
 LLM_CHAT_TIMEOUT = 150
 LLM_MAX_MESSAGE_LENGTH = 4000
 LLM_MAX_TRANSACTION_RESULTS = 500
 
 # Anthropic/Claude
-LLM_ANTHROPIC_API_KEY = os.getenv("BURNRATE_ANTHROPIC_API_KEY")
+LLM_ANTHROPIC_API_KEY = settings.burnrate_anthropic_api_key
 LLM_ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-20250514"
 LLM_ANTHROPIC_TIMEOUT = 120
 
 # OpenAI
-LLM_OPENAI_API_KEY = os.getenv("BURNRATE_OPENAI_API_KEY")
+LLM_OPENAI_API_KEY = settings.burnrate_openai_api_key
 LLM_OPENAI_DEFAULT_MODEL = "gpt-4-turbo-preview"
 LLM_OPENAI_TIMEOUT = 120
 
 # AWS Bedrock
-AWS_ACCESS_KEY_ID = os.getenv("BURNRATE_AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("BURNRATE_AWS_SECRET_ACCESS_KEY")
-AWS_REGION = os.getenv("BURNRATE_AWS_REGION", "us-east-1")
+AWS_ACCESS_KEY_ID = settings.burnrate_aws_access_key_id
+AWS_SECRET_ACCESS_KEY = settings.burnrate_aws_secret_access_key
+AWS_REGION = settings.burnrate_aws_region
 LLM_BEDROCK_DEFAULT_MODEL = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 LLM_BEDROCK_TIMEOUT = 120

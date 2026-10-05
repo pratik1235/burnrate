@@ -98,6 +98,7 @@ class Burnrate < Formula
       export BURNRATE_DATA_DIR="#{var}/burnrate"
       export BURNRATE_STATIC_DIR="#{libexec}/frontend-neopop/dist"
       export BURNRATE_HOMEBREW="true"
+      export BURNRATE_ENV="production"
       export PYTHONPATH="#{libexec}:$PYTHONPATH"
       export DYLD_LIBRARY_PATH="#{Formula["expat"].opt_lib}:$DYLD_LIBRARY_PATH"
       exec "#{libexec}/bin/python" -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 "$@"

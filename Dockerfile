@@ -29,6 +29,7 @@ COPY --from=frontend-builder /build/dist /app/static
 
 ENV BURNRATE_STATIC_DIR=/app/static
 ENV BURNRATE_DATA_DIR=/data
+ENV BURNRATE_ENV=production
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 

@@ -21,6 +21,7 @@ from backend.models.database import UPLOADS_DIR
 from backend.models.models import OAuthCredential, Settings
 from backend.services import processing_queue
 from backend.services.oauth_tokens import decrypt_secret, encrypt_secret
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def _credentials_from_row(row: OAuthCredential) -> Credentials:
     access: Optional[str] = None
     if row.encrypted_access_token:
         access = decrypt_secret(row.encrypted_access_token)
-    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
+    client_id = settings.google_oauth_client_id
     if not client_id:
         raise RuntimeError("GOOGLE_OAUTH_CLIENT_ID is not set")
     return Credentials(
@@ -66,7 +67,7 @@ def _credentials_from_row(row: OAuthCredential) -> Credentials:
         refresh_token=refresh,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=client_id,
-        client_secret=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or None,
+        client_secret=settings.google_oauth_client_secret,
         scopes=[GMAIL_READONLY],
     )
 
@@ -119,7 +120,7 @@ def _save_attachments_for_message(service, msg_id: str, dest: Path) -> int:
 
 def run_gmail_sync(db: Session, *, force: bool = False) -> Dict[str, Any]:
     """List recent statement-like messages, save attachments, enqueue processing."""
-    if not os.environ.get("GOOGLE_OAUTH_CLIENT_ID"):
+    if not settings.google_oauth_client_id:
         return {"status": "error", "message": "Gmail OAuth is not configured"}
 
     settings_row = db.query(Settings).first()

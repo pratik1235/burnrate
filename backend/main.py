@@ -25,7 +25,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.models.database import SessionLocal, init_db
 from backend.models.models import CategoryDefinition, Settings
-from backend.routers import analytics, cards, categories, data, due_reminders, feedback, gmail, insights, milestones, offers, settings, statements, tags, transactions
+from backend.config import settings
+from backend.routers import analytics, cards, categories, data, due_reminders, feedback, gmail, insights, milestones, offers, settings as backend_settings, statements, tags, transactions
 
 logger = logging.getLogger(__name__)
 
@@ -174,10 +175,10 @@ async def lifespan(app: FastAPI):
         import webbrowser
 
         # Only open browser if running from Homebrew
-        if os.environ.get("BURNRATE_HOMEBREW") != "true":
+        if settings.burnrate_homebrew != "true":
             return
 
-        port = int(os.environ.get("BURNRATE_PORT", "8000"))
+        port = settings.burnrate_port
         time.sleep(2)  # Wait for server startup
         try:
             webbrowser.open(f"http://localhost:{port}")
@@ -229,7 +230,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(settings.router, prefix="/api")
+app.include_router(backend_settings.router, prefix="/api")
 app.include_router(cards.router, prefix="/api")
 app.include_router(due_reminders.router, prefix="/api")
 app.include_router(statements.router, prefix="/api")
@@ -246,7 +247,7 @@ app.include_router(feedback.router, prefix="/api")
 
 _project_root_for_static = Path(__file__).resolve().parent.parent
 _static_candidates = [
-    os.environ.get("BURNRATE_STATIC_DIR", ""),
+    settings.burnrate_static_dir,
     str(_project_root_for_static / "frontend-neopop" / "dist"),
     str(_project_root_for_static / "frontend" / "dist"),
 ]
@@ -281,5 +282,5 @@ if _static_dir:
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("BURNRATE_PORT", "8000"))
+    port = settings.burnrate_port
     uvicorn.run(app, host="127.0.0.1", port=port)

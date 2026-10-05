@@ -36,6 +36,9 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
+      - name: Inject Secrets into Production Env
+        run: echo "FORMSPREE_URL=${{ secrets.FORMSPREE_URL }}" >> .env.production
+
       - name: Build and push multi-arch image
         uses: docker/build-push-action@v6
         with:
@@ -115,6 +118,9 @@ jobs:
         run: |
           bash scripts/generate-icons.sh
 
+      - name: Inject Secrets into Production Env
+        run: echo "FORMSPREE_URL=${{ secrets.FORMSPREE_URL }}" >> .env.production
+
       - name: Build Python sidecar
         env:
           PYTHONPATH: .
@@ -124,6 +130,7 @@ jobs:
             --name burnrate-server \
             --onefile \
             --noconfirm \
+            --add-data ".env.production:." \
             --paths . \
             --hidden-import uvicorn.logging \
             --hidden-import uvicorn.loops \

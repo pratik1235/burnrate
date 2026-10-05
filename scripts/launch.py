@@ -37,6 +37,9 @@ def _open_browser(port: int, delay: float = 2.0) -> None:
 
 
 def main() -> None:
+    if getattr(sys, "frozen", False):
+        os.environ.setdefault("BURNRATE_ENV", "production")
+
     port = int(os.environ.get("BURNRATE_PORT", "8000"))
 
     static_dir = _find_static_dir()

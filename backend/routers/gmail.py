@@ -19,6 +19,7 @@ from backend.models.database import get_db
 from backend.models.models import OAuthCredential, OAuthPending, Settings
 from backend.services import gmail_sync
 from backend.services.oauth_tokens import encrypt_secret
+from backend.config import settings
 
 router = APIRouter(prefix="/gmail", tags=["gmail"])
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ _DEFAULT_FRONTEND_ERR = "http://localhost:5173/customize?gmail=error"
 
 
 def _allowed_oauth_redirect_hosts() -> set[str]:
-    raw = os.environ.get("BURNRATE_OAUTH_REDIRECT_ALLOWED_HOSTS", "")
+    raw = settings.burnrate_oauth_redirect_allowed_hosts
     return {h.strip().lower() for h in raw.split(",") if h.strip()}
 
 
@@ -59,16 +60,13 @@ def _redirect_with_reason(base: str, key: str, value: str) -> str:
     return urllib.parse.urlunparse(parsed._replace(query=new_query))
 
 
-REDIRECT_URI = os.environ.get(
-    "GMAIL_OAUTH_REDIRECT_URI",
-    "http://127.0.0.1:8000/api/gmail/oauth/callback",
-)
+REDIRECT_URI = settings.gmail_oauth_redirect_uri
 FRONTEND_OK = _validated_browser_redirect(
-    os.environ.get("GMAIL_OAUTH_SUCCESS_REDIRECT"),
+    settings.gmail_oauth_success_redirect,
     _DEFAULT_FRONTEND_OK,
 )
 FRONTEND_ERR = _validated_browser_redirect(
-    os.environ.get("GMAIL_OAUTH_ERROR_REDIRECT"),
+    settings.gmail_oauth_error_redirect,
     _DEFAULT_FRONTEND_ERR,
 )
 
@@ -84,7 +82,7 @@ def _pkce_pair() -> tuple[str, str]:
 
 @router.get("/status")
 def gmail_status(db: Session = Depends(get_db)):
-    client_id = bool(os.environ.get("GOOGLE_OAUTH_CLIENT_ID"))
+    client_id = bool(settings.google_oauth_client_id)
     row = db.query(OAuthCredential).filter(OAuthCredential.provider == "google_gmail").first()
     s = db.query(Settings).first()
     last = s.last_gmail_sync.isoformat() if s and s.last_gmail_sync else None
@@ -97,7 +95,7 @@ def gmail_status(db: Session = Depends(get_db)):
 
 @router.post("/auth/start")
 def gmail_auth_start(db: Session = Depends(get_db)):
-    if not os.environ.get("GOOGLE_OAUTH_CLIENT_ID"):
+    if not settings.google_oauth_client_id:
         raise HTTPException(
             status_code=503,
             detail="Gmail is not configured (set GOOGLE_OAUTH_CLIENT_ID).",
@@ -108,7 +106,7 @@ def gmail_auth_start(db: Session = Depends(get_db)):
     db.query(OAuthPending).filter(OAuthPending.created_at < cutoff).delete(synchronize_session=False)
     db.merge(OAuthPending(state=state, code_verifier=verifier))
     db.commit()
-    client_id = os.environ["GOOGLE_OAUTH_CLIENT_ID"]
+    client_id = settings.google_oauth_client_id
     params = urllib.parse.urlencode(
         {
             "client_id": client_id,
@@ -138,10 +136,10 @@ def gmail_oauth_callback(
     db.delete(pending)
     db.commit()
 
-    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
+    client_id = settings.google_oauth_client_id
     if not client_id:
         return RedirectResponse(FRONTEND_ERR)
-    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or ""
+    client_secret = settings.google_oauth_client_secret or ""
     data = urllib.parse.urlencode(
         {
             "code": code,

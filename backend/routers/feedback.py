@@ -4,6 +4,8 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from backend.config import settings
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -16,7 +18,7 @@ class FeedbackRequest(BaseModel):
 
 @router.post("")
 async def submit_feedback(payload: FeedbackRequest):
-    formspree_url = os.getenv("FORMSPREE_URL")
+    formspree_url = settings.formspree_url
     if not formspree_url:
         logger.warning("FORMSPREE_URL environment variable is not set. Feedback cannot be submitted.")
         raise HTTPException(status_code=500, detail="Feedback service is not configured.")
