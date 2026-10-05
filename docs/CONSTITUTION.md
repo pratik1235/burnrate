@@ -13,7 +13,7 @@ Burnrate is a **privacy-first, local-first** credit card and bank statement anal
 
 - **Financial data never leaves the machine** for core spend analytics. Processing, storage, and analytics for transactions and statements occur locally unless a **documented, feature-scoped** integration explicitly requires otherwise (and only for that feature’s purpose).
 - **No telemetry.** The application does not collect usage statistics, crash reports, or any form of analytics.
-- **Feature-scoped network access is allowed** where the product intentionally integrates with online services. Examples include **milestones**, **offers and benefits fetching**, **Gmail (or similar email) integration**, and comparable features that users opt into or clearly expect to use the network. Such features must be called out in specs/plans, minimize data sent, and must not weaken the local-first guarantee for unrelated core financial flows.
+- **Feature-scoped network access is allowed** where the product intentionally integrates with online services. Examples include **milestones**, **offers and benefits fetching**, **Gmail (or similar email) integration**, **user feedback submission**, and comparable features that users opt into or clearly expect to use the network. Such features must be called out in specs/plans, minimize data sent, and must not weaken the local-first guarantee for unrelated core financial flows.
 
 ### 1.2 Local-Only
 
@@ -142,7 +142,8 @@ Use these NeoPOP components for all UI:
 ### 5.1 Secrets and Credentials
 
 - **No hardcoded secrets**, API keys, or credentials in source code.
-- Use environment variables or secure configuration for any required secrets (e.g., development-only).
+- Configuration and secrets MUST be managed centrally via `pydantic-settings` using `.env` files (e.g., `.env.development` or `.env.production`).
+- Production secrets (such as API URLs or keys) should be securely injected via CI pipelines at build-time.
 
 ### 5.2 Input Validation
 
@@ -235,7 +236,7 @@ Plans must include:
 ### 8.1 Network
 
 - **Default: local-first.** Core transaction and statement handling must not depend on the internet; privacy guarantees for that data remain as in §1.
-- **Exceptions:** Outbound requests are permitted only for **explicit, documented features** that require online services—e.g. **milestones**, **offers/benefits fetching**, **Gmail (or email) integration**, and similar integrations. Implementations must stay within the scope of each feature’s spec, avoid telemetry, and must not exfiltrate bulk financial datasets except where the feature’s contract requires it and the user understands that flow.
+- **Exceptions:** Outbound requests are permitted only for **explicit, documented features** that require online services—e.g. **milestones**, **offers/benefits fetching**, **Gmail (or email) integration**, **user feedback submission**, and similar integrations. Implementations must stay within the scope of each feature’s spec, avoid telemetry, and must not exfiltrate bulk financial datasets except where the feature’s contract requires it and the user understands that flow.
 
 ### 8.2 Database
 
@@ -284,7 +285,7 @@ Plans must include:
 
 | Layer | Technology |
 |-------|------------|
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2.x, SQLite (WAL), Uvicorn |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2.x, SQLite (WAL), Uvicorn, pydantic-settings |
 | Frontend | React 18, TypeScript, Vite 6, styled-components, @cred/neopop-web, lucide-react, recharts |
 | Desktop | Tauri v2 (macOS DMG, Windows via PyInstaller + Inno Setup) |
 | PDF Parsing | pdfplumber, pikepdf (qpdf) |
@@ -303,4 +304,4 @@ Plans must include:
 
 ---
 
-*Last updated: March 2026*
+*Last updated: October 2026*
