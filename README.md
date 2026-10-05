@@ -23,8 +23,10 @@ Burnrate is a personal finance app that keeps imported **statements and transact
 - **Multi-card and multi-source filtering** — Filter transactions and metrics by cards, **bank accounts** (bank + last 4), **source** (credit card / bank / all), categories, date range, amount, direction, and tags
 - **Multiple Views** — Analyze transactions per statement, consolidate across multiple cards, or apply flexible filters for any custom combination
 - **Transaction tagging** — Define and apply custom tags to transactions
+- **Data Export/Import** — Securely export and import your complete database with AES ZIP encryption.
 - **CSV export** — Export filtered transactions for external analysis
-- **Statement management** — Reparse or remove imported statements; inline password entry for encrypted PDFs when needed
+- **Statement management** — Reparse or remove imported statements. Burnrate can automatically unlock most statement PDFs by generating common password combinations based on your profile. If it can't, you only enter the password once—it is securely stored in the encrypted local database for seamless future access.
+- **User Feedback** — Submit in-app feedback to report bugs or request features.
 - **Google Apps Script** — Alternative workflow: auto-download statements from Gmail into a folder the app watches ([`apps-script/`](apps-script/))
 
 ## Privacy First
