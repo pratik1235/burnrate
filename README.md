@@ -1,6 +1,6 @@
 # Burnrate
 
-**Privacy-first credit card and bank-account spend analytics.**
+**Privacy-first credit card spend analytics.**
 
 Burnrate is a personal finance app that keeps imported **statements and transactions in a local database** on your machine — no Burnrate-hosted cloud for your data, no telemetry. Optional **Gmail autosync** and **offers** syncing use the network only when you use those features (see **Privacy First** below).
 
@@ -10,17 +10,16 @@ Burnrate is a personal finance app that keeps imported **statements and transact
 
 ## Features
 
-- **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, IndusInd, Kotak, Standard Chartered, YES, AU, RBL, Federal Scapia
+- **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, Federal Scapia
 - **Auto-import** — Drop credit card statement PDFs or set up a watch folder for automatic processing
-- **Bank account statements (CSV)** — Import savings/current account CSVs from major Indian banks (HDFC, ICICI, SBI, Axis, plus a generic auto-detect parser). Statements and transactions carry a **CC** vs **BANK** source so you can filter and review them separately. Credit card bill payments on bank statements are excluded from spend totals so they are not double-counted with card-side payments.
-- **Statements hub** — Browse imported statements (card and bank), filter by bank and period, and manage uploads from one place, plus built-in payment reminders.
+- **Statements hub** — Browse imported statements, filter by bank and period, and manage uploads from one place, plus built-in payment reminders.
 - **LLM Insights & Reminders** — Get AI-powered insights on your spending using cloud providers (Local LLM(OLLAMA), Anthropic, OpenAI, AWS Bedrock) with secure keychain credential storage.
 - **Offers & benefits** — Offers are fetched from public bank and aggregator pages, normalized, cached locally, and shown in a searchable catalog. Highlight offers that match your cards, hide noise, add your own manual offers, and refresh on demand. Always verify details with your issuer before relying on an offer.
 - **Spending milestones** — Track progress toward fee waivers, bonus points, lounge access, and other card benefits. Set custom goals or sync predefined milestones from bank definitions. Filter by card and see how much more you need to spend to reach each milestone.
 - **Gmail statement autosync (optional)** — Opt in to read-only Gmail OAuth (PKCE). Matching statement attachments (PDF, CSV, XLS/XLSX) are saved to your watch folder or default uploads and processed like manual drops. Configure OAuth in the backend; connect from **Customize** and monitor sync from the navbar.
 - **Smart & Manual categorization** — Transactions auto-categorized with customizable categories and keywords. Support for manual inline category editing as well.
 - **Rich analytics** — Spend trends, category breakdowns, merchant insights, credit utilization
-- **Multi-card and multi-source filtering** — Filter transactions and metrics by cards, **bank accounts** (bank + last 4), **source** (credit card / bank / all), categories, date range, amount, direction, and tags
+- **Multi-card filtering** — Filter transactions and metrics by cards, categories, date range, amount, direction, and tags
 - **Multiple Views** — Analyze transactions per statement, consolidate across multiple cards, or apply flexible filters for any custom combination
 - **Transaction tagging** — Define and apply custom tags to transactions
 - **Data Export/Import** — Securely export and import your complete database with AES ZIP encryption.
@@ -111,8 +110,8 @@ Open http://localhost:5173 in your browser.
 ### First Run
 
 1. Complete the setup wizard (name, DOB, cards)
-2. Set a watch folder or import files (credit card statement PDFs, bank account CSVs)
-3. Explore your spend analytics — use **Customize** for bank CSV imports or optional Gmail autosync; use **Offers** in the nav for card benefits
+2. Set a watch folder or import files (credit card statement PDFs)
+3. Explore your spend analytics — use **Customize** for optional Gmail autosync; use **Offers** in the nav for card benefits
 
 ## Configuration
 
