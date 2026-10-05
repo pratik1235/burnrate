@@ -120,7 +120,7 @@ Burnrate securely manages its configuration via `.env` files using `pydantic-set
 - **Local Development**: Values are loaded from `.env.development`.
 - **Production Builds**: Values are loaded from `.env.production`. For packaged apps (macOS DMG, Windows EXE) and Docker images, these environments are locked to `production` and secrets (like `FORMSPREE_URL`) are injected securely at build-time by the CI pipeline.
 
-You can customize properties such as the server port (`BURNRATE_PORT`), LLM provider URLs, AWS regions, and OAuth configurations by simply modifying your local `.env.development` file.
+You can customize properties such as the server port (`BURNRATE_PORT`), other configurations by simply modifying your local `.env.development` file.
 
 ## Screenshots
 

@@ -90,3 +90,5 @@ src-tauri/gen/
 .claude/
 temp/
 docs/security-deployment.md
+# Ignore folder for uncommitted files
+ignore/

@@ -285,7 +285,7 @@ Plans must include:
 
 | Layer | Technology |
 |-------|------------|
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2.x, SQLite (WAL), Uvicorn, pydantic-settings |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2.x, SQLite (WAL), Uvicorn |
 | Frontend | React 18, TypeScript, Vite 6, styled-components, @cred/neopop-web, lucide-react, recharts |
 | Desktop | Tauri v2 (macOS DMG, Windows via PyInstaller + Inno Setup) |
 | PDF Parsing | pdfplumber, pikepdf (qpdf) |
