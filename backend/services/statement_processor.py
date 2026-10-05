@@ -299,22 +299,19 @@ def process_statement(
         card_last4s = _get_card_last4s(db_session, bank=bank) if bank else _get_card_last4s(db_session)
         working_path = pdf_path
         encrypted = is_encrypted(pdf_path, allowed_roots=roots)
+        encrypted_password_to_save = None
 
         if encrypted and manual_password:
             unlocked = unlock_pdf(pdf_path, [manual_password], allowed_roots=roots)
             if unlocked:
                 working_path = unlocked
-                from backend.services.keychain import (
-                    save_bank_statement_password,
-                    save_statement_password,
-                )
-                save_statement_password(file_hash, manual_password)
+                from backend.services.crypto import encrypt_secret
+                encrypted_password_to_save = encrypt_secret(manual_password)
                 if not bank:
                     from backend.parsers.detector import detect_bank
                     detected = detect_bank(working_path)
                     if detected and detected in SUPPORTED_BANKS:
                         bank = detected
-                save_bank_statement_password(bank or "", manual_password)
             else:
                 if reparse_mode:
                     db_session.rollback()
@@ -328,91 +325,50 @@ def process_statement(
                     "count": 0,
                 }
         elif encrypted:
-            from backend.services.keychain import get_statement_password
-            keychain_pwd = get_statement_password(file_hash)
-            
             unlocked = None
-            if keychain_pwd:
-                unlocked = unlock_pdf(pdf_path, [keychain_pwd], allowed_roots=roots)
-                if unlocked:
-                    working_path = unlocked
-                    if not bank:
-                        from backend.parsers.detector import detect_bank
-                        detected = detect_bank(working_path)
-                        if detected and detected in SUPPORTED_BANKS:
-                            bank = detected
             
-            if not unlocked and profile:
-                from backend.services.pdf_unlock import unlock_pdf_with_password
-                if bank:
+            # Step 1: Try auto-generated passwords (NO DB access)
+            if profile:
+                from backend.services.pdf_unlock import unlock_pdf_with_password, generate_passwords
+                
+                banks_to_try = [bank] if bank else SUPPORTED_BANKS
+                for try_bank in banks_to_try:
+                    try_card_last4s = card_last4s if bank else _get_card_last4s(db_session, bank=try_bank)
                     passwords = generate_passwords(
-                        bank=bank,
+                        bank=try_bank,
                         name=profile.name,
                         dob_day=profile.dob_day or "",
                         dob_month=profile.dob_month or "",
-                        card_last4s=card_last4s,
+                        card_last4s=try_card_last4s,
                         dob_year=profile.dob_year or "",
                     )
-                    unlocked_path, successful_pwd = unlock_pdf_with_password(pdf_path, passwords, allowed_roots=roots)
-                    if unlocked_path and successful_pwd:
+                    if not passwords:
+                        continue
+                        
+                    unlocked_path, _ = unlock_pdf_with_password(pdf_path, passwords, allowed_roots=roots)
+                    if unlocked_path:
+                        bank = try_bank
                         working_path = unlocked_path
                         unlocked = unlocked_path
-                        from backend.services.keychain import save_bank_statement_password, save_statement_password
-                        save_statement_password(file_hash, successful_pwd)
-                        save_bank_statement_password(bank, successful_pwd)
-                    else:
-                        if reparse_mode:
-                            db_session.rollback()
-                        else:
-                            _create_password_needed_statement(
-                                db_session, file_hash, pdf_path, bank, source, original_upload_path,
-                            )
-                        return {
-                            "status": "password_needed",
-                            "message": "Could not unlock PDF - enter password for this statement to be processed",
-                            "count": 0,
-                        }
-                else:
-                    for try_bank in SUPPORTED_BANKS:
-                        try_card_last4s = _get_card_last4s(db_session, bank=try_bank)
-                        passwords = generate_passwords(
-                            bank=try_bank,
-                            name=profile.name,
-                            dob_day=profile.dob_day or "",
-                            dob_month=profile.dob_month or "",
-                            card_last4s=try_card_last4s,
-                            dob_year=profile.dob_year or "",
-                        )
-                        unlocked_path, successful_pwd = unlock_pdf_with_password(pdf_path, passwords, allowed_roots=roots)
-                        if unlocked_path and successful_pwd:
-                            bank = try_bank
-                            working_path = unlocked_path
-                            unlocked = unlocked_path
-                            logger.info("Unlocked with bank=%s passwords", try_bank)
-                            from backend.services.keychain import save_bank_statement_password, save_statement_password
-                            save_statement_password(file_hash, successful_pwd)
-                            save_bank_statement_password(bank, successful_pwd)
-                            break
+                        logger.info("Unlocked with generated password for bank=%s", try_bank)
+                        break
 
-                    if not unlocked:
-                        if reparse_mode:
-                            db_session.rollback()
-                        else:
-                            _create_password_needed_statement(
-                                db_session, file_hash, pdf_path, bank, source, original_upload_path,
-                            )
-                        return {
-                            "status": "password_needed",
-                            "message": "Could not unlock PDF - enter password for this statement to be processed",
-                            "count": 0,
-                        }
-
-                    from backend.parsers.detector import detect_bank
-                    detected = detect_bank(working_path)
-                    if detected and detected in SUPPORTED_BANKS:
-                        bank = detected
-                        
-            if not unlocked and not profile:
+            # Step 2: Check DB encrypted_password (fallback)
+            if not unlocked:
+                from backend.services.pdf_unlock import get_db_password_candidates
+                db_passwords = get_db_password_candidates(db_session, file_hash=file_hash, bank=bank)
+                if db_passwords:
+                    unlocked = unlock_pdf(pdf_path, db_passwords, allowed_roots=roots)
+                    if unlocked:
+                        working_path = unlocked
+                        if not bank:
+                            from backend.parsers.detector import detect_bank
+                            detected = detect_bank(working_path)
+                            if detected and detected in SUPPORTED_BANKS:
+                                bank = detected
+                                
+            # Step 3: Return password_needed if all failed
+            if not unlocked:
                 if reparse_mode:
                     db_session.rollback()
                 else:
@@ -582,6 +538,7 @@ def process_statement(
                     f"for this bank."
                 )
                 statement = Statement(
+                    encrypted_password=encrypted_password_to_save,
                     bank=bank,
                     card_last4=None,
                     period_start=None,
@@ -627,6 +584,7 @@ def process_statement(
                 db_session.rollback()
             else:
                 statement = Statement(
+                    encrypted_password=encrypted_password_to_save,
                     bank=bank,
                     card_last4=card_last4,
                     period_start=None,
@@ -764,6 +722,7 @@ def process_statement(
                     )
 
             stmt = Statement(
+                encrypted_password=encrypted_password_to_save,
                 bank=bank,
                 card_last4=c_last4,
                 period_start=period_start,
@@ -957,6 +916,7 @@ def _process_csv_statement(
             db_session.rollback()
         else:
             statement = Statement(
+                encrypted_password=encrypted_password_to_save,
                 bank=bank,
                 card_last4=card_last4,
                 period_start=None,
@@ -991,6 +951,7 @@ def _process_csv_statement(
 
     cur = _parsed_currency(parsed)
     statement = Statement(
+        encrypted_password=encrypted_password_to_save,
         bank=bank,
         card_last4=card_last4,
         period_start=parsed.period_start,

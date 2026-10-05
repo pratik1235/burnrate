@@ -284,7 +284,8 @@ The processing pipeline is invoked by:
   - Federal, Indian Bank: Similar patterns.
   - Generic: `NAME4+DDMM`, `name4+ddmm`, etc.
 - **Unlock:** `unlock_pdf(pdf_path, passwords)` tries each password; on success saves `{stem}_unlocked{suffix}` and returns path.
-- **Cleanup:** Unlocked temp file deleted after parsing (or on early return).
+  - *Rationale for Temp File:* We cannot pass a password dynamically to the user's default PDF viewer (e.g. macOS Preview) via the CLI `open` command due to process isolation. To bypass the system password prompt entirely, Burnrate must decrypt the file in memory via `pikepdf` and write it to a temporary unlocked file that the PDF viewer can read directly.
+- **Cleanup:** Unlocked temp file deleted after parsing (or via a 5-minute background timer when explicitly opening the file from the UI).
 
 ### Card Resolution
 

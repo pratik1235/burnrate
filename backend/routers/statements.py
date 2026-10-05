@@ -629,11 +629,6 @@ def delete_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[s
         
     db.delete(stmt)
     db.commit()
-    
-    other_stmt = db.query(Statement).filter(Statement.file_hash == file_hash).first()
-    if not other_stmt:
-        from backend.services.keychain import delete_statement_password
-        delete_statement_password(file_hash)
         
     return {"status": "ok", "message": "Statement and transactions deleted"}
 
@@ -761,7 +756,9 @@ def open_statement_file(statement_id: str, db: Session = Depends(get_db)) -> Dic
         _validate_pdf_path,
         allowed_roots_for_statements,
         is_encrypted,
-        password_candidates_for_statement_pdf,
+        get_db_password_candidates,
+        unlock_pdf_with_password,
+        generate_passwords,
         schedule_temp_file_cleanup,
         unlock_pdf,
     )
@@ -776,11 +773,32 @@ def open_statement_file(statement_id: str, db: Session = Depends(get_db)) -> Dic
 
     open_path = file_path
     if ext == ".pdf" and is_encrypted(file_path, allowed_roots=roots):
-        pwd_list = password_candidates_for_statement_pdf(
-            getattr(stmt, "file_hash", None),
-            getattr(stmt, "bank", None),
+        # 1. Check DB for passwords
+        pwd_list = get_db_password_candidates(
+            db_session=db,
+            file_hash=getattr(stmt, "file_hash", None),
+            bank=getattr(stmt, "bank", None),
         )
         decrypted = unlock_pdf(file_path, pwd_list, allowed_roots=roots)
+        
+        # 2. Check auto-generated passwords if DB failed
+        if not decrypted:
+            from backend.services.statement_processor import _get_user_profile, _get_card_last4s
+            profile = _get_user_profile(db)
+            if profile:
+                bank = getattr(stmt, "bank", None)
+                card_last4s = _get_card_last4s(db, bank=bank) if bank else _get_card_last4s(db)
+                passwords = generate_passwords(
+                    bank=bank or "",
+                    name=profile.name,
+                    dob_day=profile.dob_day or "",
+                    dob_month=profile.dob_month or "",
+                    card_last4s=card_last4s,
+                    dob_year=profile.dob_year or "",
+                )
+                if passwords:
+                    decrypted, _ = unlock_pdf_with_password(file_path, passwords, allowed_roots=roots)
+
         if decrypted:
             schedule_temp_file_cleanup(decrypted, delay_seconds=300.0)
             open_path = decrypted

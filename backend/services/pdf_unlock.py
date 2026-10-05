@@ -70,31 +70,46 @@ def schedule_temp_file_cleanup(path: str, delay_seconds: float = 300.0) -> None:
     timer.start()
 
 
-def password_candidates_for_statement_pdf(
+def get_db_password_candidates(
+    db_session: Session,
     file_hash: Optional[str],
     bank: Optional[str],
 ) -> List[str]:
     """
-    Ordered unique list of passwords when opening an encrypted statement:
-
-    hash-scoped secret first (matches this PDF), then bank-scoped secret.
+    Retrieve password candidates from the database (encrypted SQLite column).
+    Prioritizes the exact file's password, then the most recent password for the bank.
     """
-    from backend.services.keychain import (
-        get_bank_statement_password,
-        get_statement_password,
-    )
+    from backend.models.models import Statement
+    from backend.services.crypto import decrypt_secret
 
     passwords: List[str] = []
     seen: set[str] = set()
 
-    def add(pwd: Optional[str]) -> None:
-        if pwd and pwd not in seen:
-            seen.add(pwd)
-            passwords.append(pwd)
+    def add(encrypted_pwd: Optional[str]) -> None:
+        if encrypted_pwd:
+            try:
+                pwd = decrypt_secret(encrypted_pwd)
+                if pwd and pwd not in seen:
+                    seen.add(pwd)
+                    passwords.append(pwd)
+            except Exception as e:
+                logger.warning("Failed to decrypt statement password: %s", e)
 
     if file_hash:
-        add(get_statement_password(file_hash))
-    add(get_bank_statement_password(bank or ""))
+        stmt = db_session.query(Statement).filter(Statement.file_hash == file_hash, Statement.encrypted_password.is_not(None)).first()
+        if stmt:
+            add(stmt.encrypted_password)
+            
+    if bank:
+        bank_stmt = (
+            db_session.query(Statement)
+            .filter(Statement.bank == bank, Statement.encrypted_password.is_not(None))
+            .order_by(Statement.imported_at.desc())
+            .first()
+        )
+        if bank_stmt:
+            add(bank_stmt.encrypted_password)
+
     return passwords
 
 

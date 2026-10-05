@@ -7,7 +7,9 @@ from pathlib import Path
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-_env_data_dir = os.environ.get("BURNRATE_DATA_DIR")
+from backend.config import settings
+
+_env_data_dir = settings.burnrate_data_dir
 if _env_data_dir:
     DATA_DIR = Path(_env_data_dir).expanduser()
 elif getattr(sys, "frozen", False):
@@ -90,6 +92,7 @@ def _run_migrations(engine_ref) -> None:
         ("transactions", "is_manually_categorized", "INTEGER NOT NULL DEFAULT 0"),
         ("statements", "note", "TEXT"),
         ("transactions", "txn_keyword", "VARCHAR(10)"),
+        ("statements", "encrypted_password", "TEXT"),
     ]
 
     with engine_ref.connect() as conn:
