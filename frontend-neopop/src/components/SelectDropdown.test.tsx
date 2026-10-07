@@ -30,7 +30,7 @@ describe('SelectDropdown', () => {
     const onChange = vi.fn();
     const { container } = render(<SelectDropdown options={OPTIONS} placeholder="Pick" onChange={onChange} />);
 
-    await user.click(within(container).getByText('Pick'));
+    await user.click(within(container).getAllByText('Pick').slice(-1)[0]);
     await user.click(screen.getByRole('option', { name: 'Beta' }));
 
     await waitFor(() => {
@@ -40,13 +40,13 @@ describe('SelectDropdown', () => {
 
   it('shows placeholder when value is missing', () => {
     render(<SelectDropdown options={OPTIONS} placeholder="Choose" value="" onChange={vi.fn()} />);
-    expect(screen.getByText('Choose')).toBeInTheDocument();
+    expect(screen.getAllByText('Choose')[0]).toBeInTheDocument();
   });
 
   it('Escape closes the menu', async () => {
     const user = userEvent.setup();
     const { container } = render(<SelectDropdown options={OPTIONS} placeholder="Pick" />);
-    await user.click(within(container).getByText('Pick'));
+    await user.click(within(container).getAllByText('Pick').slice(-1)[0]);
     expect(screen.getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     await waitFor(() => {
@@ -66,7 +66,7 @@ describe('SelectDropdown', () => {
         placeholder="Tags"
       />,
     );
-    await user.click(within(container).getByText('Tags'));
+    await user.click(within(container).getAllByText('Tags').slice(-1)[0]);
     await user.click(screen.getByRole('option', { name: /One/ }));
     expect(onSelectedValuesChange).toHaveBeenCalledWith(['x']);
     expect(screen.getByRole('option', { name: /One/ })).toBeInTheDocument();
@@ -84,7 +84,7 @@ describe('SelectDropdown', () => {
         placeholder="Tags"
       />,
     );
-    await user.click(within(container).getByText('Tags'));
+    await user.click(within(container).getAllByText('Tags').slice(-1)[0]);
     await user.click(screen.getByRole('option', { name: /One/ }));
     expect(onSelectedValuesChange).toHaveBeenCalledWith([]);
   });
@@ -101,7 +101,7 @@ describe('SelectDropdown', () => {
         placeholder="Tags"
       />,
     );
-    await user.click(within(container).getByText('Tags'));
+    await user.click(within(container).getAllByText('Tags').slice(-1)[0]);
     const four = screen.getByRole('option', { name: /Four/ });
     expect(four).toBeDisabled();
   });
@@ -115,7 +115,7 @@ describe('SelectDropdown', () => {
         emptyMenuContent={<span>No items</span>}
       />,
     );
-    await user.click(within(container).getByText('Open'));
+    await user.click(within(container).getAllByText('Open').slice(-1)[0]);
     expect(screen.getByText('No items')).toBeInTheDocument();
     expect(screen.queryByRole('option')).not.toBeInTheDocument();
   });
@@ -142,7 +142,7 @@ describe('SelectDropdown', () => {
         menuMount="portal"
       />,
     );
-    await user.click(within(container).getByText('Pick'));
+    await user.click(within(container).getAllByText('Pick').slice(-1)[0]);
     const listboxes = document.body.querySelectorAll('[role="listbox"]');
     expect(listboxes.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
@@ -156,7 +156,7 @@ describe('SelectDropdown', () => {
         <button type="button">outside</button>
       </div>,
     );
-    await user.click(within(container).getByText('Pick'));
+    await user.click(within(container).getAllByText('Pick').slice(-1)[0]);
     expect(screen.getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'outside' }));
     await waitFor(() => {
