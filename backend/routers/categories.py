@@ -26,7 +26,8 @@ class UpdateCategoryPayload(BaseModel):
 
 
 def _slug_from_name(name: str) -> str:
-    return name.lower().strip().replace(" ", "_")
+    import re
+    return re.sub(r"[^a-z0-9_]", "", name.lower().strip().replace(" ", "_"))
 
 
 @router.get("/all")
@@ -159,7 +160,7 @@ def recategorize_transactions(
     """Re-categorize all transactions based on current category definitions."""
     override = payload.override_manual if payload else False
     
-    transactions = db.query(Transaction).all()
+    transactions = db.query(Transaction).yield_per(1000)
     updated = 0
     for txn in transactions:
         is_manual = getattr(txn, "is_manually_categorized", 0) == 1

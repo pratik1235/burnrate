@@ -266,9 +266,7 @@ def update_transaction_tags(
     for tag_name in validated:
         tag_def = db.query(TagDefinition).filter(TagDefinition.name == tag_name).first()
         if not tag_def:
-            tag_def = TagDefinition(name=tag_name)
-            db.add(tag_def)
-            db.flush()
+            raise HTTPException(status_code=400, detail=f"Tag '{tag_name}' does not exist. Please create it first.")
         db.add(TransactionTag(transaction_id=transaction_id, tag_id=tag_def.id))
     db.commit()
     return {"tags": validated}

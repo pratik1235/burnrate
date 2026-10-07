@@ -27,8 +27,8 @@ def _validate_watch_folder(folder: Optional[str]) -> Optional[str]:
 
     resolved = expanded.resolve(strict=False)
     home = Path.home().resolve()
-    if not resolved.is_relative_to(home) and not resolved.is_relative_to(Path("/Volumes")):
-        raise HTTPException(status_code=400, detail="Watch folder must be within your home directory.")
+    if not resolved.is_relative_to(home) and not resolved.is_relative_to(Path("/Volumes")) and not str(resolved).startswith(("/data", "/mnt", "/media")):
+        raise HTTPException(status_code=400, detail="Watch folder must be within your home directory or an allowed Docker mount (/data, /mnt, /media).")
 
     if not resolved.exists():
         raise HTTPException(status_code=400, detail="Watch folder does not exist.")
@@ -42,10 +42,11 @@ def _normalize_display_currency(value: Optional[str]) -> Optional[str]:
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
     code = str(value).strip().upper()[:3]
-    if code not in ("INR", "USD"):
+    import re
+    if not re.match(r"^[A-Z]{3}$", code):
         raise HTTPException(
             status_code=400,
-            detail="display_currency must be INR or USD",
+            detail="display_currency must be a valid 3-letter ISO 4217 code",
         )
     return code
 

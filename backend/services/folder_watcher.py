@@ -57,6 +57,7 @@ def _wait_for_file_stable(path: Path, timeout: float = 15.0, interval: float = 0
                 if time.monotonic() - stable_start >= 1.5:
                     return True
             else:
+                # Reset the stability timer whenever the size changes
                 last_size = size
                 stable_start = time.monotonic()
         except OSError:
@@ -196,8 +197,8 @@ def _validate_watch_path(raw_path: str) -> Optional[Path]:
 
     resolved = expanded.resolve(strict=False)
     home = Path.home().resolve()
-    if not resolved.is_relative_to(home) and not resolved.is_relative_to(Path("/Volumes")):
-        logger.warning("Watch path is outside the user's home directory: %s", raw_path)
+    if not resolved.is_relative_to(home) and not resolved.is_relative_to(Path("/Volumes")) and not str(resolved).startswith(("/data", "/mnt", "/media")):
+        logger.warning("Watch path is outside allowed directories: %s", raw_path)
         return None
 
     if not resolved.exists() or not resolved.is_dir():

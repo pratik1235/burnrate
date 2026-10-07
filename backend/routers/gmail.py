@@ -129,7 +129,17 @@ def gmail_oauth_callback(
     state: str,
     db: Session = Depends(get_db),
 ):
-    pending = db.query(OAuthPending).filter(OAuthPending.state == state).first()
+    import re
+    from datetime import datetime, timedelta
+
+    if not code or not re.match(r"^[A-Za-z0-9/\-_]+$", code):
+        return RedirectResponse(FRONTEND_ERR)
+
+    cutoff = datetime.utcnow() - timedelta(hours=1)
+    pending = db.query(OAuthPending).filter(
+        OAuthPending.state == state,
+        OAuthPending.created_at >= cutoff
+    ).first()
     if not pending:
         return RedirectResponse(FRONTEND_ERR)
     verifier = pending.code_verifier

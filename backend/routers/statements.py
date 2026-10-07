@@ -171,6 +171,10 @@ def upload_statement(
     content = file.file.read(MAX_UPLOAD_SIZE + 1)
     if len(content) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=413, detail="File too large (max 50 MB)")
+    
+    if ext == ".pdf" and not content.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="Invalid PDF content")
+
     with open(persistent_path, "wb") as f:
         f.write(content)
 
@@ -332,16 +336,30 @@ def _process_one_statement(
                         if key not in preserved_manual_categories:
                             preserved_manual_categories[key] = []
                         preserved_manual_categories[key].append(tx.category)
-            session.delete(stmt)
+            # 3.1: Temporarily alter unique keys to avoid constraint collision during reparse without deleting early
+            old_hash = stmt.file_hash
+            old_card = stmt.card_last4
+            stmt.file_hash = f"reparse_{stmt.id}"
+            stmt.card_last4 = f"reparse_{stmt.id}"
+            session.commit()
             
         result = process_statement(
-            pdf_path=file_path, bank=bank, db_session=session, source=source,
+            pdf_path=file_path, bank=bank.lower() if bank else None, db_session=session, source=source,
             original_upload_path=original_upload_path, reparse_mode=True,
             preserved_manual_categories=preserved_manual_categories,
         )
         
-        if result.get("status") != "success":
-            session.rollback()
+        if stmt:
+            stmt = session.query(Statement).filter(Statement.id == statement_id).first()
+            if result.get("status") != "success":
+                if stmt:
+                    stmt.file_hash = old_hash
+                    stmt.card_last4 = old_card
+                    session.commit()
+            else:
+                if stmt:
+                    session.delete(stmt)
+                    session.commit()
             
         return result
     finally:
@@ -369,20 +387,20 @@ def reparse_all_statements(payload: Optional[ReparseAllPayload] = None, db: Sess
 
     results["skipped"] = len(stmts) - len(valid_entries)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {
-            executor.submit(_process_one_statement, sid, path, bank, source, orig, override_manual): path
-            for sid, path, bank, source, orig in valid_entries
-        }
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                result = future.result()
-                if result.get("status") == "success":
-                    results["success"] += 1
-                else:
-                    results["failed"] += 1
-            except Exception:
+    from backend.services import processing_queue
+    futures = {
+        processing_queue.submit(_process_one_statement, sid, path, bank, source, orig, override_manual): path
+        for sid, path, bank, source, orig in valid_entries
+    }
+    for future in concurrent.futures.as_completed(futures):
+        try:
+            result = future.result()
+            if result.get("status") == "success":
+                results["success"] += 1
+            else:
                 results["failed"] += 1
+        except Exception:
+            results["failed"] += 1
 
     return {"status": "ok", **results}
 
@@ -438,16 +456,15 @@ def list_statements(
         q = q.filter(Statement.transaction_count > 0)
         
     if search:
-        search_term = f"%{search}%"
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        search_term = f"%{escaped}%"
         q = q.filter(
             or_(
-                Statement.bank.ilike(search_term),
-                Statement.card_last4.ilike(search_term),
-                Statement.source.ilike(search_term),
-                Statement.file_path.ilike(search_term),
-                Statement.original_upload_path.ilike(search_term),
-                Statement.status.ilike(search_term),
-                Statement.status_message.ilike(search_term),
+                Statement.bank.ilike(search_term, escape="\\"),
+                Statement.card_last4.ilike(search_term, escape="\\"),
+                Statement.source.ilike(search_term, escape="\\"),
+                Statement.status.ilike(search_term, escape="\\"),
+                Statement.status_message.ilike(search_term, escape="\\"),
             )
         )
         
@@ -527,10 +544,8 @@ def list_statements(
                 "status": getattr(s, "status", None) or "success",
                 "parse_failed": int(getattr(s, "parse_failed", 0) or 0),
                 "imported_at": s.imported_at.isoformat() if s.imported_at else None,
-                "file_path": fp,
                 "file_name": os.path.basename(fp) if fp else None,
                 "display_path": statement_display_path(fp, orig),
-                "original_upload_path": orig,
                 "status_message": getattr(s, "status_message", None),
                 "note": getattr(s, "note", None),
             }
@@ -624,8 +639,6 @@ def delete_statement(statement_id: str, db: Session = Depends(get_db)) -> Dict[s
     stmt = db.query(Statement).filter(Statement.id == statement_id).first()
     if not stmt:
         raise HTTPException(status_code=404, detail="Statement not found")
-        
-    file_hash = stmt.file_hash
         
     db.delete(stmt)
     db.commit()

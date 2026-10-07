@@ -45,4 +45,7 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/settings')" || exit 1
 
+# WARNING: This binds the server to 0.0.0.0, exposing it to all network interfaces
+# within the container. When mapping ports, ensure you map to the host's loopback
+# (e.g., -p 127.0.0.1:8000:8000) to avoid exposing the unauthenticated API to the LAN.
 CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

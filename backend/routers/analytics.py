@@ -443,15 +443,34 @@ def statement_periods(
 
     statements = q.order_by(Statement.period_start.desc()).all()
 
+    from backend.models.models import Transaction
+    from decimal import Decimal, ROUND_HALF_UP
+    from datetime import date
+
     periods = []
+    if not statements:
+        return {"periods": periods}
+
+    min_date = min([s.period_start for s in statements if s.period_start] or [date.today()])
+    max_date = max([s.period_end for s in statements if s.period_end] or [date.today()])
+
+    txns = db.query(Transaction).filter(
+        Transaction.date >= min_date,
+        Transaction.date <= max_date,
+        Transaction.category != "cc_payment"
+    ).all()
+
     for s in statements:
         cur = (getattr(s, "currency", None) or "INR").upper()[:3]
         if s.period_start and s.period_end:
-            net_spend = compute_net_spend(
-                db, s.period_start, s.period_end,
-                bank=s.bank, card_last4=s.card_last4,
-                currency=cur,
+            net_spend = sum(
+                (float(t.amount) if t.type == "debit" else -float(t.amount))
+                for t in txns
+                if t.bank == s.bank
+                and (not s.card_last4 or t.card_last4 == s.card_last4)
+                and s.period_start <= t.date <= s.period_end
             )
+            net_spend = float(Decimal(str(net_spend)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
         else:
             net_spend = s.total_spend
         periods.append({

@@ -128,7 +128,8 @@ def _exec_list_cards(args: Dict[str, Any], db: Session) -> Any:
     # Apply optional filters
     bank_filter = args.get("bank")
     if bank_filter:
-        q = q.filter(Card.bank.ilike(f"%{bank_filter.strip()}%"))
+        escaped_bank = bank_filter.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        q = q.filter(Card.bank.ilike(f"%{escaped_bank}%", escape="\\"))
 
     last4_filter = args.get("last4")
     if last4_filter:
@@ -175,7 +176,8 @@ def _exec_get_card_by_identifier(args: Dict[str, Any], db: Session) -> Any:
     q = db.query(Card)
 
     if bank:
-        q = q.filter(Card.bank.ilike(f"%{bank}%"))
+        escaped_bank = bank.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        q = q.filter(Card.bank.ilike(f"%{escaped_bank}%", escape="\\"))
 
     if last4:
         q = q.filter(Card.last4 == last4)

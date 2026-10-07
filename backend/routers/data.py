@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
@@ -31,9 +31,12 @@ def check_csv_safe(filepath: Path) -> bool:
             for row in reader:
                 for cell in row:
                     cell_stripped = cell.strip()
-                    # We check for '=' and '@'. We ignore '+' and '-' as they are common in financial data.
+                    import re
                     if cell_stripped.startswith(('=', '@')):
                         return False
+                    if cell_stripped.startswith(('+', '-')):
+                        if not re.match(r'^[+-]?\s*\d*\.?\d+$', cell_stripped):
+                            return False
         return True
     except Exception:
         return False
@@ -70,8 +73,11 @@ def export_data(background_tasks: BackgroundTasks, password: Optional[str] = For
     )
 
 @router.post("/data/import")
-def import_data(file: UploadFile = File(...), password: Optional[str] = Form(None)):
+def import_data(request: Request, file: UploadFile = File(...), password: Optional[str] = Form(None)):
     """Import a ZIP backup containing tuesday.db and optional statements/."""
+    origin = request.headers.get("origin") or request.headers.get("referer") or ""
+    if origin and not origin.lower().startswith(("http://localhost", "http://127.0.0.1", "tauri://localhost")):
+        raise HTTPException(status_code=403, detail="Cross-Site Request Forgery attempt detected")
     if not file.filename or not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Must be a .zip file")
         
