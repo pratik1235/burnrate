@@ -48,23 +48,24 @@ class Burnrate < Formula
     filtered_reqs = buildpath/"requirements-filtered.txt"
     excluded = %w[cryptography pydantic pydantic-core pydantic_core jiter]
     filtered_reqs.write (buildpath/"requirements.txt").readlines.reject { |l|
-      excluded.any? { |pkg| l.strip.downcase.start_with?(pkg) }
+      excluded.any? { |pkg| l.strip.downcase.match?(/^#{pkg}(?:[=><~]|$)/) }
     }.join
+
+    # Inject the Homebrew-managed packages into the venv via .pth files so
+    # Python can import them from their Homebrew keg without pip re-installing
+    # them. We do this BEFORE pip install so pip sees they are already satisfied
+    # and doesn't try to download their Rust-compiled wheels.
+    site_packages = libexec/"lib/python3.13/site-packages"
+    site_packages.mkpath
+    %w[cryptography pydantic].each do |pkg|
+      homebrew_sp = Formula[pkg].opt_prefix/"lib/python3.13/site-packages"
+      (site_packages/"homebrew-#{pkg}.pth").write homebrew_sp.to_s
+    end
 
     system libexec/"bin/python", "-m", "pip",
            "install", "--no-cache-dir",
            "--no-binary=pikepdf",
            "-r", filtered_reqs
-
-    # Inject the Homebrew-managed packages into the venv via .pth files so
-    # Python can import them from their Homebrew keg without pip re-installing
-    # them. The packages live at opt_prefix/lib/python3.13/site-packages (not
-    # inside libexec) because they are regular formula installs, not virtualenvs.
-    site_packages = libexec/"lib/python3.13/site-packages"
-    %w[cryptography pydantic].each do |pkg|
-      homebrew_sp = Formula[pkg].opt_prefix/"lib/python3.13/site-packages"
-      (site_packages/"homebrew-#{pkg}.pth").write homebrew_sp.to_s
-    end
 
     # -------------------------------------------------------------------------
     # HIDE SITE-PACKAGES FROM HOMEBREW'S LINKAGE SCANNER
