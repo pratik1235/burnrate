@@ -132,8 +132,6 @@ export function CreditCardVisual({
   bank,
   last4,
   cardName,
-  totalSpend: _totalSpend,
-  transactionCount: _transactionCount,
   onClick,
   className,
   size = 'medium',

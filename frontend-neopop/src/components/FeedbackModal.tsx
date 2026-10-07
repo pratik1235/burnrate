@@ -68,7 +68,8 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
       await submitFeedback(text);
       toast.success('Feedback submitted successfully!');
       handleClose();
-    } catch (e: any) {
+    } catch (error) {
+      const e = error as any;
       toast.error(e.response?.data?.detail || e.message || 'Failed to submit feedback');
     } finally {
       setSubmitting(false);

@@ -41,7 +41,7 @@ export function DataManagementModal({ open, onClose }: { open: boolean; onClose:
       await exportData(password);
       toast.success('Backup downloaded');
       onClose();
-    } catch (e) {
+    } catch {
       toast.error('Failed to export backup');
     } finally {
       setExporting(false);
@@ -70,7 +70,8 @@ export function DataManagementModal({ open, onClose }: { open: boolean; onClose:
       setTimeout(() => {
         window.location.reload();
       }, 1500);
-    } catch (err: any) {
+    } catch (error) {
+      const err = error as any;
       const msg = err.response?.data?.detail || err.message || 'Import failed';
       toast.error(`Import Error: ${msg}`);
       setImporting(false);

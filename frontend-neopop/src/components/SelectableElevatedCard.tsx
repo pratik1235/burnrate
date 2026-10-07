@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { ComponentProps, CSSProperties } from 'react';
 import styled from 'styled-components';
 import { ElevatedCard as NeoElevatedCard } from '@cred/neopop-web/lib/components';

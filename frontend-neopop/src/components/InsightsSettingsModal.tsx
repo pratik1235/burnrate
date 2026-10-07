@@ -219,7 +219,7 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
     setTesting(true);
     setTestResult(null);
     try {
-      const testParams: any = {
+      const testParams: Record<string, string | undefined> = {
         provider: provider,
         model: model || undefined,
       };

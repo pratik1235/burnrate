@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   showToast as neoShowToast,
   ToastContainer as NeoToastContainer,
@@ -48,7 +49,7 @@ export const toast = {
     });
     return message;
   },
-  dismiss: (_id: string) => {
+  dismiss: () => {
     // NeoPOP toast doesn't support programmatic dismiss by ID
     // Toast will auto-close or be dismissed on click
   },
