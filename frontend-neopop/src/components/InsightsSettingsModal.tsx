@@ -15,6 +15,7 @@ import {
   saveAwsCredentials,
   deleteAwsCredentials,
   getAwsCredentialsStatus,
+  type TestConnectionRequest,
 } from '@/lib/insightsApi';
 
 const Backdrop = styled.div`
@@ -219,7 +220,7 @@ export function InsightsSettingsModal({ open, onClose }: Props) {
     setTesting(true);
     setTestResult(null);
     try {
-      const testParams: Record<string, string | undefined> = {
+      const testParams: TestConnectionRequest = {
         provider: provider,
         model: model || undefined,
       };

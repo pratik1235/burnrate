@@ -49,7 +49,7 @@ export const toast = {
     });
     return message;
   },
-  dismiss: () => {
+  dismiss: (_id?: string) => {
     // NeoPOP toast doesn't support programmatic dismiss by ID
     // Toast will auto-close or be dismissed on click
   },
