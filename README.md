@@ -8,6 +8,17 @@ Burnrate is a personal finance app that keeps imported **statements and transact
 
 ![Dashboard](assets/screenshot_dashboard.png)
 
+### Quick Start
+
+```bash
+# macOS (Homebrew)
+brew install pratik1235/burnrate/burnrate
+# then run burnrate
+burnrate
+```
+
+> Open http://localhost:8000 once started. For Docker, Windows, macOS DMG, or running from source, see **[Installation](#installation)**.
+
 ## Features
 
 - **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, Federal Scapia
@@ -44,8 +55,7 @@ Burnrate is a personal finance app that keeps imported **statements and transact
 ### Homebrew (macOS)
 
 ```bash
-brew tap pratik1235/burnrate
-brew install burnrate
+brew install pratik1235/burnrate/burnrate
 burnrate
 ```
 
@@ -123,17 +133,21 @@ You can customize properties such as the server port (`BURNRATE_PORT`), other co
 
 ## Screenshots
 
-| Dashboard | Transactions | Analytics |
-|-----------|--------------|-----------|
-| ![](assets/screenshot_dashboard.png) | ![](assets/screenshot_transactions.png) | ![](assets/screenshot_analytics.png) |
+| Dashboard | Statements | Transactions |
+|-----------|------------|--------------|
+| ![](assets/screenshot_dashboard.png) | ![](assets/screenshot_statements.png) | ![](assets/screenshot_transactions.png) |
 
-| Cards | Offers | Milestones |
-|-------|--------|------------|
-| ![](assets/screenshot_cards.png) | ![](assets/screenshot_offers.png) | ![](assets/screenshot_milestones.png) |
+| Analytics | Cards | Offers |
+|-----------|-------|--------|
+| ![](assets/screenshot_analytics.png) | ![](assets/screenshot_cards.png) | ![](assets/screenshot_offers.png) |
 
-| Customize | Categories | Setup |
-|-----------|------------|-------|
-| ![](assets/screenshot_customize.png) | ![](assets/screenshot_categories_modal.png) | ![](assets/screenshot_setup.png) |
+| Milestones | Customize | Categories |
+|------------|-----------|------------|
+| ![](assets/screenshot_milestones.png) | ![](assets/screenshot_customize.png) | ![](assets/screenshot_categories_modal.png) |
+
+| Setup | | |
+|-------|---|---|
+| ![](assets/screenshot_setup.png) | | |
 
 ## Tech Stack
 

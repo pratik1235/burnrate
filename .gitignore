@@ -92,3 +92,10 @@ temp/
 docs/security-deployment.md
 # Ignore folder for uncommitted files
 ignore/
+
+# Workspace specific excludes
+burnrate-video/
+take_screenshots.py
+mobile/
+venv/
+.agents/skills-backups/
