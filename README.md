@@ -24,10 +24,6 @@ burnrate
 - **Multi-bank support** — HDFC, ICICI, Axis, Federal Bank, Indian Bank, SBI, Amex, IDFC FIRST, Federal Scapia
 - **Auto-import** — Drop credit card statement PDFs or set up a watch folder for automatic processing
 - **Statements hub** — Browse imported statements, filter by bank and period, and manage uploads from one place, plus built-in payment reminders.
-- **LLM Insights & Reminders** — Get AI-powered insights on your spending using cloud providers (Local LLM(OLLAMA), Anthropic, OpenAI, AWS Bedrock) with secure keychain credential storage.
-- **Offers & benefits** — Offers are fetched from public bank and aggregator pages, normalized, cached locally, and shown in a searchable catalog. Highlight offers that match your cards, hide noise, add your own manual offers, and refresh on demand. Always verify details with your issuer before relying on an offer.
-- **Spending milestones** — Track progress toward fee waivers, bonus points, lounge access, and other card benefits. Set custom goals or sync predefined milestones from bank definitions. Filter by card and see how much more you need to spend to reach each milestone.
-- **Gmail statement autosync (optional)** — Opt in to read-only Gmail OAuth (PKCE). Matching statement attachments (PDF, CSV, XLS/XLSX) are saved to your watch folder or default uploads and processed like manual drops. Configure OAuth in the backend; connect from **Customize** and monitor sync from the navbar.
 - **Smart & Manual categorization** — Transactions auto-categorized with customizable categories and keywords. Support for manual inline category editing as well.
 - **Rich analytics** — Spend trends, category breakdowns, merchant insights, credit utilization
 - **Multi-card filtering** — Filter transactions and metrics by cards, categories, date range, amount, direction, and tags
@@ -36,6 +32,10 @@ burnrate
 - **Data Export/Import** — Securely export and import your complete database with AES ZIP encryption.
 - **CSV export** — Export filtered transactions for external analysis
 - **Statement management** — Reparse or remove imported statements. Burnrate can automatically unlock most statement PDFs by generating common password combinations based on your profile. If it can't, you only enter the password once—it is securely stored in the encrypted local database for seamless future access.
+- **LLM Insights & Reminders** — Get AI-powered insights on your spending using cloud providers (Local LLM(OLLAMA), Anthropic, OpenAI, AWS Bedrock) with secure keychain credential storage.
+- **Offers & benefits** — Offers are fetched from public bank and aggregator pages, normalized, cached locally, and shown in a searchable catalog. Highlight offers that match your cards, hide noise, add your own manual offers, and refresh on demand. Always verify details with your issuer before relying on an offer.
+- **Spending milestones** — Track progress toward fee waivers, bonus points, lounge access, and other card benefits. Set custom goals or sync predefined milestones from bank definitions. Filter by card and see how much more you need to spend to reach each milestone.
+- **Gmail statement autosync (optional)** — Opt in to read-only Gmail OAuth (PKCE). Matching statement attachments (PDF, CSV, XLS/XLSX) are saved to your watch folder or default uploads and processed like manual drops. Configure OAuth in the backend; connect from **Customize** and monitor sync from the navbar.
 - **User Feedback** — Submit in-app feedback to report bugs or request features. The submission is securely proxied through the backend to protect your API endpoints (e.g., Formspree) from spam.
 - **Google Apps Script** — Alternative workflow: auto-download statements from Gmail into a folder the app watches ([`apps-script/`](apps-script/))
 
@@ -48,7 +48,7 @@ burnrate
   - **Offers** fetches public offer pages on a schedule for convenience; offers are cached locally. See [docs/plans/offers-benefits.md](docs/plans/offers-benefits.md).
 - With those options turned off, routine spend analytics do not require outbound calls to third parties
 
-> **Note:** Currently, only **HDFC**, **ICICI**, **Axis**, and **Indian Bank** credit cards are officially supported and tested. Other bank cards *may* work, but stability is not guaranteed at this time. Support for many more cards is coming soon! If you'd like to request support for a new card, please [create a GitHub issue](https://github.com/pratik1235/burnrate/issues/new?title=Card%20support%20request:%20%3CYour%20Bank%3E&labels=enhancement).
+> **Note:** Currently, only **HDFC**, **ICICI**, **Axis**, **Federal**, **IDFC FIRST**, **SBI** and **Indian Bank** credit cards are officially supported and tested. Other bank cards *may* work, but stability is not guaranteed at this time. Support for many more cards is coming soon! If you'd like to request support for a new card, please [create a GitHub issue](https://github.com/pratik1235/burnrate/issues/new?title=Card%20support%20request:%20%3CYour%20Bank%3E&labels=enhancement).
 
 ## Installation
 
